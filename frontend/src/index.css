@@ -1,0 +1,477 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Scrollbar utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  /* Internet Explorer 10+ */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  /* Safari and Chrome */
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Landing page animations */
+@keyframes slow-zoom {
+  0% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1.15);
+  }
+}
+
+.animate-slow-zoom {
+  animation: slow-zoom 15s ease-in-out infinite alternate;
+}
+
+/* Floating animation for UI elements */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Fade-in animation for fixed header */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+/* Pulse animation for highlighting elements */
+@keyframes gentle-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+}
+
+.animate-gentle-pulse {
+  animation: gentle-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+
+/* Rich content video styles */
+.prose iframe {
+  width: 100% !important;
+  height: 400px !important;
+  max-width: 100%;
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 640px) {
+  .prose iframe {
+    height: 240px !important;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Image Cropper Styles */
+.reactEasyCrop_Container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #f0f0f0;
+  touch-action: none;
+}
+
+.reactEasyCrop_CropArea {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-sizing: border-box;
+  box-shadow: 0 0 0 9999em rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+}
+
+
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #006837;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #006837;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+toaster {
+  animation-name: anime-header;
+  animation-duration: 0.5s;
+}
+
+@keyframes anime-header {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+
+  to {
+    opacity: 100%;
+    transform: translateY(0px);
+  }
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Rich content styles for ReactQuill content */
+.prose ul {
+  list-style-type: disc;
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.prose li {
+  margin-bottom: 0.5em;
+}
+
+.prose ul>li::marker {
+  color: #303030;
+}
+
+.prose ol>li::marker {
+  color: #303030;
+  font-weight: normal;
+}
+
+.prose iframe {
+  width: 100% !important;
+  height: 400px !important;
+  max-width: 100%;
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 640px) {
+  .prose iframe {
+    height: 240px !important;
+  }
+}
+
+/* Fix modal stacking contexts */
+#modal-portal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+#modal-portal-container>div {
+  pointer-events: auto;
+}
+
+/* Ensure sidebar doesn't create its own stacking context that competes with modals */
+.sidebar {
+  z-index: 50;
+}
+
+/* Force modals to the highest level */
+.modal-overlay {
+  z-index: 9999 !important;
+}
+
+.modal-content {
+  z-index: 10000 !important;
+}
+
+/* Add these styles to your existing CSS file */
+
+/* Modal root container styling */
+#modal-root {
+  position: fixed;
+  z-index: 9999;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+#modal-root>div {
+  pointer-events: auto;
+}
+
+/* Force sidebar to have a lower z-index */
+.sidebar,
+nav.sidebar,
+div[class*="sidebar"],
+aside[class*="sidebar"],
+[class*="Sidebar"] {
+  z-index: 50 !important;
+  position: relative !important;
+}
+
+/* Ensure modal overlays are above everything */
+.modal-overlay,
+.lightbox-overlay,
+div[role="dialog"] {
+  position: fixed !important;
+  z-index: 10000 !important;
+}
+
+/* Highest z-index for modal content */
+.modal-content {
+  position: relative;
+  z-index: 10001 !important;
+}
+
+/* Custom Loader Animations */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-delayed {
+
+  0%,
+  50% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes bounce-delayed-1 {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+
+  40% {
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-delayed-2 {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+
+  50% {
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-delayed-3 {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+
+  60% {
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-delayed-4 {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+
+  70% {
+    transform: scale(1);
+  }
+}
+
+@keyframes progress-bar {
+  0% {
+    width: 0%;
+    transform: translateX(-100%);
+  }
+
+  50% {
+    width: 100%;
+    transform: translateX(0%);
+  }
+
+  100% {
+    width: 100%;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes logo-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(0, 104, 55, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(0, 104, 55, 0.6), 0 0 30px rgba(0, 104, 55, 0.4);
+  }
+}
+
+/* Animation Classes */
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out;
+}
+
+.animate-fade-in-delayed {
+  animation: fade-in-delayed 1.2s ease-out;
+}
+
+.animate-bounce-delayed-1 {
+  animation: bounce-delayed-1 1.4s infinite;
+}
+
+.animate-bounce-delayed-2 {
+  animation: bounce-delayed-2 1.4s infinite;
+}
+
+.animate-bounce-delayed-3 {
+  animation: bounce-delayed-3 1.4s infinite;
+}
+
+.animate-bounce-delayed-4 {
+  animation: bounce-delayed-4 1.4s infinite;
+}
+
+.animate-progress-bar {
+  animation: progress-bar 2s ease-in-out infinite;
+}
+
+.animate-logo-glow {
+  animation: logo-glow 2s ease-in-out infinite;
+}
+
+/* Enhanced Logo Animation */
+.logo-container {
+  transition: all 0.3s ease;
+}
+
+.logo-container:hover {
+  transform: translateY(-2px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .animate-fade-in-up {
+    animation-duration: 0.6s;
+  }
+
+  .animate-fade-in-delayed {
+    animation-duration: 1s;
+  }
+}

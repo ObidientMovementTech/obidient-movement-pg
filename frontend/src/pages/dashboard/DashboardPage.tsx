@@ -1,0 +1,303 @@
+import { useState, useEffect } from "react";
+import {
+  Home,
+  BookOpen,
+  BarChart3,
+  Eye,
+  Megaphone,
+  Flag,
+  User,
+  Activity,
+  X,
+  ChevronDown,
+  ChevronUp,
+  ScanLine,
+  Landmark,
+  ShieldCheck,
+  UserCheck,
+  Bell,
+  RefreshCw,
+} from "lucide-react";
+import TopLogo from "../../components/TopLogo";
+import Loading from "../../components/Loader";
+import { useUser } from "../../context/UserContext";
+import UserProfileCard from "../../components/UserProfileCard";
+
+import DashboardOverview from "./overview/DashboardOverview";
+
+import VotingBlocPage from "./votingBloc/VotingBlocPage";
+import LeaderboardPage from "./votingBloc/LeaderboardPage";
+import RunForOffice from "./lead/RunForOffice";
+import ProfilePage from "../profile/ProfilePage";
+import DashboardHeader from "./components/DashboardHeader";
+import { useNavigate } from "react-router";
+import Vote from "./elections/Vote";
+import CitizensOrganizingSchool from "./organise/CitizensOrganizingSchool";
+import Results from "./elections/Results";
+import Monitor from "./elections/Monitor";
+import KYCManagement from "./admin/KYCManagement";
+import AdminBroadcastPage from "./admin/AdminBroadcastPage";
+import AdminDefaultVotingBlocPage from "./admin/AdminDefaultVotingBlocPage";
+import AdminTemplateSyncPage from "./admin/AdminTemplateSyncPage";
+import AllNotificationsPage from "./notifications/AllNotificationsPage";
+// Sidebar menu items type
+interface NavItem {
+  title: string;
+  icon: React.ReactNode;
+  component?: React.ReactNode;
+  children?: NavItem[];
+}
+
+export default function DashboardPage() {
+  const { profile, isLoading } = useUser();
+  const initialPage = sessionStorage.getItem("dashboardPage") || "Overview";
+  const [activePage, setActivePage] = useState(initialPage);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    sessionStorage.removeItem("dashboardPage");
+  }, []);
+
+  // Handle redirect to login when no profile is available
+  useEffect(() => {
+    if (!isLoading && !profile) {
+      navigate("/auth/login");
+    }
+  }, [isLoading, profile, navigate]);
+
+  // Check for pending voting bloc join after user logs in
+  useEffect(() => {
+    if (profile && !isLoading) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const emailVerified = urlParams.get('emailVerified');
+
+      // If user just verified email, show success message
+      if (emailVerified === 'true') {
+        // Remove the query parameter from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      const pendingJoin = localStorage.getItem('pending-voting-bloc-join');
+      if (pendingJoin) {
+        try {
+          const joinData = JSON.parse(pendingJoin);
+          // Check if this is recent (within 24 hours)
+          const joinTimestamp = new Date(joinData.timestamp);
+          const now = new Date();
+          const hoursDiff = (now.getTime() - joinTimestamp.getTime()) / (1000 * 60 * 60);
+
+          if (hoursDiff < 24) {
+            // Clear the pending join data and redirect to the voting bloc page
+            localStorage.removeItem('pending-voting-bloc-join');
+            navigate(`/voting-bloc/${joinData.joinCode}`);
+            return; // Exit early to prevent other logic
+          } else {
+            // Remove expired join intent
+            localStorage.removeItem('pending-voting-bloc-join');
+          }
+        } catch (error) {
+          console.error('Error parsing pending join data:', error);
+          localStorage.removeItem('pending-voting-bloc-join');
+        }
+      }
+    }
+  }, [profile, isLoading, navigate]);
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(null);
+
+  const sidebarItems: NavItem[] = [
+    {
+      title: "Overview",
+      icon: <Home size={24} />,
+      component: <DashboardOverview setActivePage={setActivePage} />,
+    },
+
+    {
+      title: "Organise",
+      icon: <Megaphone size={24} />,
+      children: [
+        { title: "Create your Voting Bloc", icon: <Flag size={20} />, component: <VotingBlocPage /> },
+        { title: "Leaderboard", icon: <BarChart3 size={20} />, component: <LeaderboardPage /> },
+        { title: "Citizens Organizing School", icon: <BookOpen size={20} />, component: <CitizensOrganizingSchool /> },
+      ],
+    },
+
+    {
+      title: "Lead",
+      icon: <Flag size={24} />,
+      children: [
+        { title: "Run for Office Hub", icon: <Activity size={20} />, component: <RunForOffice /> },
+      ],
+    },
+    {
+      title: "Elections",
+      icon: <Landmark size={24} />,
+      children: [
+        { title: "Vote", icon: <ScanLine size={20} />, component: <Vote /> },
+        { title: "Monitor", icon: <Eye size={20} />, component: <Monitor /> },
+        { title: "Results", icon: <BarChart3 size={20} />, component: <Results /> },
+      ]
+    },
+    // Admin section - only visible for admin users
+    ...(profile?.role === 'admin' ? [{
+      title: "Admin",
+      icon: <ShieldCheck size={24} />,
+      children: [
+        { title: "KYC Management", icon: <UserCheck size={20} />, component: <KYCManagement /> },
+        { title: "Default Voting Bloc Settings", icon: <Flag size={20} />, component: <AdminDefaultVotingBlocPage /> },
+        { title: "Template Synchronization", icon: <RefreshCw size={20} />, component: <AdminTemplateSyncPage /> },
+        { title: "Broadcast Messages", icon: <Megaphone size={20} />, component: <AdminBroadcastPage /> },
+      ],
+    }] : []),
+
+
+    {
+      title: "Notifications",
+      icon: <Bell size={24} />,
+      component: <AllNotificationsPage setActivePage={setActivePage} />,
+    },
+    {
+      title: "My Profile",
+      icon: <User size={24} />,
+      component: <ProfilePage />,
+    },
+  ];
+
+  const toggleSection = (title: string) => {
+    setOpenSection((prev) => (prev === title ? null : title));
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen((prev) => !prev);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-b from-[#F2F2F2] to-[#E0E7E9]">
+        <Loading />
+      </div>
+    );
+  }
+
+  if (!profile && !isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-b from-[#F2F2F2] to-[#E0E7E9]">
+        <Loading />
+      </div>
+    );
+  }
+
+  const findComponent = (items: NavItem[]): React.ReactNode => {
+    for (const item of items) {
+      if (item.title === activePage && item.component) return item.component;
+      if (item.children) {
+        const match = item.children.find((child) => child.title === activePage);
+        if (match && match.component) return match.component;
+      }
+    }
+    return <div className="text-gray-500">Coming soon!</div>;
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-white font-poppins">
+      {/* Mobile sidebar overlay - clicking this will close the sidebar */}
+      {isSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/30 z-20 backdrop-blur-sm"
+          onClick={toggleSidebar}
+          aria-label="Close sidebar"
+        />
+      )}
+
+      {/* Close button outside sidebar - only visible on mobile when sidebar is open */}
+      {isSidebarOpen && (
+        <button
+          className="md:hidden fixed top-4 right-[20px] z-20 p-2 rounded-full bg-white shadow-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+          onClick={toggleSidebar}
+          aria-label="Close sidebar"
+        >
+          <X size={20} className="text-gray-700" />
+        </button>
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 w-72 bg-white border-r shadow-xl p-6 transition-transform duration-300 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} md:sticky md:top-0 z-20 h-screen overflow-y-auto`}
+      >
+
+        <div className="mb-3">
+          <TopLogo />
+        </div>
+        <div className="mb-6">
+          <UserProfileCard setActivePage={setActivePage} />
+        </div>
+        <nav className="space-y-3">
+          {sidebarItems.map((item) => (
+            <div key={item.title}>
+              {item.children ? (
+                <>
+                  <button
+                    onClick={() => toggleSection(item.title)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-md font-normal text-[#006837] hover:bg-[#8cc63f]/20 rounded-lg transition-colors duration-200"
+                  >
+                    <span className="flex items-center gap-3">
+                      {item.icon}
+                      {item.title}
+                    </span>
+                    {openSection === item.title ? (
+                      <ChevronUp size={20} className="text-[#006837]" />
+                    ) : (
+                      <ChevronDown size={20} className="text-[#006837]" />
+                    )}
+                  </button>
+                  {openSection === item.title && (
+                    <div className="pl-8 mt-2 space-y-2 animate-fade-in">
+                      {item.children.map((sub) => (
+                        <div
+                          key={sub.title}
+                          onClick={() => {
+                            setActivePage(sub.title);
+                            setIsSidebarOpen(false);
+                          }}
+                          className={`flex items-center cursor-pointer gap-3 px-3 py-2 text-sm text-gray-700 hover:text-[#006837] hover:bg-[#8cc63f]/10 rounded-lg transition-colors duration-200 ${activePage === sub.title ? "bg-[#8cc63f]/20 text-[#006837]" : ""
+                            }`}
+                        >
+                          {sub.icon}
+                          {sub.title}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div
+                  onClick={() => {
+                    setActivePage(item.title);
+                    setIsSidebarOpen(false);
+                  }}
+                  className={`flex items-center gap-3 px-3 py-2 text-md font-normal cursor-pointer text-[#006837] hover:bg-[#8cc63f]/20 rounded-lg transition-colors duration-200 ${activePage === item.title ? "bg-[#8cc63f]/20 text-[#006837]" : ""
+                    }`}
+                >
+                  {item.icon}
+                  {item.title}
+                </div>
+              )}
+            </div>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto">
+        <DashboardHeader
+          title={activePage}
+          isSidebarOpen={isSidebarOpen}
+          toggleSidebar={toggleSidebar}
+          setActivePage={setActivePage}
+        />
+        <div className="animate-fade-in p-4">{findComponent(sidebarItems)}</div>
+      </main>
+    </div>
+  );
+}
