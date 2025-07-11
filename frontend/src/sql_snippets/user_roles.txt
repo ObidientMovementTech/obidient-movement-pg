@@ -1,0 +1,22 @@
+-- Allow admins to view all user roles
+CREATE POLICY "Allow admins to view all user roles"
+ON "public"."user_roles"
+FOR SELECT
+TO public
+USING (
+  is_admin()
+);
+
+
+CREATE POLICY "Only admins can update roles"
+ON "public"."user_roles"
+FOR UPDATE
+TO public
+USING (
+  is_admin()
+)
+WITH CHECK (
+  is_admin()
+);
+
+

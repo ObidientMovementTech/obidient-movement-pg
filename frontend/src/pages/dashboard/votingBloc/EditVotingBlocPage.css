@@ -1,0 +1,71 @@
+/* Custom styles for ReactQuill editor */
+.ql-editor {
+  min-height: 150px !important;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+}
+
+.ql-toolbar {
+  border-top: 1px solid #d1d5db !important;
+  border-left: 1px solid #d1d5db !important;
+  border-right: 1px solid #d1d5db !important;
+  border-bottom: none !important;
+}
+
+.ql-container {
+  border-bottom: 1px solid #d1d5db !important;
+  border-left: 1px solid #d1d5db !important;
+  border-right: 1px solid #d1d5db !important;
+  border-top: none !important;
+}
+
+.ql-editor p {
+  margin-bottom: 0.5rem;
+}
+
+.ql-editor h1,
+.ql-editor h2,
+.ql-editor h3,
+.ql-editor h4,
+.ql-editor h5,
+.ql-editor h6 {
+  margin-bottom: 0.5rem;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.ql-editor ul,
+.ql-editor ol {
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.ql-editor li {
+  margin-bottom: 0.25rem;
+}
+
+.ql-editor strong {
+  font-weight: 600;
+}
+
+.ql-editor em {
+  font-style: italic;
+}
+
+.ql-editor u {
+  text-decoration: underline;
+}
+
+.ql-editor a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.ql-editor a:hover {
+  color: #1d4ed8;
+}

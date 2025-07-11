@@ -1,0 +1,161 @@
+-- ============================================================================
+-- Function: create_user_profile
+-- Description:
+--   This function creates a new user profile and assigns a default role.
+--   It should be called after a new user registers or is created in the system.
+--
+--   Specifically, it:
+--     1. Inserts a row into the "profile" table with user metadata.
+--     2. Assigns the 'member' role to the user in the "user_roles" table.
+--
+-- Parameters:
+--   - user_id: UUID of the user (typically from auth.uid()).
+--   - email: User's email address.
+--   - referral_code: Optional referral code associated with the user.
+--   - add_to_newsletter: Boolean flag indicating if user opted into newsletter.
+--
+-- Returns:
+--   - void
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.create_user_profile(
+    user_id UUID,
+    email TEXT,
+    referral_code TEXT,
+    add_to_newsletter BOOLEAN
+)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Insert into profiles table
+    INSERT INTO public.profile (user_id, email, referral_code, add_to_newsletter)
+    VALUES (user_id, email, referral_code, add_to_newsletter);
+
+    -- Assign default role
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (user_id, 'member');
+END;
+$$;
+
+
+-- ============================================================================
+-- Function: admin_user_count_by_column
+-- Description:
+--   Allows admin users to get a count of users grouped by any column
+--   in the "profile" table. Access is restricted using the is_admin() function.
+--
+-- Parameters:
+--   - column_name: The name of the column to group by (e.g., 'referral_code').
+--
+-- Returns:
+--   - A set of (unique_column, user_count) rows ordered by the column.
+--
+-- Notes:
+--   - The column_name is sanitized using format with %I to prevent SQL injection.
+--   - Only users for whom is_admin() returns TRUE are allowed to run this query.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.admin_user_count_by_column(
+    column_name TEXT
+)
+RETURNS TABLE (
+    unique_column TEXT,
+    user_count BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Check if the current user is an admin
+    IF NOT is_admin() THEN
+        RAISE EXCEPTION 'Access denied: Only admins can view this data';
+    END IF;
+
+    -- Run dynamic SQL safely using EXECUTE with format
+    RETURN QUERY EXECUTE format(
+        'SELECT %I AS unique_column, COUNT(*) AS user_count
+         FROM public.profile
+         GROUP BY %I
+         ORDER BY %I',
+        column_name, column_name, column_name
+    );
+END;
+$$;
+
+
+
+-- ============================================================================
+-- Function: admin_user_count_by_2_columns
+-- Description:
+--   Allows admin users to get a count of users grouped by two specified columns
+--   from the "profile" table. Intended for admin-only usage, protected via is_admin().
+--
+-- Parameters:
+--   - row_col_name: First column to group by (e.g., 'referral_code')
+--   - col_col_name: Second column to group by (e.g., 'add_to_newsletter')
+--
+-- Returns:
+--   - A set of (row_data, col_data, user_count) rows ordered by the group columns.
+--
+-- Notes:
+--   - Uses format() with %I to safely interpolate identifiers (prevents SQL injection).
+--   - Assumes is_admin() function exists and returns boolean.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.admin_user_count_by_2_columns(
+    row_col_name TEXT,
+    col_col_name TEXT
+)
+RETURNS TABLE (
+    row_data TEXT,
+    col_data TEXT,
+    user_count BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Ensure only admins can run this query
+    IF NOT is_admin() THEN
+        RAISE EXCEPTION 'Access denied: Only admins can view this data';
+    END IF;
+
+    -- Execute safe dynamic SQL using format with identifier escaping
+    RETURN QUERY EXECUTE format(
+        'SELECT %I AS row_data, %I AS col_data, COUNT(*) AS user_count
+         FROM public.profile
+         GROUP BY %I, %I
+         ORDER BY %I, %I',
+        row_col_name, col_col_name,
+        row_col_name, col_col_name,
+        row_col_name, col_col_name
+    );
+END;
+$$;
+
+
+-- ============================================================================
+-- Function: is_admin
+-- Description:
+--   Checks whether the currently authenticated user (auth.uid())
+--   has the 'admin' role in the "user_roles" table.
+--
+-- Returns:
+--   - BOOLEAN: TRUE if the user is an admin, FALSE otherwise.
+--
+-- Usage:
+--   Can be used inside RLS policies or stored procedures for access control.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.user_roles
+    WHERE user_roles.user_id = auth.uid()
+      AND user_roles.role = 'admin'
+  );
+END;
+$$;

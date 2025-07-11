@@ -1,0 +1,50 @@
+-- 1. Allow users to insert their own profile
+CREATE POLICY "Users can insert their own profile"
+ON profiles
+FOR INSERT
+WITH CHECK (( SELECT auth.uid() AS uid) = user_id);
+
+
+-- 2. Allow users to select (view) their own profile
+CREATE POLICY "Users can view their own profile"
+ON profiles
+FOR SELECT
+USING (( SELECT auth.uid() AS uid) = user_id);
+
+
+-- 3. Allow users to update their own profile
+CREATE POLICY "Users can update their own profile"
+ON profiles
+FOR UPDATE
+USING (( SELECT auth.uid() AS uid) = user_id);
+
+
+-- 4. Allow users to delete their own profile
+CREATE POLICY "Users can delete their own profile"
+ON profiles
+FOR DELETE
+USING (( SELECT auth.uid() AS uid) = user_id);
+
+
+
+-- SELECT - ADMIN
+CREATE POLICY "Admins can view all profiles"
+ON "public"."profile"
+FOR SELECT
+TO authenticated
+USING (
+  is_admin()
+);
+
+
+-- UPDATE - ADMIN
+CREATE POLICY "Only admin users can update profile"
+ON "public"."profile"
+FOR UPDATE
+TO authenticated
+USING (
+  is_admin()
+)
+WITH CHECK (
+  is_admin()
+);

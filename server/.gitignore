@@ -1,0 +1,9 @@
+.env
+node_modules
+.env.production
+run_migration.sh
+tests
+scripts
+.env.example
+.env.test
+migrations

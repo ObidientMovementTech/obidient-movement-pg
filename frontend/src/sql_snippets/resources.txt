@@ -1,0 +1,31 @@
+-- SELECT
+CREATE POLICY "Only admin users can view records" 
+ON resources 
+FOR SELECT 
+TO authenticated 
+USING (true);
+
+
+-- INSERT
+CREATE POLICY "Only admin users can insert records" 
+ON resources 
+FOR INSERT 
+TO authenticated 
+WITH CHECK (is_admin());
+
+
+-- UPDATE
+CREATE POLICY "Only admin users can update records" 
+ON resources 
+FOR UPDATE 
+TO authenticated 
+USING (is_admin()) 
+WITH CHECK (is_admin());
+
+
+-- DELETE
+CREATE POLICY "Only admin users can delete records" 
+ON resources 
+FOR DELETE 
+TO authenticated 
+USING (is_admin());
