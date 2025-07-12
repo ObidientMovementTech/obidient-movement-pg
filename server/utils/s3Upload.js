@@ -15,7 +15,18 @@ export const uploadBufferToS3 = async (buffer, originalName, options = {}) => {
   try {
     const fileExtension = path.extname(originalName);
     const fileName = `${uuidv4()}${fileExtension}`;
-    const key = options.folder ? `${options.folder}/${fileName}` : fileName;
+
+    // Construct the full key with AWS_LOCATION as base folder
+    const baseFolder = process.env.AWS_LOCATION || '';
+    let key = fileName;
+
+    if (baseFolder && options.folder) {
+      key = `${baseFolder}/${options.folder}/${fileName}`;
+    } else if (baseFolder) {
+      key = `${baseFolder}/${fileName}`;
+    } else if (options.folder) {
+      key = `${options.folder}/${fileName}`;
+    }
 
     const uploadParams = {
       Bucket: process.env.AWS_STORAGE_BUCKET_NAME,
