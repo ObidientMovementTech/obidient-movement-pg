@@ -189,31 +189,31 @@ export default function LeaderboardPage() {
             {leaderboard.map((entry, index) => (
               <div
                 key={entry._id}
-                className={`p-6 transition-colors hover:bg-gray-50 ${getRankClass(index)}`}
+                className={`p-4 sm:p-6 transition-colors hover:bg-gray-50 ${getRankClass(index)}`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
                   {/* Rank */}
-                  <div className="flex-shrink-0 w-12 flex justify-center">
+                  <div className="flex-shrink-0 w-12 flex justify-center mb-2 sm:mb-0">
                     {getRankIcon(index)}
                   </div>
 
                   {/* Voting Bloc Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 truncate">
                           {entry.name}
                         </h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600 mb-2">
                           <span>Created by {entry.creator.name || 'Unknown User'}</span>
                           <span className="text-gray-400">•</span>
                           <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
                             {entry.scope}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <MapPin size={14} />
-                          <span>
+                        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-500">
+                          <MapPin size={12} className="sm:!w-4 sm:!h-4" />
+                          <span className="truncate">
                             {entry.location.state}
                             {entry.location.lga && ` • ${entry.location.lga}`}
                             {entry.location.ward && ` • ${entry.location.ward}`}
@@ -222,20 +222,18 @@ export default function LeaderboardPage() {
                       </div>
 
                       {/* Stats */}
-                      <div className="text-right">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">
-                              {entry.metrics.totalMembers}
-                            </div>
-                            <div className="text-xs text-gray-500">Members</div>
+                      <div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-3 mt-3 sm:mt-0">
+                        <div className="text-center">
+                          <div className="text-lg sm:text-2xl font-bold text-green-600">
+                            {entry.metrics.totalMembers}
                           </div>
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-blue-600">
-                              {entry.metrics.engagementScore}
-                            </div>
-                            <div className="text-xs text-gray-500">Score</div>
+                          <div className="text-xs text-gray-500">Members</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-base sm:text-lg font-semibold text-blue-600">
+                            {entry.metrics.engagementScore}
                           </div>
+                          <div className="text-xs text-gray-500">Score</div>
                         </div>
                       </div>
                     </div>
