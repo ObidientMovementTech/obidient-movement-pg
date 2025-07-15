@@ -45,6 +45,7 @@ import Toast from "../../../components/Toast";
 import InviteMemberModal from "../../../components/modals/InviteMemberModal";
 import BroadcastMessageModal from "../../../components/modals/BroadcastMessageModal";
 import PrivateMessageModal from "../../../components/modals/PrivateMessageModal";
+import FlyerModal from "../../../components/modals/FlyerModal";
 
 export default function VotingBlocManagePage() {
   const { id } = useParams<{ id: string }>();
@@ -83,6 +84,7 @@ export default function VotingBlocManagePage() {
   const [editingMember, setEditingMember] = useState<any>(null);
   const [showMemberTagModal, setShowMemberTagModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showFlyerModal, setShowFlyerModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -374,7 +376,6 @@ export default function VotingBlocManagePage() {
 
   const handleBack = () => {
     navigate("/dashboard");
-    sessionStorage.setItem("dashboardPage", "Create your Voting Bloc");
   };
 
   if (loading) return <Loading />;
@@ -472,14 +473,22 @@ export default function VotingBlocManagePage() {
                   <span className="text-xs sm:text-sm">{votingBloc.metrics.totalMembers} members</span>
                 </div>
               </div>
-              {/* Share Button - Large CTA */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
+              {/* Share Buttons - Large CTAs */}
+              <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
                 <button
                   onClick={shareVotingBloc}
                   className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl font-medium text-base sm:text-lg"
                 >
                   <Share2 size={20} />
                   Share to Invite Members
+                </button>
+
+                <button
+                  onClick={() => setShowFlyerModal(true)}
+                  className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-lg hover:shadow-xl font-medium text-base sm:text-lg"
+                >
+                  <ExternalLink size={20} />
+                  Share my Flyer
                 </button>
               </div>
             </div>
@@ -1528,6 +1537,14 @@ export default function VotingBlocManagePage() {
         </div>
       )}
 
+      {/* Flyer Modal */}
+      <FlyerModal
+        isOpen={showFlyerModal}
+        onClose={() => setShowFlyerModal(false)}
+        userProfile={profile}
+        votingBloc={votingBloc}
+      />
+
       {/* Toast */}
       {toast && (
         <Toast
@@ -1536,6 +1553,30 @@ export default function VotingBlocManagePage() {
           onClose={() => setToast(null)}
         />
       )}
+
+      {/* YouTube Tutorial Section */}
+      <div className="mt-12">
+        <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-xl border border-blue-100 overflow-hidden flex flex-col md:flex-row items-center gap-6 p-6">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <span className="inline-block bg-red-600 text-white rounded-full p-1.5 mr-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.8 7.2C21.6 6.5 21.1 6 20.4 5.8C19.1 5.5 12 5.5 12 5.5C12 5.5 4.9 5.5 3.6 5.8C2.9 6 2.4 6.5 2.2 7.2C2 8.5 2 12 2 12C2 12 2 15.5 2.2 16.8C2.4 17.5 2.9 18 3.6 18.2C4.9 18.5 12 18.5 12 18.5C12 18.5 19.1 18.5 20.4 18.2C21.1 18 21.6 17.5 21.8 16.8C22 15.5 22 12 22 12C22 12 22 8.5 21.8 7.2ZM10 15.5V8.5L16 12L10 15.5Z" fill="currentColor" /></svg>
+              </span>
+              Watch: How to Use Your Voting Bloc
+            </h3>
+            <p className="text-gray-700 mb-3 text-sm">See a quick video guide on inviting members, sharing your bloc, and managing your group.</p>
+            <a
+              href="https://drive.google.com/file/d/1cosd4uwEnR0XYpgGwzEbMQPk9t7M5Fr7/view?usp=drive_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-md"
+            >
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M10 15.5V8.5L16 12L10 15.5Z" /></svg>
+              Watch Tutorial
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
