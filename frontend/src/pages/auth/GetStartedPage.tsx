@@ -45,6 +45,14 @@ const GetStartedPage = () => {
     return emailRegex.test(email);
   };
 
+
+  const validatePhone = (phone: string): boolean => {
+    // Accepts numbers with optional +, spaces, dashes, and must be 8-20 digits
+    const phoneRegex = /^\+?[0-9\s\-]{8,20}$/;
+    // Should not contain @ (to prevent emails)
+    return phoneRegex.test(phone) && !phone.includes('@');
+  };
+
   const displayError = (msg: string) => {
     setMessage(msg);
     setToastType("error");
@@ -59,8 +67,15 @@ const GetStartedPage = () => {
     e.preventDefault();
     setIsLoading(true);
 
+
     if (!validateEmail(email)) {
       displayError("Invalid email address format.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!validatePhone(phone)) {
+      displayError("Please enter a valid WhatsApp phone number (digits only, no emails).");
       setIsLoading(false);
       return;
     }
@@ -138,10 +153,10 @@ const GetStartedPage = () => {
       </div>
 
       <div>
-        <label className="block text-dark dark:text-gray-100 mb-2 text-sm">Phone Number</label>
+        <label className="block text-dark dark:text-gray-100 mb-2 text-sm">WhatsApp Phone Number</label>
         <input
           type="tel"
-          placeholder="Phone"
+          placeholder="WhatsApp Phone Number"
           className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
