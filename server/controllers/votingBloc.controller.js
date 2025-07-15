@@ -748,7 +748,7 @@ export const sendMemberInvitation = async (req, res) => {
     };
 
     if (isExistingUser) {
-      invitationData.invitedUser = invitedUser._id;
+      invitationData.invitedUser = invitedUser.id;
     } else {
       // For non-existing users, store email for future reference
       invitationData.invitedEmail = email;
@@ -799,7 +799,7 @@ export const sendMemberInvitation = async (req, res) => {
       invitation: {
         ...(isExistingUser && invitedUser ? {
           invitedUser: {
-            _id: invitedUser._id,
+            _id: invitedUser.id,
             name: invitedUser.name,
             email: invitedUser.email,
           }
@@ -872,6 +872,7 @@ export const sendBroadcastMessage = async (req, res) => {
         )
       );
     }
+    
 
     // Send emails if email channel is enabled
     if (channels.includes('email')) {
