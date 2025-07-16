@@ -14,6 +14,7 @@ import {
   syncAllOutdatedBlocs,
   updateSyncPreferences
 } from '../controllers/templateSync.controller.js';
+import adminUserManagementRoutes from './adminUserManagement.route.js';
 
 const router = express.Router();
 
@@ -28,5 +29,8 @@ router.get('/sync/outdated-blocs', protect, isAdmin, checkOutdatedBlocs);
 router.post('/sync/voting-bloc/:votingBlocId', protect, isAdmin, syncVotingBloc);
 router.post('/sync/all-outdated', protect, isAdmin, syncAllOutdatedBlocs);
 router.put('/sync/preferences/:votingBlocId', protect, isAdmin, updateSyncPreferences);
+
+// User management routes
+router.use('/user-management', adminUserManagementRoutes);
 
 export default router;

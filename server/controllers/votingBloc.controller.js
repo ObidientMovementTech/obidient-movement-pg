@@ -566,7 +566,14 @@ export const clearRespondedInvitations = async (req, res) => {
 // Get leaderboard data
 export const getLeaderboard = async (req, res) => {
   try {
-    const { level = 'national', state, lga, ward } = req.query;
+    const {
+      level = 'national',
+      state,
+      lga,
+      ward,
+      limit = 100,
+      offset = 0
+    } = req.query;
 
     let searchOptions = { status: 'active' };
 
@@ -586,16 +593,21 @@ export const getLeaderboard = async (req, res) => {
         break;
     }
 
-    const leaderboard = await VotingBloc.search({
+    const leaderboard = await VotingBloc.searchForLeaderboard({
       ...searchOptions,
-      limit: 50,
-      offset: 0
+      limit: Math.min(parseInt(limit) || 100, 100), // Cap at 100 for performance
+      offset: parseInt(offset) || 0
     });
 
     res.status(200).json({
       success: true,
       leaderboard: transformVotingBloc(leaderboard),
       level,
+      pagination: {
+        limit: Math.min(parseInt(limit) || 100, 100),
+        offset: parseInt(offset) || 0,
+        total: leaderboard.length
+      }
     });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
@@ -872,7 +884,7 @@ export const sendBroadcastMessage = async (req, res) => {
         )
       );
     }
-    
+
 
     // Send emails if email channel is enabled
     if (channels.includes('email')) {

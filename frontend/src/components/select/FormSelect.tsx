@@ -28,6 +28,7 @@ export default function FormSelect({
   options = [],
   defaultSelected = "",
   className = "",
+  disabled = false,
 }: TextInputProps) {
   return (
     <div className={className}>
@@ -38,6 +39,7 @@ export default function FormSelect({
         options={options}
         onChange={onChange}
         defaultSelected={defaultSelected}
+        disabled={disabled}
       />
     </div>
   );

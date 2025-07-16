@@ -333,13 +333,111 @@ class VotingBloc {
       votingBlocData.creator = {
         id: row.creatorId,
         name: row.creatorName,
-        email: row.creatorEmail
+        email: row.creatorEmail,
+        personalInfo: {
+          user_name: row.creatorName || 'Unknown User'
+        }
       };
 
       // Remove the flat creator fields
       delete votingBlocData.creatorId;
       delete votingBlocData.creatorName;
       delete votingBlocData.creatorEmail;
+
+      return new VotingBloc(votingBlocData);
+    });
+  }
+
+  // Optimized search for leaderboard with profile images
+  static async searchForLeaderboard(searchOptions = {}) {
+    const {
+      query: searchQuery,
+      scope,
+      locationState,
+      locationLga,
+      locationWard,
+      status = 'active',
+      limit = 100,
+      offset = 0
+    } = searchOptions;
+
+    let whereClause = 'WHERE vb.status = $1';
+    let values = [status];
+    let paramCount = 2;
+
+    if (searchQuery) {
+      whereClause += ` AND (vb.name ILIKE $${paramCount} OR vb.description ILIKE $${paramCount})`;
+      values.push(`%${searchQuery}%`);
+      paramCount++;
+    }
+
+    if (scope) {
+      whereClause += ` AND vb.scope = $${paramCount}`;
+      values.push(scope);
+      paramCount++;
+    }
+
+    if (locationState) {
+      whereClause += ` AND vb."locationState" = $${paramCount}`;
+      values.push(locationState);
+      paramCount++;
+    }
+
+    if (locationLga) {
+      whereClause += ` AND vb."locationLga" = $${paramCount}`;
+      values.push(locationLga);
+      paramCount++;
+    }
+
+    if (locationWard) {
+      whereClause += ` AND vb."locationWard" = $${paramCount}`;
+      values.push(locationWard);
+      paramCount++;
+    }
+
+    // Optimized query using pre-aggregated member counts and including profile images
+    const result = await query(
+      `WITH MemberCounts AS (
+         SELECT 
+           "votingBlocId",
+           COUNT("userId") as "memberCount"
+         FROM "votingBlocMembers"
+         GROUP BY "votingBlocId"
+       )
+       SELECT 
+         vb.*,
+         COALESCE(mc."memberCount", 0) as "memberCount",
+         u.id as "creatorId",
+         u.name as "creatorName", 
+         u.email as "creatorEmail",
+         u."profileImage" as "creatorProfileImage"
+       FROM "votingBlocs" vb
+       LEFT JOIN MemberCounts mc ON vb.id = mc."votingBlocId"
+       LEFT JOIN users u ON vb.creator = u.id
+       ${whereClause}
+       ORDER BY COALESCE(mc."memberCount", 0) DESC, vb."createdAt" DESC 
+       LIMIT $${paramCount} OFFSET $${paramCount + 1}`,
+      [...values, limit, offset]
+    );
+
+    return result.rows.map(row => {
+      // Create a copy of the row and set creator as an object with profile image
+      const votingBlocData = { ...row };
+      votingBlocData.creator = {
+        id: row.creatorId,
+        name: row.creatorName,
+        email: row.creatorEmail,
+        profileImage: row.creatorProfileImage,
+        personalInfo: {
+          user_name: row.creatorName || 'Unknown User'
+        }
+      };
+
+      // Remove the flat creator fields
+      delete votingBlocData.creatorId;
+      delete votingBlocData.creatorName;
+      delete votingBlocData.creatorEmail;
+      delete votingBlocData.creatorProfileImage;
 
       return new VotingBloc(votingBlocData);
     });

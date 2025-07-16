@@ -19,22 +19,24 @@ type SelectProps = {
   options: SelectOptionType[];
   onChange: (value: SelectOptionType) => void;
   defaultSelected: string;
+  disabled?: boolean;
 };
 
 export default function Select({
   options,
   onChange,
   defaultSelected,
+  disabled = false,
 }: SelectProps) {
   const defaultOption = options.filter(
     (option) => option.value?.toLocaleLowerCase() === defaultSelected?.toLocaleLowerCase()
   );
 
   const initialOption = defaultOption[0] || null
-  
+
   const [selectedOption, setSelectedOption] = useState<SelectOptionType | null>(initialOption);
 
-  function onSelectItem(value: SelectOptionType) {    
+  function onSelectItem(value: SelectOptionType) {
     setSelectedOption(value);
     onChange(value);
   }
@@ -42,14 +44,15 @@ export default function Select({
   useEffect(() => {
     setSelectedOption(initialOption)
   }, [initialOption])
-  
+
 
   return (
-    <Listbox value={selectedOption} onChange={onSelectItem} >
+    <Listbox value={selectedOption} onChange={onSelectItem} disabled={disabled}>
       <ListboxButton
         className={clsx(
-                   "relative rounded-lg bg-gray-200 dark:bg-secondary-light p-3 text-left text-sm/6 text-black/80 dark:text-white w-full flex items-center justify-between",
-          "focus:outline-none data-[focus]:outline-2 data-[focus]:-outline-offset-2 data-[focus]:outline-white/25"
+          "relative rounded-lg bg-gray-200 dark:bg-secondary-light p-3 text-left text-sm/6 text-black/80 dark:text-white w-full flex items-center justify-between",
+          "focus:outline-none data-[focus]:outline-2 data-[focus]:-outline-offset-2 data-[focus]:outline-white/25",
+          disabled && "opacity-50 cursor-not-allowed"
         )}
       >
         {selectedOption?.label || 'Select'}
@@ -62,7 +65,7 @@ export default function Select({
         anchor="bottom"
         transition
         className={clsx(
-          "w-[var(--button-width)]  rounded-xl border-2 border-white/10 bg-background-dark text-white [--anchor-gap:var(--spacing-1)] focus:outline-none z-40",
+          "w-[var(--button-width)]  rounded-xl border-2 border-white/10 bg-background-dark text-white [--anchor-gap:var(--spacing-1)] focus:outline-none z-[60]",
           "transition duration-100 ease-in data-[leave]:data-[closed]:opacity-0 "
         )}
       >
@@ -70,9 +73,8 @@ export default function Select({
           <ListboxOption
             key={option?.id}
             value={option}
-            className={`  p-2 border-b border-white/10  duration-300 cursor-pointer flex gap-2 ${
-              option?.unavailable ? "text-white/50" : "hover:bg-white/10"
-            }`}
+            className={`  p-2 border-b border-white/10  duration-300 cursor-pointer flex gap-2 ${option?.unavailable ? "text-white/50" : "hover:bg-white/10"
+              }`}
             disabled={option?.unavailable}
           >
             {option.label}

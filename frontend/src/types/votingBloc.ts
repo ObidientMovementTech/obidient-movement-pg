@@ -99,6 +99,7 @@ export interface LeaderboardEntry {
   creator: {
     _id: string;
     name: string;
+    profileImage?: string;
     personalInfo: {
       user_name: string;
     };

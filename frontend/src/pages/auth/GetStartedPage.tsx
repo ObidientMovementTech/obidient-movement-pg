@@ -10,6 +10,10 @@ import { XCircleIcon } from "@heroicons/react/24/outline";
 import validatePassword from "../../utils/validatePassword.js";
 import { registerUser } from "../../services/authService.js";
 import { useUserContext } from "../../context/UserContext.js";
+import FormSelect from "../../components/select/FormSelect.js";
+import { statesLGAWardList } from "../../utils/StateLGAWard.js";
+import { OptionType } from "../../utils/lookups.js";
+import { formatStateName, formatLocationName } from "../../utils/textUtils.js";
 
 const GetStartedPage = () => {
   const navigate = useNavigate();
@@ -20,11 +24,14 @@ const GetStartedPage = () => {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [votingState, setVotingState] = useState("");
+  const [votingLGA, setVotingLGA] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [message, setMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [states, setStates] = useState<OptionType[]>([]);
 
   // Redirect to dashboard if user is already authenticated
   useEffect(() => {
@@ -39,6 +46,25 @@ const GetStartedPage = () => {
       }
     }
   }, [profile, isAuthLoading, navigate]);
+
+  // Initialize states list
+  useEffect(() => {
+    const stateOptions = statesLGAWardList.map((s, i) => ({
+      id: i,
+      label: formatStateName(s.state), // Display formatted name
+      value: s.state, // Keep original value for backend
+    }));
+    setStates(stateOptions);
+  }, []);
+
+  const getLgas = (stateName: string): OptionType[] => {
+    const found = statesLGAWardList.find(s => s.state === stateName);
+    return found ? found.lgas.map((l, i) => ({
+      id: i,
+      label: formatLocationName(l.lga), // Display formatted name
+      value: l.lga // Keep original value for backend
+    })) : [];
+  };
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -93,6 +119,8 @@ const GetStartedPage = () => {
         email,
         phone,
         password: validPassword,
+        votingState: votingState ? formatStateName(votingState) : undefined,
+        votingLGA: votingLGA ? formatLocationName(votingLGA) : undefined,
       });
       setMessage("Signup successful! Please check your email.");
       setToastType("success");
@@ -162,6 +190,48 @@ const GetStartedPage = () => {
           onChange={(e) => setPhone(e.target.value)}
           required
         />
+      </div>
+
+      {/* Optional Voting Location Section */}
+      <div className="space-y-4">
+        {/* <div className="flex justify-center">
+          <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+            <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+              Optional: Personalize your voting bloc with location
+            </span>
+          </div>
+        </div> */}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <FormSelect
+              label="Voting State"
+              options={states}
+              defaultSelected={votingState}
+              onChange={(opt) => {
+                if (opt) {
+                  setVotingState(opt.value);
+                  setVotingLGA(''); // Reset LGA when state changes
+                } else {
+                  setVotingState('');
+                  setVotingLGA('');
+                }
+              }}
+            />
+          </div>
+
+          <div>
+            <FormSelect
+              label="Voting LGA"
+              options={getLgas(votingState)}
+              defaultSelected={votingLGA}
+              onChange={(opt) => {
+                setVotingLGA(opt ? opt.value : '');
+              }}
+              disabled={!votingState}
+            />
+          </div>
+        </div>
       </div>
 
       <div>

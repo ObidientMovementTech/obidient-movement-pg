@@ -39,14 +39,48 @@ export const uploadProfileImage = async (req, res) => {
 export const updateMe = async (req, res) => {
   try {
     const updates = req.body;
+    console.log('🔄 UpdateMe called with updates:', updates);
+
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    // Only update allowed fields (including nested personalInfo)
+
+    console.log('👤 Current user before update:', { name: user.name, phone: user.phone, profileImage: user.profileImage });
+
+    // Update nested personalInfo fields
     if (updates.personalInfo) {
+      console.log('📝 Updating personalInfo:', updates.personalInfo);
       user.personalInfo = { ...user.personalInfo, ...updates.personalInfo };
     }
-    // Add other top-level fields if needed
+
+    // Update top-level fields
+    const allowedTopLevelFields = [
+      'name',
+      'phone',
+      'profileImage',
+      'organizationAffiliations',
+      'politicalPartyAffiliation',
+      'notificationPreferences',
+      'onboardingData'
+    ];
+
+    allowedTopLevelFields.forEach(field => {
+      if (updates[field] !== undefined) {
+        console.log(`🔧 Updating ${field} from "${user[field]}" to "${updates[field]}"`);
+        if (field === 'onboardingData') {
+          // Handle nested onboardingData updates
+          user.onboardingData = { ...user.onboardingData, ...updates.onboardingData };
+        } else {
+          user[field] = updates[field];
+        }
+      }
+    });
+
+    console.log('👤 User after updates but before save:', { name: user.name, phone: user.phone, profileImage: user.profileImage });
+
     await user.save();
+
+    console.log('✅ User saved successfully:', { name: user.name, phone: user.phone, profileImage: user.profileImage });
+
     res.json({ user });
   } catch (err) {
     console.error('UpdateMe error:', err);
@@ -57,7 +91,7 @@ export const updateMe = async (req, res) => {
 // PATCH /users/:id - update user by admin
 export const updateUser = async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name, phone, politicalPartyAffiliation } = req.body;
     const userId = req.userId;
 
     const user = await User.findById(userId);
