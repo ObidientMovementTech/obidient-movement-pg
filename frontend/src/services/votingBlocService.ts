@@ -135,9 +135,14 @@ export const getLeaderboard = async (params: {
   state?: string;
   lga?: string;
   ward?: string;
+  limit?: number;
+  offset?: number;
 } = {}) => {
   const res = await axios.get(`${API_BASE}/voting-blocs/leaderboard`, {
-    params,
+    params: {
+      ...params,
+      limit: params.limit || 100 // Default to 100 for better performance
+    },
     withCredentials: true,
   });
   return res.data;

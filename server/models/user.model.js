@@ -14,7 +14,9 @@ class User {
       passwordHash,
       profileImage = null,
       emailVerified = false,
-      role = 'user'
+      role = 'user',
+      votingState = null,
+      votingLGA = null
     } = userData;
 
     const client = await getClient();
@@ -25,10 +27,10 @@ class User {
       const userResult = await client.query(
         `INSERT INTO users (
           name, email, phone, "passwordHash", "profileImage", 
-          "emailVerified", role
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7) 
+          "emailVerified", role, "votingState", "votingLGA"
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
         RETURNING *`,
-        [name, email, phone, passwordHash, profileImage, emailVerified, role]
+        [name, email, phone, passwordHash, profileImage, emailVerified, role, votingState, votingLGA]
       );
 
       const user = userResult.rows[0];

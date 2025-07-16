@@ -124,18 +124,35 @@ class DefaultVotingBlocSettings {
     // Generate personalized name
     const votingBlocName = `${user.name} for ${this.targetCandidate} - Join my Voting Bloc for a New Nigeria`;
 
-    // Use user location if available, otherwise use defaults with fallbacks
+    // Use user voting location if available, otherwise use personalInfo location, then defaults with fallbacks
     let location = {
-      state: locationDefaults.defaultState || 'Federal Capital Territory',
-      lga: locationDefaults.defaultLga || 'Abuja Municipal',
-      ward: locationDefaults.defaultWard || 'Central Ward'
+      state: locationDefaults.defaultState || null,
+      lga: locationDefaults.defaultLga || null,
+      ward: locationDefaults.defaultWard || null
     };
 
-    if (locationDefaults.useUserLocation && user.personalInfo?.currentLocation) {
+    // Priority 1: Use new voting location fields from signup
+    if (locationDefaults.useUserLocation && (user.votingState || user.votingLGA)) {
       location = {
-        state: user.personalInfo.currentLocation.state || location.state,
-        lga: user.personalInfo.currentLocation.lga || location.lga,
-        ward: user.personalInfo.currentLocation.ward || location.ward
+        state: user.votingState || null,
+        lga: user.votingLGA || null,
+        ward: null // Ward not collected in signup, keep as null
+      };
+    }
+    // Priority 2: Use legacy personalInfo location (for backward compatibility)
+    else if (locationDefaults.useUserLocation && user.personalInfo?.currentLocation) {
+      location = {
+        state: user.personalInfo.currentLocation.state || null,
+        lga: user.personalInfo.currentLocation.lga || null,
+        ward: user.personalInfo.currentLocation.ward || null
+      };
+    }
+    // Priority 3: Use fallback defaults only if useUserLocation is false or no user location data
+    else if (!locationDefaults.useUserLocation) {
+      location = {
+        state: locationDefaults.defaultState || 'Federal Capital Territory',
+        lga: locationDefaults.defaultLga || 'Abuja Municipal',
+        ward: locationDefaults.defaultWard || 'Central Ward'
       };
     }
 

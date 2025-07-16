@@ -1,0 +1,1018 @@
+import bcrypt from 'bcryptjs';
+import { query, getClient } from '../config/db.js';
+import { generateOTP } from '../utils/otpUtils.js';
+import { sendOTPEmail } from '../utils/emailHandler.js';
+
+export const adminUserManagementController = {
+  // Get all users with pagination and filters - OPTIMIZED FOR LARGE DATASETS
+  async getAllUsers(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 25, // Increased default limit for better UX
+        search = '',
+        role = '',
+        status = '',
+        kycStatus = '',
+        emailVerified = '',
+        sortBy = 'createdAt',
+        sortOrder = 'DESC',
+        skipCount = 'false' // Option to skip expensive count for better performance
+      } = req.query;
+
+      const offset = (page - 1) * limit;
+      const maxLimit = 100; // Prevent excessive data loading
+      const actualLimit = Math.min(parseInt(limit), maxLimit);
+
+      // Validate sortBy and sortOrder to prevent SQL injection
+      const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'email', 'role', 'emailVerified', 'kycStatus'];
+      const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+      const safeSortOrder = ['ASC', 'DESC'].includes(sortOrder.toUpperCase()) ? sortOrder.toUpperCase() : 'DESC';
+
+      // Build WHERE clause dynamically
+      let whereConditions = [];
+      let queryParams = [];
+      let paramIndex = 1;
+
+      if (search) {
+        // Standard ILIKE search (works without pg_trgm extension)
+        // This provides good performance with proper B-tree indexes
+        whereConditions.push(`(
+          u.name ILIKE $${paramIndex} OR 
+          u.email ILIKE $${paramIndex} OR 
+          u.phone ILIKE $${paramIndex}
+        )`);
+        queryParams.push(`%${search}%`);
+        paramIndex++;
+      }
+
+      if (role) {
+        whereConditions.push(`u.role = $${paramIndex}`);
+        queryParams.push(role);
+        paramIndex++;
+      }
+
+      if (kycStatus) {
+        whereConditions.push(`u."kycStatus" = $${paramIndex}`);
+        queryParams.push(kycStatus);
+        paramIndex++;
+      }
+
+      if (emailVerified !== '') {
+        whereConditions.push(`u."emailVerified" = $${paramIndex}`);
+        queryParams.push(emailVerified === 'true');
+        paramIndex++;
+      }
+
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+      // OPTIMIZED: Simplified query for basic user listing - NO EXPENSIVE JOINS
+      const usersQuery = `
+        SELECT 
+          u.id, u.name, u.email, u.phone, u.role, u."emailVerified", u."kycStatus",
+          u."profileImage", u."countryOfResidence", u."votingState", u."votingLGA",
+          u."createdAt", u."updatedAt"
+        FROM users u
+        ${whereClause}
+        ORDER BY u."${safeSortBy}" ${safeSortOrder}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+
+      // Add limit and offset to the parameters
+      queryParams.push(actualLimit, offset);
+
+      let total = null;
+      let totalPages = null;
+      let usersResult;
+      let countResult = null;
+
+      // Skip count for faster loading when specifically requested
+      if (skipCount === 'true') {
+        usersResult = await query(usersQuery, queryParams);
+      } else {
+        // Optimized count query - only count from main table
+        const countQuery = `
+          SELECT COUNT(*) as total
+          FROM users u
+          ${whereClause}
+        `;
+
+        // Count query params should not include limit and offset
+        const countParams = queryParams.slice(0, -2);
+
+        [usersResult, countResult] = await Promise.all([
+          query(usersQuery, queryParams),
+          query(countQuery, countParams)
+        ]);
+
+        total = parseInt(countResult.rows[0].total);
+        totalPages = Math.ceil(total / actualLimit);
+      }
+
+      const users = usersResult.rows;
+
+      // OPTIMIZED: Load additional data only for current page users (lazy loading)
+      if (users.length > 0) {
+        const userIds = users.map(u => u.id);
+
+        // Get voting bloc member counts for users' own voting blocs - FIXED QUERY
+        const votingBlocQuery = `
+          SELECT 
+            vb.creator as "userId",
+            COALESCE(SUM(member_counts.actual_members), 0) as "totalMembersInOwnedBlocs",
+            COUNT(vb.id) as "ownedVotingBlocsCount",
+            MAX(member_counts.latest_join) as "lastVotingBlocActivity"
+          FROM "votingBlocs" vb
+          LEFT JOIN (
+            SELECT 
+              vbm."votingBlocId",
+              COUNT(*) as actual_members,
+              MAX(vbm."joinDate") as latest_join
+            FROM "votingBlocMembers" vbm
+            GROUP BY vbm."votingBlocId"
+          ) member_counts ON vb.id = member_counts."votingBlocId"
+          WHERE vb.creator = ANY($1) AND vb.status = 'active'
+          GROUP BY vb.creator
+        `;
+
+        const votingBlocResult = await query(votingBlocQuery, [userIds]);
+        const votingBlocData = Object.fromEntries(
+          votingBlocResult.rows.map(row => [row.userId, row])
+        );
+
+        // Enhance users with voting bloc data
+        users.forEach(user => {
+          const votingData = votingBlocData[user.id];
+          user.totalMembersInOwnedBlocs = votingData ? parseInt(votingData.totalMembersInOwnedBlocs) : 0;
+          user.ownedVotingBlocsCount = votingData ? parseInt(votingData.ownedVotingBlocsCount) : 0;
+          user.lastVotingBlocActivity = votingData?.lastVotingBlocActivity || null;
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          users,
+          pagination: skipCount === 'true' ? {
+            page: parseInt(page),
+            limit: actualLimit,
+            hasNextPage: users.length === actualLimit, // Estimate based on result size
+            hasPrevPage: page > 1
+          } : {
+            page: parseInt(page),
+            limit: actualLimit,
+            total,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Get all users error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch users',
+        error: error.message
+      });
+    }
+  },
+
+  // OPTIMIZED: Cached user statistics with faster queries
+  async getUserStatistics(req, res) {
+    try {
+      // Use multiple simpler queries instead of one complex query for better performance
+      const [totalUsersQuery, rolesQuery, verificationQuery, kycQuery, recentQuery] = await Promise.all([
+        query('SELECT COUNT(*) as total FROM users'),
+        query('SELECT role, COUNT(*) as count FROM users GROUP BY role'),
+        query('SELECT "emailVerified", COUNT(*) as count FROM users GROUP BY "emailVerified"'),
+        query('SELECT "kycStatus", COUNT(*) as count FROM users GROUP BY "kycStatus"'),
+        query(`
+          SELECT 
+            COUNT(CASE WHEN "createdAt" >= NOW() - INTERVAL '7 days' THEN 1 END) as "newUsersWeek",
+            COUNT(CASE WHEN "createdAt" >= NOW() - INTERVAL '30 days' THEN 1 END) as "newUsersMonth"
+          FROM users
+        `)
+      ]);
+
+      // Process results
+      const totalUsers = parseInt(totalUsersQuery.rows[0].total);
+
+      const roleStats = Object.fromEntries(
+        rolesQuery.rows.map(row => [row.role, parseInt(row.count)])
+      );
+
+      const verificationStats = Object.fromEntries(
+        verificationQuery.rows.map(row => [row.emailVerified ? 'verified' : 'unverified', parseInt(row.count)])
+      );
+
+      const kycStats = Object.fromEntries(
+        kycQuery.rows.map(row => [row.kycStatus, parseInt(row.count)])
+      );
+
+      const recentStats = recentQuery.rows[0];
+
+      const stats = {
+        totalUsers,
+        totalAdmins: roleStats.admin || 0,
+        totalRegularUsers: roleStats.user || 0,
+        verifiedUsers: verificationStats.verified || 0,
+        unverifiedUsers: verificationStats.unverified || 0,
+        approvedKyc: kycStats.approved || 0,
+        pendingKyc: kycStats.pending || 0,
+        rejectedKyc: kycStats.rejected || 0,
+        unsubmittedKyc: kycStats.unsubmitted || 0,
+        newUsersWeek: parseInt(recentStats.newUsersWeek) || 0,
+        newUsersMonth: parseInt(recentStats.newUsersMonth) || 0
+      };
+
+      // Get registration trends (last 30 days) with optimized query
+      const trendsQuery = `
+        SELECT 
+          DATE("createdAt") as date,
+          COUNT(*) as count
+        FROM users
+        WHERE "createdAt" >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY DATE("createdAt")
+        ORDER BY date DESC
+        LIMIT 30
+      `;
+
+      const trendsResult = await query(trendsQuery);
+      const registrationTrends = trendsResult.rows;
+
+      res.json({
+        success: true,
+        data: {
+          statistics: stats,
+          registrationTrends
+        }
+      });
+
+    } catch (error) {
+      console.error('Get user statistics error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch user statistics',
+        error: error.message
+      });
+    }
+  },
+
+  // Get single user details
+  async getUserDetails(req, res) {
+    try {
+      const { userId } = req.params;
+
+      const userQuery = `
+        SELECT 
+          u.*,
+          pi.*,
+          od.*,
+          kyc.*
+        FROM users u
+        LEFT JOIN "userPersonalInfo" pi ON u.id = pi."userId"
+        LEFT JOIN "userOnboardingData" od ON u.id = od."userId"
+        LEFT JOIN "userKycInfo" kyc ON u.id = kyc."userId"
+        WHERE u.id = $1
+      `;
+
+      // Get user's voting blocs
+      const votingBlocsQuery = `
+        SELECT 
+          vb.id, vb.name, vb.description, vb.scope, vb."locationState", vb."locationLga",
+          vbm."joinDate", vbm.id as "membershipId",
+          vbmm."decisionTag", vbmm."contactTag", vbmm."engagementLevel"
+        FROM "votingBlocs" vb
+        JOIN "votingBlocMembers" vbm ON vb.id = vbm."votingBlocId"
+        LEFT JOIN "votingBlocMemberMetadata" vbmm ON vb.id = vbmm."votingBlocId" AND vbm."userId" = vbmm."userId"
+        WHERE vbm."userId" = $1
+        ORDER BY vbm."joinDate" DESC
+      `;
+
+      // Get user's created voting blocs
+      const createdBlocsQuery = `
+        SELECT id, name, description, scope, "totalMembers", "createdAt"
+        FROM "votingBlocs"
+        WHERE creator = $1
+        ORDER BY "createdAt" DESC
+      `;
+
+      const [userResult, votingBlocsResult, createdBlocsResult] = await Promise.all([
+        query(userQuery, [userId]),
+        query(votingBlocsQuery, [userId]),
+        query(createdBlocsQuery, [userId])
+      ]);
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      const user = userResult.rows[0];
+      const votingBlocs = votingBlocsResult.rows;
+      const createdBlocs = createdBlocsResult.rows;
+
+      res.json({
+        success: true,
+        data: {
+          user,
+          votingBlocs,
+          createdBlocs
+        }
+      });
+
+    } catch (error) {
+      console.error('Get user details error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch user details',
+        error: error.message
+      });
+    }
+  },
+
+  // Update user role
+  async updateUserRole(req, res) {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!['user', 'admin'].includes(role)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid role. Must be "user" or "admin"'
+        });
+      }
+
+      // Prevent admin from demoting themselves
+      if (req.user.id === userId && role === 'user') {
+        return res.status(403).json({
+          success: false,
+          message: 'You cannot change your own role'
+        });
+      }
+
+      const updateQuery = `
+        UPDATE users 
+        SET role = $1, "updatedAt" = NOW()
+        WHERE id = $2
+        RETURNING id, name, email, role
+      `;
+
+      const result = await query(updateQuery, [role, userId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `User role updated to ${role}`,
+        data: result.rows[0]
+      });
+
+    } catch (error) {
+      console.error('Update user role error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update user role',
+        error: error.message
+      });
+    }
+  },
+
+  // Update user status (suspend/activate)
+  async updateUserStatus(req, res) {
+    try {
+      const { userId } = req.params;
+      const { emailVerified, suspended = false } = req.body;
+
+      let updateFields = [];
+      let queryParams = [];
+      let paramIndex = 1;
+
+      if (typeof emailVerified === 'boolean') {
+        updateFields.push(`"emailVerified" = $${paramIndex}`);
+        queryParams.push(emailVerified);
+        paramIndex++;
+      }
+
+      // We can add a suspended field to the users table if needed
+      updateFields.push(`"updatedAt" = NOW()`);
+
+      if (updateFields.length === 1) { // Only updatedAt
+        return res.status(400).json({
+          success: false,
+          message: 'No valid fields to update'
+        });
+      }
+
+      queryParams.push(userId);
+
+      const updateQuery = `
+        UPDATE users 
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING id, name, email, "emailVerified"
+      `;
+
+      const result = await query(updateQuery, queryParams);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'User status updated successfully',
+        data: result.rows[0]
+      });
+
+    } catch (error) {
+      console.error('Update user status error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update user status',
+        error: error.message
+      });
+    }
+  },
+
+  // Update user profile
+  async updateUserProfile(req, res) {
+    try {
+      const { userId } = req.params;
+      const {
+        name,
+        email,
+        phone,
+        countryOfResidence,
+        votingState,
+        votingLGA,
+        personalInfo
+      } = req.body;
+
+      const client = await getClient();
+
+      try {
+        await client.query('BEGIN');
+
+        // Update main user table
+        if (name || email || phone || countryOfResidence || votingState || votingLGA) {
+          let updateFields = [];
+          let queryParams = [];
+          let paramIndex = 1;
+
+          if (name) {
+            updateFields.push(`name = $${paramIndex}`);
+            queryParams.push(name);
+            paramIndex++;
+          }
+
+          if (email) {
+            updateFields.push(`email = $${paramIndex}`);
+            queryParams.push(email);
+            paramIndex++;
+          }
+
+          if (phone) {
+            updateFields.push(`phone = $${paramIndex}`);
+            queryParams.push(phone);
+            paramIndex++;
+          }
+
+          if (countryOfResidence) {
+            updateFields.push(`"countryOfResidence" = $${paramIndex}`);
+            queryParams.push(countryOfResidence);
+            paramIndex++;
+          }
+
+          if (votingState) {
+            updateFields.push(`"votingState" = $${paramIndex}`);
+            queryParams.push(votingState);
+            paramIndex++;
+          }
+
+          if (votingLGA) {
+            updateFields.push(`"votingLGA" = $${paramIndex}`);
+            queryParams.push(votingLGA);
+            paramIndex++;
+          }
+
+          updateFields.push(`"updatedAt" = NOW()`);
+          queryParams.push(userId);
+
+          const userUpdateQuery = `
+            UPDATE users 
+            SET ${updateFields.join(', ')}
+            WHERE id = $${paramIndex}
+          `;
+
+          await client.query(userUpdateQuery, queryParams);
+        }
+
+        // Update personal info if provided
+        if (personalInfo) {
+          const personalInfoFields = Object.keys(personalInfo);
+          if (personalInfoFields.length > 0) {
+            // Check if personal info record exists
+            const checkPersonalInfo = await client.query(
+              'SELECT id FROM "userPersonalInfo" WHERE "userId" = $1',
+              [userId]
+            );
+
+            if (checkPersonalInfo.rows.length > 0) {
+              // Update existing record
+              let updateFields = [];
+              let queryParams = [];
+              let paramIndex = 1;
+
+              personalInfoFields.forEach(field => {
+                updateFields.push(`"${field}" = $${paramIndex}`);
+                queryParams.push(personalInfo[field]);
+                paramIndex++;
+              });
+
+              updateFields.push(`"updatedAt" = NOW()`);
+              queryParams.push(userId);
+
+              const personalUpdateQuery = `
+                UPDATE "userPersonalInfo" 
+                SET ${updateFields.join(', ')}
+                WHERE "userId" = $${paramIndex}
+              `;
+
+              await client.query(personalUpdateQuery, queryParams);
+            } else {
+              // Create new record
+              const fields = ['userId', ...personalInfoFields];
+              const values = [userId, ...personalInfoFields.map(field => personalInfo[field])];
+              const placeholders = values.map((_, index) => `$${index + 1}`);
+
+              const insertQuery = `
+                INSERT INTO "userPersonalInfo" (${fields.map(f => `"${f}"`).join(', ')})
+                VALUES (${placeholders.join(', ')})
+              `;
+
+              await client.query(insertQuery, values);
+            }
+          }
+        }
+
+        await client.query('COMMIT');
+
+        res.json({
+          success: true,
+          message: 'User profile updated successfully'
+        });
+
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+    } catch (error) {
+      console.error('Update user profile error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update user profile',
+        error: error.message
+      });
+    }
+  },
+
+  // Force password reset
+  async forcePasswordReset(req, res) {
+    try {
+      const { userId } = req.params;
+
+      // Get user details
+      const userResult = await query(
+        'SELECT id, email, name FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      const user = userResult.rows[0];
+
+      // Generate OTP for password reset
+      const otp = generateOTP();
+      const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      // Update user with OTP
+      await query(
+        `UPDATE users 
+         SET otp = $1, "otpExpiry" = $2, "otpPurpose" = 'password_reset', "updatedAt" = NOW()
+         WHERE id = $3`,
+        [otp, otpExpiry, userId]
+      );
+
+      // Send OTP email
+      await sendOTPEmail(user.name, user.email, otp, 'password_reset');
+
+      res.json({
+        success: true,
+        message: 'Password reset email sent to user'
+      });
+
+    } catch (error) {
+      console.error('Force password reset error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to initiate password reset',
+        error: error.message
+      });
+    }
+  },
+
+  // Create new user
+  async createUser(req, res) {
+    try {
+      const {
+        name,
+        email,
+        password,
+        phone,
+        role = 'user',
+        emailVerified = false,
+        countryOfResidence,
+        votingState,
+        votingLGA
+      } = req.body;
+
+      // Validate required fields
+      if (!name || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name, email, and password are required'
+        });
+      }
+
+      // Check if user already exists
+      const existingUser = await query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
+
+      if (existingUser.rows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'User with this email already exists'
+        });
+      }
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 12);
+
+      // Create user
+      const createUserQuery = `
+        INSERT INTO users (
+          name, email, phone, "passwordHash", role, "emailVerified",
+          "countryOfResidence", "votingState", "votingLGA"
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id, name, email, phone, role, "emailVerified", "createdAt"
+      `;
+
+      const result = await query(createUserQuery, [
+        name, email, phone, passwordHash, role, emailVerified,
+        countryOfResidence, votingState, votingLGA
+      ]);
+
+      const newUser = result.rows[0];
+
+      res.status(201).json({
+        success: true,
+        message: 'User created successfully',
+        data: newUser
+      });
+
+    } catch (error) {
+      console.error('Create user error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create user',
+        error: error.message
+      });
+    }
+  },
+
+  // Delete user with complete cleanup
+  async deleteUser(req, res) {
+    try {
+      const { userId } = req.params;
+
+      // Prevent admin from deleting themselves
+      if (req.user.id === userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'You cannot delete your own account'
+        });
+      }
+
+      const client = await getClient();
+
+      try {
+        await client.query('BEGIN');
+
+        // Get user details before deletion
+        const userResult = await client.query(
+          'SELECT name, email FROM users WHERE id = $1',
+          [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({
+            success: false,
+            message: 'User not found'
+          });
+        }
+
+        const user = userResult.rows[0];
+
+        // Delete in order to handle foreign key constraints
+
+        // 1. Delete voting bloc invitations
+        await client.query(
+          'DELETE FROM "votingBlocInvitations" WHERE "invitedUser" = $1 OR "invitedBy" = $1',
+          [userId]
+        );
+
+        // 2. Delete voting bloc member metadata
+        await client.query(
+          'DELETE FROM "votingBlocMemberMetadata" WHERE "userId" = $1',
+          [userId]
+        );
+
+        // 3. Delete voting bloc memberships
+        await client.query(
+          'DELETE FROM "votingBlocMembers" WHERE "userId" = $1',
+          [userId]
+        );
+
+        // 4. Delete voting bloc messages where user is sender or receiver
+        await client.query(
+          'DELETE FROM "votingBlocMessages" WHERE "fromUser" = $1 OR "toUser" = $1',
+          [userId]
+        );
+
+        // 5. Delete voting bloc broadcasts where user is sender
+        await client.query(
+          'DELETE FROM "votingBlocBroadcasts" WHERE "sentBy" = $1',
+          [userId]
+        );
+
+        // 6. Handle voting blocs created by this user
+        // We need to decide: delete the bloc or transfer ownership
+        // For now, let's delete them (since they're auto-generated mostly)
+        const ownedBlocsResult = await client.query(
+          'SELECT id FROM "votingBlocs" WHERE creator = $1',
+          [userId]
+        );
+
+        for (const bloc of ownedBlocsResult.rows) {
+          // Delete toolkits first
+          await client.query(
+            'DELETE FROM "votingBlocToolkits" WHERE "votingBlocId" = $1',
+            [bloc.id]
+          );
+
+          // Delete the voting bloc (this will cascade to members due to foreign key)
+          await client.query(
+            'DELETE FROM "votingBlocs" WHERE id = $1',
+            [bloc.id]
+          );
+        }
+
+        // 7. Delete notifications
+        await client.query(
+          'DELETE FROM notifications WHERE recipient = $1',
+          [userId]
+        );
+
+        // 8. Delete evaluations (by assessor email)
+        await client.query(
+          'DELETE FROM evaluations WHERE assessorEmail = $1',
+          [user.email] // Use the user's email to find their evaluations
+        );
+
+        // 9. Delete admin broadcasts (if user was admin)
+        await client.query(
+          'DELETE FROM "adminBroadcasts" WHERE "sentBy" = $1',
+          [userId]
+        );
+
+        // 10. Delete user personal data (these will cascade due to foreign key constraints)
+        await client.query(
+          'DELETE FROM "userKycInfo" WHERE "userId" = $1',
+          [userId]
+        );
+
+        await client.query(
+          'DELETE FROM "userOnboardingData" WHERE "userId" = $1',
+          [userId]
+        );
+
+        await client.query(
+          'DELETE FROM "userPersonalInfo" WHERE "userId" = $1',
+          [userId]
+        );
+
+        await client.query(
+          'DELETE FROM "userNotificationSettings" WHERE "userId" = $1',
+          [userId]
+        );
+
+        await client.query(
+          'DELETE FROM "userNotificationPreferences" WHERE "userId" = $1',
+          [userId]
+        );
+
+        // 11. Finally delete the main user record
+        await client.query(
+          'DELETE FROM users WHERE id = $1',
+          [userId]
+        );
+
+        await client.query('COMMIT');
+
+        res.json({
+          success: true,
+          message: `User ${user.name} (${user.email}) and all related data deleted successfully`
+        });
+
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+    } catch (error) {
+      console.error('Delete user error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete user',
+        error: error.message
+      });
+    }
+  },
+
+  // Bulk operations
+  async bulkUpdateUsers(req, res) {
+    try {
+      const { userIds, action, data } = req.body;
+
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'User IDs array is required'
+        });
+      }
+
+      const client = await getClient();
+
+      try {
+        await client.query('BEGIN');
+
+        let result = [];
+
+        switch (action) {
+          case 'updateRole':
+            if (!data.role || !['user', 'admin'].includes(data.role)) {
+              throw new Error('Invalid role');
+            }
+
+            // Prevent admin from changing their own role in bulk
+            const filteredIds = userIds.filter(id => id !== req.user.id);
+
+            if (filteredIds.length > 0) {
+              const updateQuery = `
+                UPDATE users 
+                SET role = $1, "updatedAt" = NOW()
+                WHERE id = ANY($2)
+                RETURNING id, name, email, role
+              `;
+
+              const updateResult = await client.query(updateQuery, [data.role, filteredIds]);
+              result = updateResult.rows;
+            }
+            break;
+
+          case 'updateEmailVerified':
+            if (typeof data.emailVerified !== 'boolean') {
+              throw new Error('Invalid emailVerified value');
+            }
+
+            const verifyQuery = `
+              UPDATE users 
+              SET "emailVerified" = $1, "updatedAt" = NOW()
+              WHERE id = ANY($2)
+              RETURNING id, name, email, "emailVerified"
+            `;
+
+            const verifyResult = await client.query(verifyQuery, [data.emailVerified, userIds]);
+            result = verifyResult.rows;
+            break;
+
+          default:
+            throw new Error('Invalid bulk action');
+        }
+
+        await client.query('COMMIT');
+
+        res.json({
+          success: true,
+          message: `Bulk ${action} completed successfully`,
+          data: result
+        });
+
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+    } catch (error) {
+      console.error('Bulk update users error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to perform bulk operation',
+        error: error.message
+      });
+    }
+  },
+
+  // FAST SEARCH: Optimized search for typeahead/autocomplete
+  async fastSearch(req, res) {
+    try {
+      const { q = '', limit = 10 } = req.query;
+
+      if (!q || q.length < 2) {
+        return res.json({
+          success: true,
+          data: { users: [] }
+        });
+      }
+
+      const maxLimit = 20;
+      const actualLimit = Math.min(parseInt(limit), maxLimit);
+
+      // Ultra-fast search query - only essential fields, indexed columns
+      const searchQuery = `
+        SELECT 
+          id, name, email, role, "emailVerified", "kycStatus", "profileImage"
+        FROM users
+        WHERE 
+          name ILIKE $1 OR 
+          email ILIKE $1 OR 
+          phone ILIKE $1
+        ORDER BY 
+          CASE 
+            WHEN name ILIKE $2 THEN 1
+            WHEN email ILIKE $2 THEN 2
+            ELSE 3
+          END,
+          "createdAt" DESC
+        LIMIT $3
+      `;
+
+      const result = await query(searchQuery, [`%${q}%`, `${q}%`, actualLimit]);
+
+      res.json({
+        success: true,
+        data: {
+          users: result.rows,
+          query: q
+        }
+      });
+
+    } catch (error) {
+      console.error('Fast search error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Search failed',
+        error: error.message
+      });
+    }
+  }
+};

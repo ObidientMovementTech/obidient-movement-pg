@@ -1,6 +1,10 @@
-import { useState } from 'react';
-import { X, Mail, Lock, User, Phone } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Mail, Lock, User, Phone, Eye, EyeOff } from 'lucide-react';
 import { loginUser, registerUser } from '../services/authService';
+import FormSelect from './select/FormSelect';
+import { statesLGAWardList } from '../utils/StateLGAWard';
+import { OptionType } from '../utils/lookups';
+import { formatStateName, formatLocationName } from '../utils/textUtils';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -22,6 +26,10 @@ export default function AuthModal({
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>(initialTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [states, setStates] = useState<OptionType[]>([]);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Login form state
   const [loginData, setLoginData] = useState({
@@ -35,8 +43,36 @@ export default function AuthModal({
     email: '',
     password: '',
     confirmPassword: '',
-    phone: ''
+    phone: '',
+    votingState: '',
+    votingLGA: ''
   });
+
+  // Initialize states list
+  useEffect(() => {
+    const stateOptions = statesLGAWardList.map((s, i) => ({
+      id: i,
+      label: formatStateName(s.state), // Display formatted name
+      value: s.state, // Keep original value for backend
+    }));
+    setStates(stateOptions);
+  }, []);
+
+  const getLgas = (stateName: string): OptionType[] => {
+    const found = statesLGAWardList.find(s => s.state === stateName);
+    return found ? found.lgas.map((l, i) => ({
+      id: i,
+      label: formatLocationName(l.lga), // Display formatted name
+      value: l.lga // Keep original value for backend
+    })) : [];
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    // Accepts numbers with optional +, spaces, dashes, and must be 8-20 digits
+    const phoneRegex = /^\+?[0-9\s\-]{8,20}$/;
+    // Should not contain @ (to prevent emails)
+    return phoneRegex.test(phone) && !phone.includes('@');
+  };
 
   if (!isOpen) return null;
 
@@ -69,6 +105,12 @@ export default function AuthModal({
       return;
     }
 
+    if (!validatePhone(signupData.phone)) {
+      setError('Please enter a valid WhatsApp phone number (digits only, no emails).');
+      setLoading(false);
+      return;
+    }
+
     try {
       // Store voting bloc join intent if provided
       if (joinCode) {
@@ -83,7 +125,10 @@ export default function AuthModal({
         name: signupData.name,
         email: signupData.email,
         password: signupData.password,
-        phone: signupData.phone
+        phone: signupData.phone,
+        // Format location data as Title Case before sending to backend
+        votingState: signupData.votingState ? formatStateName(signupData.votingState) : undefined,
+        votingLGA: signupData.votingLGA ? formatLocationName(signupData.votingLGA) : undefined
       });
 
       // Show success message and switch to login
@@ -177,13 +222,20 @@ export default function AuthModal({
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
-                    type="password"
+                    type={showLoginPassword ? "text" : "password"}
                     required
                     value={loginData.password}
                     onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Enter your password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -233,7 +285,7 @@ export default function AuthModal({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
+                  WhatsApp Phone Number
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -243,43 +295,53 @@ export default function AuthModal({
                     value={signupData.phone}
                     onChange={(e) => setSignupData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="Enter your phone number"
+                    placeholder="Enter your WhatsApp phone number"
                   />
                 </div>
               </div>
 
-              {/* <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    State
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                    <input
-                      type="text"
-                      required
-                      value={signupData.state}
-                      onChange={(e) => setSignupData(prev => ({ ...prev, state: e.target.value }))}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="State"
+              {/* Optional Voting Location Section */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FormSelect
+                      label="Voting State"
+                      options={states}
+                      defaultSelected={signupData.votingState}
+                      onChange={(opt) => {
+                        if (opt) {
+                          setSignupData(prev => ({
+                            ...prev,
+                            votingState: opt.value,
+                            votingLGA: '' // Reset LGA when state changes
+                          }));
+                        } else {
+                          setSignupData(prev => ({
+                            ...prev,
+                            votingState: '',
+                            votingLGA: ''
+                          }));
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <FormSelect
+                      label="Voting LGA"
+                      options={getLgas(signupData.votingState)}
+                      defaultSelected={signupData.votingLGA}
+                      onChange={(opt) => {
+                        setSignupData(prev => ({
+                          ...prev,
+                          votingLGA: opt ? opt.value : ''
+                        }));
+                      }}
+                      disabled={!signupData.votingState}
                     />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    LGA
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={signupData.lga}
-                    onChange={(e) => setSignupData(prev => ({ ...prev, lga: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="LGA"
-                  />
-                </div>
-              </div> */}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -288,13 +350,20 @@ export default function AuthModal({
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
-                    type="password"
+                    type={showSignupPassword ? "text" : "password"}
                     required
                     value={signupData.password}
                     onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Create a password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPassword(!showSignupPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showSignupPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -305,13 +374,20 @@ export default function AuthModal({
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     required
                     value={signupData.confirmPassword}
                     onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Confirm your password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 

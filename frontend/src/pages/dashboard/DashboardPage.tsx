@@ -7,6 +7,7 @@ import {
   Megaphone,
   Flag,
   User,
+  Users,
   Activity,
   X,
   ChevronDown,
@@ -40,6 +41,7 @@ import KYCManagement from "./admin/KYCManagement";
 import AdminBroadcastPage from "./admin/AdminBroadcastPage";
 import AdminDefaultVotingBlocPage from "./admin/AdminDefaultVotingBlocPage";
 import AdminTemplateSyncPage from "./admin/AdminTemplateSyncPage";
+import AdminUserManagement from "./admin/AdminUserManagement";
 import AllNotificationsPage from "./notifications/AllNotificationsPage";
 // Sidebar menu items type
 interface NavItem {
@@ -164,6 +166,7 @@ export default function DashboardPage() {
       title: "Admin",
       icon: <ShieldCheck size={24} />,
       children: [
+        { title: "User Management", icon: <Users size={20} />, component: <AdminUserManagement /> },
         { title: "KYC Management", icon: <UserCheck size={20} />, component: <KYCManagement /> },
         { title: "Default Voting Bloc Settings", icon: <Flag size={20} />, component: <AdminDefaultVotingBlocPage /> },
         { title: "Template Synchronization", icon: <RefreshCw size={20} />, component: <AdminTemplateSyncPage /> },
