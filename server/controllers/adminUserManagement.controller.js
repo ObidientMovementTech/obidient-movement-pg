@@ -1100,6 +1100,125 @@ export const adminUserManagementController = {
       const JWT_SECRET = process.env.JWT_SECRET;
       const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
 
+      // Batch processing configuration
+      const BATCH_SIZE = 10; // Send 10 emails, then pause
+      const BATCH_DELAY = 30000; // 30 seconds between batches
+      const EMAIL_DELAY = 2000; // 2 seconds between individual emails
+
+      console.log(`📧 Starting bulk email operation for ${unverifiedUsers.length} users`);
+      console.log(`📊 Batch size: ${BATCH_SIZE}, Batch delay: ${BATCH_DELAY / 1000}s, Email delay: ${EMAIL_DELAY / 1000}s`);
+
+      // Process users in batches
+      for (let i = 0; i < unverifiedUsers.length; i += BATCH_SIZE) {
+        const batch = unverifiedUsers.slice(i, i + BATCH_SIZE);
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(unverifiedUsers.length / BATCH_SIZE);
+
+        console.log(`📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} emails)`);
+
+        // Process current batch
+        for (const user of batch) {
+          try {
+            // Generate confirmation token (just like in registration)
+            const emailToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+            const link = `${apiBaseUrl}/auth/confirm-email/${emailToken}`;
+
+            // Send confirmation email (same as registration)
+            await sendConfirmationEmail(user.name, user.email, link, "confirm");
+
+            results.push({
+              userId: user.id,
+              email: user.email,
+              name: user.name,
+              status: 'sent',
+              sentAt: new Date().toISOString(),
+              batch: batchNumber
+            });
+
+            console.log(`✅ Email sent to ${user.email} (${results.length}/${unverifiedUsers.length})`);
+
+            // Delay between individual emails within a batch
+            if (batch.indexOf(user) < batch.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, EMAIL_DELAY));
+            }
+
+          } catch (emailError) {
+            console.error(`❌ Failed to send email to ${user.email}:`, emailError.message);
+            errors.push({
+              userId: user.id,
+              email: user.email,
+              name: user.name,
+              status: 'failed',
+              error: emailError.message,
+              batch: batchNumber
+            });
+          }
+        }
+
+        // Delay between batches (except for the last batch)
+        if (i + BATCH_SIZE < unverifiedUsers.length) {
+          console.log(`⏳ Batch ${batchNumber} complete. Waiting ${BATCH_DELAY / 1000}s before next batch...`);
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+        }
+      }
+
+      console.log(`🎉 Bulk email operation completed! Sent: ${results.length}, Failed: ${errors.length}`);
+
+      res.json({
+        success: true,
+        message: `Verification emails processed for ${unverifiedUsers.length} users`,
+        data: {
+          totalUsers: unverifiedUsers.length,
+          totalSent: results.length,
+          totalFailed: errors.length,
+          sentEmails: results,
+          failedEmails: errors,
+          processedAt: new Date().toISOString(),
+          batchInfo: {
+            batchSize: BATCH_SIZE,
+            totalBatches: Math.ceil(unverifiedUsers.length / BATCH_SIZE),
+            batchDelay: BATCH_DELAY,
+            emailDelay: EMAIL_DELAY
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Resend all verification emails error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to process verification emails',
+        error: error.message
+      });
+    }
+  },
+
+  // BACKUP: Original bulk email function (kept for reference)
+  async resendAllVerificationEmailsSimple(req, res) {
+    try {
+      // Get all unverified users
+      const unverifiedUsersResult = await query(
+        'SELECT id, name, email FROM users WHERE "emailVerified" = false ORDER BY "createdAt" DESC'
+      );
+
+      const unverifiedUsers = unverifiedUsersResult.rows;
+
+      if (unverifiedUsers.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No unverified users found',
+          data: {
+            totalSent: 0,
+            users: []
+          }
+        });
+      }
+
+      const results = [];
+      const errors = [];
+      const JWT_SECRET = process.env.JWT_SECRET;
+      const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+
       // Process each user
       for (const user of unverifiedUsers) {
         try {
@@ -1118,8 +1237,9 @@ export const adminUserManagementController = {
             sentAt: new Date().toISOString()
           });
 
-          // Add a small delay to avoid overwhelming the email service
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Add a longer delay to avoid overwhelming Zoho and triggering spam detection
+          // 2 seconds delay = max 30 emails per minute (well within Zoho limits)
+          await new Promise(resolve => setTimeout(resolve, 2000));
 
         } catch (emailError) {
           console.error(`Failed to send email to ${user.email}:`, emailError);
