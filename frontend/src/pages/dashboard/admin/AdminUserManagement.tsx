@@ -4,7 +4,7 @@ import {
   Search,
   // Plus, 
   Trash2, Shield, ShieldOff,
-  CheckCircle, XCircle, UserCheck, UserX, Eye, Loader2, X, AlertTriangle
+  CheckCircle, XCircle, UserCheck, UserX, Eye, Loader2, X, AlertTriangle, Mail, Send
 } from 'lucide-react';
 import { adminUserManagementService } from '../../../services/adminUserManagementService';
 
@@ -43,6 +43,11 @@ interface UserStats {
   newUsersMonth: number;
 }
 
+interface UnverifiedStats {
+  count: number;
+  recentSignups: number; // Last 7 days
+}
+
 // Confirmation modal interface
 interface ConfirmationModal {
   isOpen: boolean;
@@ -58,9 +63,16 @@ interface ConfirmationModal {
 export default function AdminUserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [unverifiedStats, setUnverifiedStats] = useState<UnverifiedStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Email operation states
+  const [emailOperations, setEmailOperations] = useState({
+    bulkResending: false,
+    bulkProgress: { sent: 0, failed: 0, total: 0 }
+  });
 
   // OPTIMIZED: Pagination and filtering with better defaults
   const [currentPage, setCurrentPage] = useState(1);
@@ -173,6 +185,26 @@ export default function AdminUserManagement() {
     }
   }, []);
 
+  // Load unverified users stats
+  const loadUnverifiedStats = useCallback(async () => {
+    try {
+      const response = await adminUserManagementService.getUnverifiedUsersStats();
+      console.log('📊 Unverified stats response:', response.data);
+
+      // Map backend response to frontend interface
+      const backendStats = response.data.stats;
+      const mappedStats = {
+        count: parseInt(backendStats.total_unverified) || 0,
+        recentSignups: parseInt(backendStats.unverified_last_7d) || 0
+      };
+
+      console.log('📈 Mapped unverified stats:', mappedStats);
+      setUnverifiedStats(mappedStats);
+    } catch (error: any) {
+      console.error('❌ Failed to load unverified stats:', error);
+    }
+  }, []);
+
   // OPTIMIZED: Effects with better dependency management
   useEffect(() => {
     loadUsers();
@@ -180,7 +212,8 @@ export default function AdminUserManagement() {
 
   useEffect(() => {
     loadStats();
-  }, [loadStats]);
+    loadUnverifiedStats();
+  }, [loadStats, loadUnverifiedStats]);
 
   // Fast search effect
   useEffect(() => {
@@ -315,6 +348,97 @@ export default function AdminUserManagement() {
     });
   };
 
+  // Email resend functions
+  const handleResendVerificationEmail = async (userId: string, userEmail: string) => {
+    setActionLoading(prev => ({ ...prev, [`email-${userId}`]: true }));
+    try {
+      const response = await adminUserManagementService.resendVerificationEmail(userId);
+      setSuccess(`Verification email sent to ${userEmail}`);
+
+      if (response.data.emailSent) {
+        // Optional: You can add additional success feedback here
+        console.log('Email sent successfully via:', response.data.provider || 'SMTP');
+      }
+
+    } catch (error: any) {
+      setError(error.response?.data?.message || `Failed to send verification email to ${userEmail}`);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`email-${userId}`]: false }));
+    }
+  };
+
+  const handleResendAllVerificationEmails = async () => {
+    // If we don't have stats yet, try to load them first
+    if (!unverifiedStats) {
+      setError('Loading unverified user statistics...');
+      await loadUnverifiedStats();
+      return;
+    }
+
+    if (unverifiedStats.count === 0) {
+      setError('No unverified users found');
+      return;
+    }
+
+    showConfirmation({
+      title: 'Resend All Verification Emails',
+      message: `Are you sure you want to resend verification emails to all ${unverifiedStats.count} unverified users?\n\nThis operation:\n• Will send ${unverifiedStats.count} emails\n• May take several minutes to complete\n• Cannot be undone once started\n\nContinue with bulk email operation?`,
+      confirmText: `Send ${unverifiedStats.count} Emails`,
+      confirmStyle: 'warning',
+      onConfirm: async () => {
+        setConfirmationModal(prev => ({ ...prev, loading: true }));
+        setEmailOperations(prev => ({
+          ...prev,
+          bulkResending: true,
+          bulkProgress: { sent: 0, failed: 0, total: unverifiedStats.count }
+        }));
+
+        try {
+          const response = await adminUserManagementService.resendAllVerificationEmails();
+
+          // Update progress with final results
+          setEmailOperations(prev => ({
+            ...prev,
+            bulkProgress: {
+              sent: response.data.results?.successful || 0,
+              failed: response.data.results?.failed || 0,
+              total: response.data.results?.total || unverifiedStats.count
+            }
+          }));
+
+          const { successful = 0, failed = 0 } = response.data.results || {};
+
+          if (failed === 0) {
+            setSuccess(`Successfully sent verification emails to all ${successful} unverified users!`);
+          } else {
+            setSuccess(`Sent ${successful} emails successfully. ${failed} failed to send.`);
+            if (failed > 0) {
+              setError(`Some emails failed to send. Check server logs for details.`);
+            }
+          }
+
+          // Refresh stats after bulk operation
+          loadUnverifiedStats();
+          loadUsers();
+          setConfirmationModal(prev => ({ ...prev, isOpen: false, loading: false }));
+
+        } catch (error: any) {
+          setError(error.response?.data?.message || 'Failed to send bulk verification emails');
+          setConfirmationModal(prev => ({ ...prev, loading: false }));
+        } finally {
+          // Clear bulk operation state after a delay to show results
+          setTimeout(() => {
+            setEmailOperations(prev => ({
+              ...prev,
+              bulkResending: false,
+              bulkProgress: { sent: 0, failed: 0, total: 0 }
+            }));
+          }, 5000);
+        }
+      }
+    });
+  };
+
   const handleBulkAction = async () => {
     if (selectedUsers.length === 0 || !bulkAction) return;
 
@@ -346,6 +470,13 @@ export default function AdminUserManagement() {
         confirmText: 'Unverify Emails',
         confirmStyle: 'warning' as const,
         needsConfirmation: true
+      },
+      resendEmails: {
+        title: 'Resend Verification Emails',
+        message: `Send verification emails to ${selectedUsers.length} selected user(s). This will only send emails to unverified users in the selection.`,
+        confirmText: 'Send Emails',
+        confirmStyle: 'primary' as const,
+        needsConfirmation: true
       }
     };
 
@@ -371,6 +502,33 @@ export default function AdminUserManagement() {
           case 'unverifyEmail':
             await adminUserManagementService.bulkUpdateUsers(selectedUsers, 'updateEmailVerified', { emailVerified: false });
             setSuccess(`${selectedUsers.length} users email unverified`);
+            break;
+          case 'resendEmails':
+            // Resend emails to selected unverified users
+            const selectedUnverifiedUsers = users.filter(u => selectedUsers.includes(u.id) && !u.emailVerified);
+            if (selectedUnverifiedUsers.length === 0) {
+              setError('No unverified users in selection');
+              return;
+            }
+
+            let emailsSent = 0;
+            let emailsFailed = 0;
+
+            for (const user of selectedUnverifiedUsers) {
+              try {
+                await adminUserManagementService.resendVerificationEmail(user.id);
+                emailsSent++;
+              } catch (error) {
+                emailsFailed++;
+                console.error(`Failed to send email to ${user.email}:`, error);
+              }
+            }
+
+            if (emailsFailed === 0) {
+              setSuccess(`📧 Verification emails sent to ${emailsSent} users`);
+            } else {
+              setSuccess(`📧 Sent ${emailsSent} emails, ${emailsFailed} failed`);
+            }
             break;
         }
         setSelectedUsers([]);
@@ -525,18 +683,49 @@ export default function AdminUserManagement() {
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">Manage user accounts, roles, and permissions</p>
         </div>
-        {/* <button
-          onClick={() => alert('Create user form - coming soon!')}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
-        >
-          <Plus size={20} />
-          Create User
-        </button> */}
+
+        <div className="flex items-center gap-3">
+          {/* Bulk Email Button - Show if we have unverified stats or if stats haven't loaded yet (safety fallback) */}
+          {(!unverifiedStats || (unverifiedStats && unverifiedStats.count > 0)) && (
+            <button
+              onClick={handleResendAllVerificationEmails}
+              disabled={emailOperations.bulkResending}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              title={unverifiedStats
+                ? `Send verification emails to all ${unverifiedStats.count} unverified users`
+                : "Send verification emails to all unverified users"
+              }
+            >
+              {emailOperations.bulkResending ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send size={20} />
+                  {unverifiedStats
+                    ? `Resend Bulk Email Confirmation (${unverifiedStats.count})`
+                    : "Resend Bulk Email Confirmation"
+                  }
+                </>
+              )}
+            </button>
+          )}
+
+          {/* <button
+            onClick={() => alert('Create user form - coming soon!')}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Create User
+          </button> */}
+        </div>
       </div>
 
       {/* Statistics Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-white p-4 rounded-lg border">
             <div className="flex items-center justify-between">
               <div>
@@ -564,6 +753,21 @@ export default function AdminUserManagement() {
                 <p className="text-2xl font-bold text-gray-900">{stats.verifiedUsers}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg border">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Unverified</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.unverifiedUsers}</p>
+                {unverifiedStats && unverifiedStats.recentSignups > 0 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    +{unverifiedStats.recentSignups} this week
+                  </p>
+                )}
+              </div>
+              <Mail className="h-8 w-8 text-red-600" />
             </div>
           </div>
 
@@ -754,6 +958,7 @@ export default function AdminUserManagement() {
                 <option value="makeUser">Make User</option>
                 <option value="verifyEmail">Verify Email</option>
                 <option value="unverifyEmail">Unverify Email</option>
+                <option value="resendEmails">Resend Verification Emails</option>
               </select>
               <button
                 onClick={handleBulkAction}
@@ -794,6 +999,38 @@ export default function AdminUserManagement() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700 flex items-center">
           <Loader2 size={16} className="mr-2 flex-shrink-0 animate-spin" />
           Processing your request...
+        </div>
+      )}
+
+      {/* Bulk Email Progress */}
+      {emailOperations.bulkResending && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <Loader2 size={16} className="mr-2 animate-spin text-blue-600" />
+              <span className="text-blue-700 font-medium">Sending verification emails...</span>
+            </div>
+            <span className="text-sm text-blue-600">
+              {emailOperations.bulkProgress.sent + emailOperations.bulkProgress.failed} / {emailOperations.bulkProgress.total}
+            </span>
+          </div>
+
+          {emailOperations.bulkProgress.total > 0 && (
+            <div className="w-full bg-blue-200 rounded-full h-2 mb-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{
+                  width: `${((emailOperations.bulkProgress.sent + emailOperations.bulkProgress.failed) / emailOperations.bulkProgress.total) * 100}%`
+                }}
+              ></div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-sm text-blue-600">
+            <span>✅ Sent: {emailOperations.bulkProgress.sent}</span>
+            <span>❌ Failed: {emailOperations.bulkProgress.failed}</span>
+            <span>📧 Total: {emailOperations.bulkProgress.total}</span>
+          </div>
         </div>
       )}
 
@@ -994,18 +1231,33 @@ export default function AdminUserManagement() {
                               )}
                             </button>
                           ) : (
-                            <button
-                              onClick={() => handleStatusChange(user.id, true, user.name)}
-                              disabled={actionLoading[`status-${user.id}`]}
-                              className="text-green-600 hover:text-green-700 disabled:opacity-50 relative"
-                              title="Verify Email"
-                            >
-                              {actionLoading[`status-${user.id}`] ? (
-                                <Loader2 size={16} className="animate-spin" />
-                              ) : (
-                                <UserCheck size={16} />
-                              )}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleStatusChange(user.id, true, user.name)}
+                                disabled={actionLoading[`status-${user.id}`]}
+                                className="text-green-600 hover:text-green-700 disabled:opacity-50 relative"
+                                title="Verify Email"
+                              >
+                                {actionLoading[`status-${user.id}`] ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <UserCheck size={16} />
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => handleResendVerificationEmail(user.id, user.email)}
+                                disabled={actionLoading[`email-${user.id}`]}
+                                className="text-blue-600 hover:text-blue-700 disabled:opacity-50 relative"
+                                title="Resend Verification Email"
+                              >
+                                {actionLoading[`email-${user.id}`] ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <Mail size={16} />
+                                )}
+                              </button>
+                            </>
                           )}
 
                           <button

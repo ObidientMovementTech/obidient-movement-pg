@@ -41,9 +41,6 @@ export interface OnboardingData {
     level_of_education?: string;
     marital_status?: string;
   };
-  politicalPreferences?: {
-    party_affiliation?: string;
-  };
   engagementAndMobilization?: {
     is_volunteering?: string;
     past_election_participation?: string;
@@ -65,8 +62,25 @@ export interface UserProfile {
   role: 'user' | 'admin';
   kycStatus: 'unsubmitted' | 'pending' | 'approved' | 'rejected';
   kycRejectionReason?: string;
+
+  // Legacy nested structure (for backward compatibility)
   personalInfo: PersonalInfo;
   onboardingData: OnboardingData;
+
+  // New flat structure (post-migration fields)
+  userName?: string;
+  gender?: string;
+  ageRange?: string;
+  stateOfOrigin?: string;
+  votingState?: string;
+  votingLGA?: string;
+  votingWard?: string;
+  citizenship?: string;
+  isVoter?: string;
+  willVote?: string;
+  countryCode?: string;
+
+  // Existing fields
   selfieImageUrl?: string;
   validID: ValidID;
   joinedCauses: string[];
@@ -74,8 +88,6 @@ export interface UserProfile {
   createdAt?: string;
   updatedAt?: string;
   hasTakenCauseSurvey?: boolean;
-  organizationAffiliations?: string[];
-  politicalPartyAffiliation?: string;
   twoFactorEnabled?: boolean;
   notificationPreferences?: {
     email: boolean;

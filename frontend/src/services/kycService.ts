@@ -20,18 +20,15 @@ const getErrorMessage = (error: any): string => {
   return "An unexpected error occurred";
 };
 
-// Submit KYC with base64-encoded files (serverless-compatible)
+// Submit KYC with base64-encoded files (serverless-compatible) 
+// Updated for simplified 2-step KYC (no personal info required)
 export const submitKYCData = async (
-  personalInfo: any,
+  personalInfo: any | null, // Now optional since personal info is handled separately
   validID: { idType: string; idNumber: string; idImageBase64: string },
   selfieBase64: string
 ) => {
   try {
-    // Validate required fields
-    if (!personalInfo.first_name || !personalInfo.last_name) {
-      throw new Error("Personal information is incomplete");
-    }
-
+    // Validate required fields (only ID and selfie now)
     if (!validID.idType || !validID.idNumber) {
       throw new Error("Valid ID information is incomplete");
     }
@@ -40,7 +37,8 @@ export const submitKYCData = async (
 
     // Prepare payload with base64 encoded files (if provided)
     const payload = {
-      personalInfo,
+      // Only include personalInfo if it exists (backward compatibility)
+      ...(personalInfo ? { personalInfo } : {}),
       validIDType: validID.idType,
       validIDNumber: validID.idNumber,
       // Only include base64 data if provided (for new uploads)

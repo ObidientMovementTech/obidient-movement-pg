@@ -1,4 +1,4 @@
-import { gmailTransporter, sender } from '../config/gmail.js';
+import { emailTransporter, sender, createEmailTransporter } from '../config/email.js';
 import {
   createConfirmationEmailTemplate,
   createResetPasswordEmailTemplate,
@@ -26,12 +26,13 @@ export const sendConfirmationEmail = async (name, email, link, type) => {
     ? `Hi ${name || ''},\n\nYou requested to update your Obidient Movement account password.\n\nPlease visit this link to set a new password: ${link}\n\nIf you didn't request this, you can ignore this email.\n\n— Obidient Movement Team`
     : `Hi ${name || ''},\n\nThank you for registering on Obidient Movement!\n\nPlease confirm your email by visiting this link: ${link}\n\nIf you did not register, you can ignore this email.\n\n— The Obidient Movement Team`;
 
-  console.log(`[GMAIL][EMAIL] Preparing to send ${type} email to ${email}`);
+  console.log(`[EMAIL] Preparing to send ${type} email to ${email}`);
 
   try {
-    console.log(`[GMAIL][EMAIL] Current environment: ${process.env.NODE_ENV}`);
+    console.log(`[EMAIL] Current environment: ${process.env.NODE_ENV}`);
+    console.log(`[EMAIL] Using email service: ${process.env.EMAIL_SERVICE || 'gmail'}`);
 
-    // Gmail configuration using nodemailer
+    // Email configuration using nodemailer
     const mailOptions = {
       from: `"${sender.name}" <${sender.email}>`,
       to: email,
@@ -40,12 +41,12 @@ export const sendConfirmationEmail = async (name, email, link, type) => {
       text: plainText,
     };
 
-    const response = await gmailTransporter.sendMail(mailOptions);
+    const response = await emailTransporter.sendMail(mailOptions);
 
-    console.log(`[GMAIL][EMAIL] ${type} email sent successfully to ${email}`, response.messageId);
+    console.log(`[EMAIL] ${type} email sent successfully to ${email}`, response.messageId);
     return response;
   } catch (error) {
-    console.error(`[GMAIL][EMAIL] Error sending ${type} email to ${email}:`, error.message);
+    console.error(`[EMAIL] Error sending ${type} email to ${email}:`, error.message);
     throw error;
   }
 };
@@ -59,18 +60,12 @@ export const sendOTPEmail = async (name, email, otp, purpose) => {
       : 'Email Verification';
 
   const subject = `Your ${purposeText} Code for Obidient Movement`;
-
   const html = createOTPEmailTemplate(name, otp, purpose);
-
-  // Create a plain text version
   const plainText = `Hi ${name || ''},\n\nYour verification code for Obidient Movement is: ${otp}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this code, you can ignore this email.\n\n— Obidient Movement Team`;
 
-  console.log(`[GMAIL][EMAIL] Preparing to send OTP email to ${email} for ${purpose}`);
-
   try {
-    console.log(`[GMAIL][EMAIL] Current environment: ${process.env.NODE_ENV}`);
+    const transporter = createEmailTransporter();
 
-    // Gmail configuration using nodemailer
     const mailOptions = {
       from: `"${sender.name}" <${sender.email}>`,
       to: email,
@@ -79,12 +74,13 @@ export const sendOTPEmail = async (name, email, otp, purpose) => {
       text: plainText,
     };
 
-    const response = await gmailTransporter.sendMail(mailOptions);
+    const response = await transporter.sendMail(mailOptions);
+    console.log(`✅ OTP email sent successfully to ${email}`);
 
-    console.log(`[GMAIL][EMAIL] OTP email sent successfully to ${email}`, response.messageId);
     return response;
+
   } catch (error) {
-    console.error(`[GMAIL][EMAIL] Error sending OTP email to ${email}:`, error.message);
+    console.error(`❌ Error sending OTP email to ${email}:`, error.message);
     throw error;
   }
 };
@@ -145,7 +141,7 @@ Thank you!
 
   const recipient = [{ email }];
 
-  return await gmailTransporter.sendMail({
+  return await emailTransporter.sendMail({
     from: `"${sender.name}" <${sender.email}>`,
     to: email,
     subject: `You're invited to join ${causeName}`,
@@ -167,7 +163,7 @@ export const sendVotingBlocBroadcastEmail = async (votingBlocName, senderName, m
   try {
     // Send to multiple recipients
     const emailPromises = recipients.map(recipient =>
-      gmailTransporter.sendMail({
+      emailTransporter.sendMail({
         from: `"${sender.name}" <${sender.email}>`,
         to: recipient.email,
         subject,
@@ -206,7 +202,7 @@ export const sendVotingBlocPrivateMessageEmail = async (votingBlocName, senderNa
       text: plainText,
     };
 
-    const response = await gmailTransporter.sendMail(mailOptions);
+    const response = await emailTransporter.sendMail(mailOptions);
     console.log(`[GMAIL][EMAIL] Voting bloc private message email sent successfully to ${recipientEmail}`, response.messageId);
     return response;
   } catch (error) {
@@ -253,7 +249,7 @@ This invitation was sent by ${inviterName} through the Obidient Movement platfor
       text: plainText,
     };
 
-    const response = await gmailTransporter.sendMail(mailOptions);
+    const response = await emailTransporter.sendMail(mailOptions);
     console.log(`[GMAIL][EMAIL] Voting bloc invitation email sent successfully to ${inviteeEmail}`, response.messageId);
     return response;
   } catch (error) {
@@ -281,7 +277,7 @@ export const sendVotingBlocRemovalEmail = async (memberName, memberEmail, voting
       text: plainText,
     };
 
-    const response = await gmailTransporter.sendMail(mailOptions);
+    const response = await emailTransporter.sendMail(mailOptions);
     console.log(`[GMAIL][EMAIL] Voting bloc removal email sent successfully to ${memberEmail}`, response.messageId);
     return response;
   } catch (error) {

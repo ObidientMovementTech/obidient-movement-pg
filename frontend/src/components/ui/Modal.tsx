@@ -24,8 +24,17 @@ const Modal: React.FC<ModalProps> = ({
     };
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-        onClose();
+      const target = e.target as Element;
+
+      // Check if click is outside modal
+      if (modalRef.current && !modalRef.current.contains(target)) {
+        // Don't close if clicking on dropdown elements or their children
+        const isDropdownElement = target.closest('[data-modal-ignore="true"]') ||
+          target.hasAttribute('data-modal-ignore');
+
+        if (!isDropdownElement) {
+          onClose();
+        }
       }
     };
 

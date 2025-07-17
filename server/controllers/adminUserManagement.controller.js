@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { query, getClient } from '../config/db.js';
 import { generateOTP } from '../utils/otpUtils.js';
-import { sendOTPEmail } from '../utils/emailHandler.js';
+import { sendOTPEmail, sendConfirmationEmail } from '../utils/emailHandler.js';
 
 export const adminUserManagementController = {
   // Get all users with pagination and filters - OPTIMIZED FOR LARGE DATASETS
@@ -1011,6 +1012,184 @@ export const adminUserManagementController = {
       res.status(500).json({
         success: false,
         message: 'Search failed',
+        error: error.message
+      });
+    }
+  },
+
+  // Resend verification email to a specific unverified user
+  async resendVerificationEmail(req, res) {
+    try {
+      const { userId } = req.params;
+
+      // Get user details
+      const userResult = await query(
+        'SELECT id, name, email, "emailVerified" FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      const user = userResult.rows[0];
+
+      // Check if user is already verified
+      if (user.emailVerified) {
+        return res.status(400).json({
+          success: false,
+          message: 'User email is already verified'
+        });
+      }
+
+      // Generate confirmation token (just like in registration)
+      const JWT_SECRET = process.env.JWT_SECRET;
+      const emailToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+      const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+      const link = `${apiBaseUrl}/auth/confirm-email/${emailToken}`;
+
+      // Send confirmation email (same as registration)
+      await sendConfirmationEmail(user.name, user.email, link, "confirm");
+
+      res.json({
+        success: true,
+        message: `Confirmation email sent to ${user.email}`,
+        data: {
+          userId: user.id,
+          email: user.email,
+          sentAt: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      console.error('Resend verification email error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to resend verification email',
+        error: error.message
+      });
+    }
+  },
+
+  // Resend verification emails to ALL unverified users
+  async resendAllVerificationEmails(req, res) {
+    try {
+      // Get all unverified users
+      const unverifiedUsersResult = await query(
+        'SELECT id, name, email FROM users WHERE "emailVerified" = false ORDER BY "createdAt" DESC'
+      );
+
+      const unverifiedUsers = unverifiedUsersResult.rows;
+
+      if (unverifiedUsers.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No unverified users found',
+          data: {
+            totalSent: 0,
+            users: []
+          }
+        });
+      }
+
+      const results = [];
+      const errors = [];
+      const JWT_SECRET = process.env.JWT_SECRET;
+      const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+
+      // Process each user
+      for (const user of unverifiedUsers) {
+        try {
+          // Generate confirmation token (just like in registration)
+          const emailToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+          const link = `${apiBaseUrl}/auth/confirm-email/${emailToken}`;
+
+          // Send confirmation email (same as registration)
+          await sendConfirmationEmail(user.name, user.email, link, "confirm");
+
+          results.push({
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            status: 'sent',
+            sentAt: new Date().toISOString()
+          });
+
+          // Add a small delay to avoid overwhelming the email service
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+        } catch (emailError) {
+          console.error(`Failed to send email to ${user.email}:`, emailError);
+          errors.push({
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            status: 'failed',
+            error: emailError.message
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Verification emails processed for ${unverifiedUsers.length} users`,
+        data: {
+          totalUsers: unverifiedUsers.length,
+          totalSent: results.length,
+          totalFailed: errors.length,
+          sentEmails: results,
+          failedEmails: errors,
+          processedAt: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      console.error('Resend all verification emails error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to process verification emails',
+        error: error.message
+      });
+    }
+  },
+
+  // Get statistics for unverified users
+  async getUnverifiedUsersStats(req, res) {
+    try {
+      const statsResult = await query(`
+        SELECT 
+          COUNT(*) as total_unverified,
+          COUNT(CASE WHEN "createdAt" >= NOW() - INTERVAL '24 hours' THEN 1 END) as unverified_last_24h,
+          COUNT(CASE WHEN "createdAt" >= NOW() - INTERVAL '7 days' THEN 1 END) as unverified_last_7d,
+          COUNT(CASE WHEN "createdAt" >= NOW() - INTERVAL '30 days' THEN 1 END) as unverified_last_30d
+        FROM users 
+        WHERE "emailVerified" = false
+      `);
+
+      const recentUnverifiedResult = await query(`
+        SELECT id, name, email, "createdAt"
+        FROM users 
+        WHERE "emailVerified" = false
+        ORDER BY "createdAt" DESC
+        LIMIT 10
+      `);
+
+      res.json({
+        success: true,
+        data: {
+          stats: statsResult.rows[0],
+          recentUnverified: recentUnverifiedResult.rows
+        }
+      });
+
+    } catch (error) {
+      console.error('Get unverified users stats error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get unverified users statistics',
         error: error.message
       });
     }

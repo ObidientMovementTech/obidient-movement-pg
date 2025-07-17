@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
 import { UserProfile, useUserContext } from '../../context/UserContext';
 import Toast from '../../components/Toast';
+import Modal from '../../components/ui/Modal';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../../utils/getCroppedImg';
 import compressImage from '../../utils/ImageCompression';
+import FormSelect from '../../components/select/FormSelect';
+import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
+import { statesLGAWardList } from '../../utils/StateLGAWard';
+import { formatStateName, formatLocationName } from '../../utils/textUtils';
 import axios from 'axios';
 
 export default function EditProfileModal({
@@ -25,9 +29,101 @@ export default function EditProfileModal({
   const [zoom, setZoom] = useState(1);
   const [croppedArea, setCroppedArea] = useState<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [toastInfo, setToastInfo] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Enhanced profile fields from migration (with backward compatibility)
+  const [userName, setUserName] = useState(
+    profile.userName || profile.personalInfo?.user_name || ''
+  );
+  const [gender, setGender] = useState(
+    profile.gender || profile.personalInfo?.gender || ''
+  );
+  const [ageRange, setAgeRange] = useState(
+    profile.ageRange || profile.personalInfo?.age_range || ''
+  );
+  const [stateOfOrigin, setStateOfOrigin] = useState(
+    profile.stateOfOrigin || profile.personalInfo?.state_of_origin || ''
+  );
+  const [votingState, setVotingState] = useState(
+    profile.votingState || profile.personalInfo?.voting_engagement_state || ''
+  );
+  const [votingLGA, setVotingLGA] = useState(
+    profile.votingLGA || profile.personalInfo?.lga || ''
+  );
+  const [votingWard, setVotingWard] = useState(
+    profile.votingWard || profile.personalInfo?.ward || ''
+  );
+  const [citizenship, setCitizenship] = useState(
+    profile.citizenship || profile.personalInfo?.citizenship || ''
+  );
+  const [isVoter, setIsVoter] = useState(
+    profile.isVoter || profile.onboardingData?.votingBehavior?.is_registered || ''
+  );
+  const [willVote, setWillVote] = useState(
+    profile.willVote || profile.onboardingData?.votingBehavior?.likely_to_vote || ''
+  );
+
+  // Additional missing state variables
+  const [countryCode, setCountryCode] = useState(() => {
+    const existingCountry = profile.countryCode || '';
+    const existingCitizenship = profile.citizenship || profile.personalInfo?.citizenship || '';
+
+    // Set default country based on citizenship
+    if (existingCitizenship === 'Nigerian Citizen' || existingCitizenship === 'Diasporan') {
+      return 'Nigeria';
+    }
+    return existingCountry;
+  });
+
+  // For cascading dropdowns
+  const [selectedState, setSelectedState] = useState(profile.votingState || '');
+  const [selectedLGA, setSelectedLGA] = useState(profile.votingLGA || '');
+
+  // Dropdown options state
+  const [states, setStates] = useState<OptionType[]>([]);
+
+  // Initialize states dropdown
+  useEffect(() => {
+    const stateOptions = statesLGAWardList.map((s, i) => ({
+      id: i,
+      label: formatStateName(s.state), // Display formatted name
+      value: s.state, // Keep original value for backend
+    }));
+    setStates(stateOptions);
+  }, []);
+
+  // Helper functions for cascading dropdowns (same as KYC)
+  const getLgas = (stateName: string): OptionType[] => {
+    const found = statesLGAWardList.find(s => s.state === stateName);
+    return found ? found.lgas.map((l, i) => ({
+      id: i,
+      label: formatLocationName(l.lga), // Display formatted name
+      value: l.lga // Keep original value for backend
+    })) : [];
+  };
+
+  const getWards = (lga: string, state: string): OptionType[] => {
+    const stateData = statesLGAWardList.find(s => s.state === state);
+    const lgaData = stateData?.lgas.find(l => l.lga === lga);
+    return lgaData ? lgaData.wards.map((w, i) => ({
+      id: i,
+      label: formatLocationName(w), // Display formatted name
+      value: w // Keep original value for backend
+    })) : [];
+  };
+
+  // Dropdown options (same as KYC)
+  const citizenshipOptions = [
+    { id: 1, label: "Nigerian Citizen", value: "Nigerian Citizen" },
+    { id: 2, label: "Diasporan", value: "Diasporan" },
+    { id: 3, label: "Foreigner", value: "Foreigner" },
+  ];
+
+  const yesNoOptions = [
+    { id: 1, label: "Yes", value: "Yes" },
+    { id: 2, label: "No", value: "No" },
+  ];
 
   useEffect(() => {
     if (isOpen) {
@@ -37,40 +133,6 @@ export default function EditProfileModal({
       setFileSrc(null);
     }
   }, [isOpen, profile]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        console.log('Modal closed via ESC key');
-        onClose();
-      }
-      if (e.key === 'Tab' && modalRef.current) {
-        const focusableElements = modalRef.current.querySelectorAll(
-          'button, input, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        const firstElement = focusableElements[0] as HTMLElement;
-        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
-
-        if (e.shiftKey && document.activeElement === firstElement) {
-          e.preventDefault();
-          lastElement.focus();
-        } else if (!e.shiftKey && document.activeElement === lastElement) {
-          e.preventDefault();
-          firstElement.focus();
-        }
-      }
-    };
-
-    if (modalRef.current) {
-      const firstInput = modalRef.current.querySelector('input');
-      if (firstInput) firstInput.focus();
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -122,20 +184,40 @@ export default function EditProfileModal({
   const handleSave = async () => {
     setLoading(true);
     try {
-      await updateProfile({ name, phone, profileImage: imageUrl });
-      setToastInfo({ message: 'Profile updated', type: 'success' });
+      // Set country based on citizenship
+      let finalCountryCode = countryCode;
+      if (citizenship === 'Nigerian Citizen' || citizenship === 'Diasporan') {
+        finalCountryCode = 'Nigeria';
+      }
+
+      // Include all the enhanced profile fields
+      const updatedProfile = {
+        name,
+        phone,
+        profileImage: imageUrl,
+        // Personal information fields
+        userName,
+        gender,
+        ageRange,
+        citizenship,
+        countryCode: finalCountryCode,
+        // Format location data as Title Case before sending to backend
+        stateOfOrigin: stateOfOrigin ? formatStateName(stateOfOrigin) : stateOfOrigin,
+        votingState: votingState ? formatStateName(votingState) : votingState,
+        votingLGA: votingLGA ? formatLocationName(votingLGA) : votingLGA,
+        votingWard: votingWard ? formatLocationName(votingWard) : votingWard,
+        isVoter,
+        willVote,
+      };
+
+      await updateProfile(updatedProfile);
+      setToastInfo({ message: 'Profile updated successfully', type: 'success' });
       onClose();
-    } catch {
-      setToastInfo({ message: 'Save failed', type: 'error' });
+    } catch (error) {
+      console.error('Profile update error:', error);
+      setToastInfo({ message: 'Failed to update profile', type: 'error' });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      console.log('Modal closed via overlay click');
-      onClose();
     }
   };
 
@@ -144,31 +226,10 @@ export default function EditProfileModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
     <>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300"
-        onClick={handleOverlayClick}
-      >
-        <div
-          ref={modalRef}
-          role="dialog"
-          aria-modal="true"
-          className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 transform transition-all duration-300 scale-100 sm:scale-105 max-h-[80vh] overflow-y-auto font-poppins"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">Edit Your Profile</h2>
-            <button
-              onClick={handleClose}
-              className="text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label="Close modal"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
+      <Modal isOpen={isOpen} onClose={handleClose} title="Edit Your Profile" maxWidth="max-w-2xl">
+        <div className="space-y-6 max-h-[70vh] overflow-y-auto">
           <form className="space-y-6">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-600 mb-1">
@@ -260,6 +321,170 @@ export default function EditProfileModal({
                 </button>
               </div>
             )}
+
+            {/* Personal Information Section */}
+            <div className="space-y-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Personal Information</h3>
+
+              {/* Username */}
+              <div>
+                <label htmlFor="userName" className="block text-sm font-medium text-gray-600 mb-1">
+                  Username
+                </label>
+                <input
+                  id="userName"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Enter your username"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006837] focus:border-[#006837] transition text-gray-900"
+                />
+              </div>
+
+              {/* Gender */}
+              <div>
+                <FormSelect
+                  label="Gender"
+                  options={genderOptions}
+                  defaultSelected={gender}
+                  onChange={(opt) => {
+                    if (opt) setGender(opt.value);
+                  }}
+                />
+              </div>
+
+              {/* Age Range */}
+              <div>
+                <FormSelect
+                  label="Age Range"
+                  options={ageRangeOptions}
+                  defaultSelected={ageRange}
+                  onChange={(opt) => {
+                    if (opt) setAgeRange(opt.value);
+                  }}
+                />
+              </div>
+
+              {/* Citizenship */}
+              <div>
+                <FormSelect
+                  label="Citizenship"
+                  options={citizenshipOptions}
+                  defaultSelected={citizenship}
+                  onChange={(opt) => {
+                    if (opt) {
+                      setCitizenship(opt.value);
+                      // Set default country based on citizenship
+                      if (opt.value === 'Nigerian Citizen' || opt.value === 'Diasporan') {
+                        setCountryCode('Nigeria');
+                      } else if (opt.value === 'Foreigner') {
+                        setCountryCode(''); // Clear country for foreigners to enter manually
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Country - Only show for Foreigners */}
+              {citizenship === 'Foreigner' && (
+                <div>
+                  <label htmlFor="countryCode" className="block text-sm font-medium text-gray-600 mb-1">
+                    Country
+                  </label>
+                  <input
+                    id="countryCode"
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    placeholder="Enter your country"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006837] focus:border-[#006837] transition text-gray-900"
+                  />
+                </div>
+              )}
+
+              {/* State of Origin */}
+              <div>
+                <FormSelect
+                  label="State of Origin"
+                  options={states}
+                  defaultSelected={stateOfOrigin}
+                  onChange={(opt) => {
+                    if (opt) setStateOfOrigin(opt.value);
+                  }}
+                />
+              </div>
+
+              {/* Voting State */}
+              <div>
+                <FormSelect
+                  label="Voting State"
+                  options={states}
+                  defaultSelected={selectedState}
+                  onChange={(opt) => {
+                    const newState = opt?.value || '';
+                    setSelectedState(newState);
+                    setVotingState(newState);
+                    // Reset dependent fields
+                    setSelectedLGA('');
+                    setVotingLGA('');
+                    setVotingWard('');
+                  }}
+                />
+              </div>
+
+              {/* Voting LGA */}
+              <div>
+                <FormSelect
+                  label="Voting LGA"
+                  options={getLgas(selectedState)}
+                  defaultSelected={selectedLGA}
+                  onChange={(opt) => {
+                    const newLGA = opt?.value || '';
+                    setSelectedLGA(newLGA);
+                    setVotingLGA(newLGA);
+                    // Reset ward
+                    setVotingWard('');
+                  }}
+                  disabled={!selectedState}
+                />
+              </div>
+
+              {/* Voting Ward */}
+              <div>
+                <FormSelect
+                  label="Voting Ward"
+                  options={getWards(selectedLGA, selectedState)}
+                  defaultSelected={votingWard}
+                  onChange={(opt) => {
+                    if (opt) setVotingWard(opt.value);
+                  }}
+                  disabled={!selectedLGA}
+                />
+              </div>
+
+              {/* Voter Registration Status */}
+              <div>
+                <FormSelect
+                  label="Are you a Registered Voter?"
+                  options={yesNoOptions}
+                  defaultSelected={isVoter}
+                  onChange={(opt) => {
+                    if (opt) setIsVoter(opt.value);
+                  }}
+                />
+              </div>
+
+              {/* Voting Intention */}
+              <div>
+                <FormSelect
+                  label="Will you vote in the next election?"
+                  options={yesNoOptions}
+                  defaultSelected={willVote}
+                  onChange={(opt) => {
+                    if (opt) setWillVote(opt.value);
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="flex justify-end pt-4 border-t border-gray-200">
               <button
                 type="button"
@@ -273,7 +498,7 @@ export default function EditProfileModal({
             </div>
           </form>
         </div>
-      </div>
+      </Modal>
       {toastInfo && (
         <Toast
           message={toastInfo.message}

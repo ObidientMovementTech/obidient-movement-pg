@@ -14,7 +14,7 @@ import notificationRoutes from './routes/notification.route.js';
 import evaluationRoutes from './routes/evaluation.route.js';
 import kycRoutes from './routes/kyc.route.js';
 import votingBlocRoutes from './routes/votingBloc.route.js';
-import { verifyGmailConnection } from './config/gmail.js';
+import { verifyEmailConnection } from './config/email.js';
 
 // Load env variables
 dotenv.config();
@@ -42,16 +42,13 @@ app.use('/voting-blocs', votingBlocRoutes);
 
 // Placeholder route
 app.get('/', (req, res) => {
-  res.send('Recent Obidient Movement API running...');
+  res.send('Recent Zoho Obidient Movement API running...');
 });
 
 // PostgreSQL connection and server startup
 connectDB().then(async () => {
-
-  console.log('✅ PostgreSQL connected successfully');
-
-  // Verify Gmail connection
-  await verifyGmailConnection();
+  // Verify Email connection
+  await verifyEmailConnection();
   // Development - use HTTP
   app.listen(PORT, () => console.log(`🌐 HTTP Server running on port ${PORT}`));
 });

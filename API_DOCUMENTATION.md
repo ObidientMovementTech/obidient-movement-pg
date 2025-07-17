@@ -1837,9 +1837,6 @@ This document outlines the current API structure after migration to PostgreSQL. 
       level_of_education: String,
       marital_status: String
     },
-    politicalPreferences: {
-      party_affiliation: String
-    },
     engagementAndMobilization: {
       is_volunteering: String,
       past_election_participation: String
@@ -1860,8 +1857,6 @@ This document outlines the current API structure after migration to PostgreSQL. 
   ownedCauses: [ObjectId],
   hasTakenCauseSurvey: Boolean,
   country_of_residence: String,
-  organizationAffiliations: [String],
-  politicalPartyAffiliation: String,
   notificationPreferences: {
     email: Boolean,
     push: Boolean,

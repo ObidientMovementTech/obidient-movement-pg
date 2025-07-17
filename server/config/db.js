@@ -17,16 +17,16 @@ const pool = new Pool(dbConfig);
 const connectDB = async () => {
   try {
     const client = await pool.connect();
-    console.log('✅ PostgreSQL connected successfully');
+    console.log('PostgreSQL connected successfully');
 
     // Test query
     const result = await client.query('SELECT NOW()');
-    console.log('🕒 Database time:', result.rows[0].now);
+    console.log('Database time:', result.rows[0].now);
 
     client.release();
     return true;
   } catch (error) {
-    console.error('❌ PostgreSQL connection error:', error.message);
+    console.error('PostgreSQL connection error:', error.message);
     process.exit(1);
   }
 };
@@ -40,7 +40,7 @@ const query = async (text, params) => {
     console.log('⚡ Query executed:', { text, duration, rows: result.rowCount });
     return result;
   } catch (error) {
-    console.error('🚨 Database query error:', error.message);
+    console.error('Database query error:', error.message);
     throw error;
   }
 };

@@ -64,8 +64,9 @@ export default function Select({
       <ListboxOptions
         anchor="bottom"
         transition
+        data-modal-ignore="true"
         className={clsx(
-          "w-[var(--button-width)]  rounded-xl border-2 border-white/10 bg-background-dark text-white [--anchor-gap:var(--spacing-1)] focus:outline-none z-[60]",
+          "w-[var(--button-width)]  rounded-xl border-2 border-white/10 bg-background-dark text-white [--anchor-gap:var(--spacing-1)] focus:outline-none z-[10001]",
           "transition duration-100 ease-in data-[leave]:data-[closed]:opacity-0 "
         )}
       >

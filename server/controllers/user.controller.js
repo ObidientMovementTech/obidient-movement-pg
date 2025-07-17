@@ -35,7 +35,7 @@ export const uploadProfileImage = async (req, res) => {
   }
 };
 
-// PATCH /users/me - update user profile (including survey fields)
+// PATCH /users/me - update user profile (including personal info fields)
 export const updateMe = async (req, res) => {
   try {
     const updates = req.body;
@@ -46,21 +46,40 @@ export const updateMe = async (req, res) => {
 
     console.log('👤 Current user before update:', { name: user.name, phone: user.phone, profileImage: user.profileImage });
 
-    // Update nested personalInfo fields
+    // Update personal info fields (now in main users table after migration)
     if (updates.personalInfo) {
       console.log('📝 Updating personalInfo:', updates.personalInfo);
-      user.personalInfo = { ...user.personalInfo, ...updates.personalInfo };
+
+      // Map personalInfo fields to their new locations in users table
+      const personalInfoMapping = {
+        userName: 'userName',
+        phoneNumber: 'phone',
+        countryCode: 'countryCode',
+        gender: 'gender',
+        lga: 'votingLGA',
+        ward: 'votingWard',
+        ageRange: 'ageRange',
+        stateOfOrigin: 'stateOfOrigin',
+        votingEngagementState: 'votingState',
+        citizenship: 'citizenship',
+        isVoter: 'isVoter',
+        willVote: 'willVote'
+      };
+
+      Object.keys(personalInfoMapping).forEach(oldField => {
+        if (updates.personalInfo[oldField] !== undefined) {
+          const newField = personalInfoMapping[oldField];
+          console.log(`🔧 Mapping personalInfo.${oldField} to user.${newField}: "${updates.personalInfo[oldField]}"`);
+          user[newField] = updates.personalInfo[oldField];
+        }
+      });
     }
 
-    // Update top-level fields
+    // Update top-level fields (expanded to include all personal info fields)
     const allowedTopLevelFields = [
-      'name',
-      'phone',
-      'profileImage',
-      'organizationAffiliations',
-      'politicalPartyAffiliation',
-      'notificationPreferences',
-      'onboardingData'
+      'name', 'phone', 'profileImage', 'votingState', 'votingLGA', 'votingWard',
+      'gender', 'ageRange', 'citizenship', 'isVoter', 'willVote', 'userName',
+      'countryCode', 'stateOfOrigin', 'notificationPreferences', 'onboardingData'
     ];
 
     allowedTopLevelFields.forEach(field => {
@@ -91,7 +110,7 @@ export const updateMe = async (req, res) => {
 // PATCH /users/:id - update user by admin
 export const updateUser = async (req, res) => {
   try {
-    const { name, phone, politicalPartyAffiliation } = req.body;
+    const { name, phone } = req.body;
     const userId = req.userId;
 
     const user = await User.findById(userId);
@@ -102,9 +121,6 @@ export const updateUser = async (req, res) => {
     // Update user fields
     if (name) user.name = name;
     if (phone) user.phone = phone;
-    if (politicalPartyAffiliation !== undefined) {
-      user.politicalPartyAffiliation = politicalPartyAffiliation;
-    }
 
     // Save updated user
     await user.save();
