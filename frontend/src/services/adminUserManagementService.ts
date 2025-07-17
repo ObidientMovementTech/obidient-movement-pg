@@ -139,5 +139,27 @@ export const adminUserManagementService = {
       withCredentials: true
     });
     return response.data;
+  },
+
+  // Email verification functions
+  async resendVerificationEmail(userId: string) {
+    const response = await axios.post(`${API_BASE}/admin/user-management/users/${userId}/resend-verification`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  },
+
+  async resendAllVerificationEmails() {
+    const response = await axios.post(`${API_BASE}/admin/user-management/users/resend-all-verification`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  },
+
+  async getUnverifiedUsersStats() {
+    const response = await axios.get(`${API_BASE}/admin/user-management/users/unverified/stats`, {
+      withCredentials: true
+    });
+    return response.data;
   }
 };

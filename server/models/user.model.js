@@ -16,7 +16,16 @@ class User {
       emailVerified = false,
       role = 'user',
       votingState = null,
-      votingLGA = null
+      votingLGA = null,
+      votingWard = null,
+      gender = null,
+      ageRange = null,
+      citizenship = null,
+      isVoter = null,
+      willVote = null,
+      userName = null,
+      countryCode = null,
+      stateOfOrigin = null
     } = userData;
 
     const client = await getClient();
@@ -27,10 +36,14 @@ class User {
       const userResult = await client.query(
         `INSERT INTO users (
           name, email, phone, "passwordHash", "profileImage", 
-          "emailVerified", role, "votingState", "votingLGA"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+          "emailVerified", role, "votingState", "votingLGA", "votingWard",
+          gender, "ageRange", citizenship, "isVoter", "willVote",
+          "userName", "countryCode", "stateOfOrigin"
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
         RETURNING *`,
-        [name, email, phone, passwordHash, profileImage, emailVerified, role, votingState, votingLGA]
+        [name, email, phone, passwordHash, profileImage, emailVerified, role,
+          votingState, votingLGA, votingWard, gender, ageRange, citizenship,
+          isVoter, willVote, userName, countryCode, stateOfOrigin]
       );
 
       const user = userResult.rows[0];
@@ -147,49 +160,63 @@ class User {
     try {
       await client.query('BEGIN');
 
-      // Update main user table
+      // Build dynamic update query for users table
+      const fieldsToUpdate = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle profile image
       if (updateData.profileImage !== undefined) {
-        await client.query(
-          'UPDATE users SET "profileImage" = $1, "updatedAt" = NOW() WHERE id = $2',
-          [updateData.profileImage, id]
-        );
+        fieldsToUpdate.push(`"profileImage" = $${paramCount}`);
+        values.push(updateData.profileImage);
+        paramCount++;
       }
 
-      // Update personal info if provided
+      // Handle personal info fields (now in users table after migration)
       if (updateData.personalInfo) {
         const personalInfo = updateData.personalInfo;
-        await client.query(
-          `INSERT INTO "userPersonalInfo" (
-            "userId", "firstName", "middleName", "lastName", "userName", "phoneNumber",
-            "countryCode", gender, lga, ward, "ageRange", "stateOfOrigin",
-            "votingEngagementState", citizenship, "isVoter", "willVote"
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-          ON CONFLICT ("userId") 
-          DO UPDATE SET
-            "firstName" = EXCLUDED."firstName",
-            "middleName" = EXCLUDED."middleName",
-            "lastName" = EXCLUDED."lastName",
-            "userName" = EXCLUDED."userName",
-            "phoneNumber" = EXCLUDED."phoneNumber",
-            "countryCode" = EXCLUDED."countryCode",
-            gender = EXCLUDED.gender,
-            lga = EXCLUDED.lga,
-            ward = EXCLUDED.ward,
-            "ageRange" = EXCLUDED."ageRange",
-            "stateOfOrigin" = EXCLUDED."stateOfOrigin",
-            "votingEngagementState" = EXCLUDED."votingEngagementState",
-            citizenship = EXCLUDED.citizenship,
-            "isVoter" = EXCLUDED."isVoter",
-            "willVote" = EXCLUDED."willVote",
-            "updatedAt" = NOW()`,
-          [
-            id, personalInfo.firstName, personalInfo.middleName, personalInfo.lastName,
-            personalInfo.userName, personalInfo.phoneNumber, personalInfo.countryCode,
-            personalInfo.gender, personalInfo.lga, personalInfo.ward, personalInfo.ageRange,
-            personalInfo.stateOfOrigin, personalInfo.votingEngagementState,
-            personalInfo.citizenship, personalInfo.isVoter, personalInfo.willVote
-          ]
-        );
+
+        const personalInfoFields = {
+          userName: 'userName',
+          phoneNumber: 'phone',
+          countryCode: 'countryCode',
+          gender: 'gender',
+          lga: 'votingLGA',
+          ward: 'votingWard',
+          ageRange: 'ageRange',
+          stateOfOrigin: 'stateOfOrigin',
+          votingEngagementState: 'votingState',
+          citizenship: 'citizenship',
+          isVoter: 'isVoter',
+          willVote: 'willVote'
+        };
+
+        Object.keys(personalInfoFields).forEach(key => {
+          if (personalInfo[key] !== undefined) {
+            fieldsToUpdate.push(`"${personalInfoFields[key]}" = $${paramCount}`);
+            values.push(personalInfo[key]);
+            paramCount++;
+          }
+        });
+      }
+
+      // Handle direct user fields
+      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA'];
+      directFields.forEach(field => {
+        if (updateData[field] !== undefined) {
+          fieldsToUpdate.push(`"${field}" = $${paramCount}`);
+          values.push(updateData[field]);
+          paramCount++;
+        }
+      });
+
+      // Always update the updatedAt timestamp
+      fieldsToUpdate.push(`"updatedAt" = NOW()`);
+
+      if (fieldsToUpdate.length > 1) { // More than just updatedAt
+        const updateQuery = `UPDATE users SET ${fieldsToUpdate.join(', ')} WHERE id = $${paramCount}`;
+        values.push(id);
+        await client.query(updateQuery, values);
       }
 
       await client.query('COMMIT');
@@ -213,7 +240,10 @@ class User {
       'name', 'email', 'phone', 'passwordHash', 'profileImage', 'emailVerified',
       'role', 'kycStatus', 'twoFactorEnabled', 'twoFactorSecret', 'twoFactorQRCode',
       'otp', 'otpExpiry', 'otpPurpose', 'pendingEmail', 'kycRejectionReason',
-      'hasTakenCauseSurvey', 'countryOfResidence'
+      'hasTakenCauseSurvey', 'countryOfResidence',
+      // Add all the new profile fields
+      'votingState', 'votingLGA', 'votingWard', 'gender', 'ageRange', 'citizenship',
+      'isVoter', 'willVote', 'userName', 'countryCode', 'stateOfOrigin'
     ];
 
     updatableFields.forEach(field => {

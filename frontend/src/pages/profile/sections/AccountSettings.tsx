@@ -2,9 +2,7 @@ import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { UserProfile } from "../../../context/UserContext";
 import { updateProfile, requestEmailChange, verifyOTP, deleteAccount as deleteAccountService, updateNotificationPreferences } from "../../../services/userService";
-import { PlusIcon, XIcon } from "lucide-react";
 import { useUser } from "../../../context/UserContext";
-import { ORGANIZATION_OPTIONS, POLITICAL_PARTY_OPTIONS } from "../../../constants/affiliations";
 import OTPVerificationModal from "../../../components/modals/OTPVerificationModal";
 import DeleteAccountModal from "../../../components/modals/DeleteAccountModal";
 import { useNavigate } from "react-router";
@@ -42,16 +40,6 @@ export default function AccountSettings({ profile }: AccountSettingsProps) {
   const [notificationsEmail, setNotificationsEmail] = useState(profile.notificationPreferences?.email ?? true);
   const [notificationsPush, setNotificationsPush] = useState(profile.notificationPreferences?.push ?? true);
   const [notificationsBroadcast, setNotificationsBroadcast] = useState(profile.notificationPreferences?.broadcast ?? true);
-
-  // Affiliations states
-  const [isEditingAffiliations, setIsEditingAffiliations] = useState(false);
-  const [organizationAffiliations, setOrganizationAffiliations] = useState<string[]>(
-    profile.organizationAffiliations || []
-  );
-  const [selectedOrganization, setSelectedOrganization] = useState("");
-  const [politicalPartyAffiliation, setPoliticalPartyAffiliation] = useState(
-    profile.politicalPartyAffiliation || ""
-  );
 
   // Delete account states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -146,48 +134,6 @@ export default function AccountSettings({ profile }: AccountSettingsProps) {
       toast.error("Failed to update phone number");
     } finally {
       setIsLoading(prev => ({ ...prev, phone: false }));
-    }
-  };
-
-  // Add organization to the list
-  const addOrganization = () => {
-    if (!selectedOrganization) {
-      return;
-    }
-
-    if (organizationAffiliations.includes(selectedOrganization)) {
-      toast.error("This organization is already in your list");
-      return;
-    }
-
-    setOrganizationAffiliations([...organizationAffiliations, selectedOrganization]);
-    setSelectedOrganization("");
-  };
-
-  // Remove organization from the list
-  const removeOrganization = (org: string) => {
-    setOrganizationAffiliations(organizationAffiliations.filter(item => item !== org));
-  };
-
-  // Save affiliations
-  const saveAffiliations = async () => {
-    try {
-      setIsLoading(prev => ({ ...prev, affiliations: true }));
-      toast.loading("Updating affiliations...", { id: "affiliations" });
-
-      await updateProfile({
-        organizationAffiliations,
-        politicalPartyAffiliation
-      });
-
-      toast.success("Affiliations updated successfully", { id: "affiliations" });
-      setIsEditingAffiliations(false);
-      refreshProfile();
-    } catch (error) {
-      console.error("Affiliations update error:", error);
-      toast.error("Failed to update affiliations", { id: "affiliations" });
-    } finally {
-      setIsLoading(prev => ({ ...prev, affiliations: false }));
     }
   };
 
@@ -434,158 +380,7 @@ export default function AccountSettings({ profile }: AccountSettingsProps) {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Affiliations Section */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
-          <h3 className="text-lg font-medium text-gray-800">Affiliations</h3>
-        </div>
-        <div className="p-6">
-          <div className="space-y-6">
-            {/* Organization Affiliations */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-gray-800 font-medium">Organization Affiliations</h4>
-                {!isEditingAffiliations && (
-                  <button
-                    onClick={() => setIsEditingAffiliations(true)}
-                    className="text-sm bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300 transition"
-                  >
-                    Edit Affiliations
-                  </button>
-                )}
-              </div>
-
-              {!isEditingAffiliations ? (
-                <div>
-                  {profile.organizationAffiliations && profile.organizationAffiliations.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {profile.organizationAffiliations.map((org, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                        >
-                          {org}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-600">No organization affiliations specified</p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {organizationAffiliations.map((org, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                      >
-                        {org}
-                        <button
-                          onClick={() => removeOrganization(org)}
-                          className="ml-1 text-blue-600 hover:text-blue-800"
-                          aria-label="Remove organization"
-                        >
-                          <XIcon size={14} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <select
-                      value={selectedOrganization}
-                      onChange={(e) => setSelectedOrganization(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#006837] focus:border-[#006837]"
-                    >
-                      <option value="">Select Organization</option>
-                      {ORGANIZATION_OPTIONS.map((org) => (
-                        <option key={org.value} value={org.value}>
-                          {org.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={addOrganization}
-                      disabled={!selectedOrganization}
-                      className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white ${!selectedOrganization
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-[#006837] hover:bg-[#005229] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#006837]'
-                        }`}
-                    >
-                      <PlusIcon size={16} className="mr-1" />
-                      Add
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Political Party Affiliation */}
-            <div className="pt-4 border-t border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-gray-800 font-medium">Political Party Affiliation</h4>
-              </div>
-
-              {!isEditingAffiliations ? (
-                <p className="text-gray-600">
-                  {profile.politicalPartyAffiliation || "No political party affiliation specified"}
-                </p>
-              ) : (
-                <div>
-                  <select
-                    value={politicalPartyAffiliation}
-                    onChange={(e) => setPoliticalPartyAffiliation(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#006837] focus:border-[#006837]"
-                  >
-                    {POLITICAL_PARTY_OPTIONS.map((party) => (
-                      <option key={party.value} value={party.value}>
-                        {party.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Save Buttons */}
-            {isEditingAffiliations && (
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={saveAffiliations}
-                  disabled={isLoading.affiliations}
-                  className={`${isLoading.affiliations ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#006837] hover:bg-[#005229]'} text-white px-4 py-2 rounded transition flex items-center`}
-                >
-                  {isLoading.affiliations && (
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  )}
-                  {isLoading.affiliations ? "Saving..." : "Save Affiliations"}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsEditingAffiliations(false);
-                    setOrganizationAffiliations(profile.organizationAffiliations || []);
-                    setPoliticalPartyAffiliation(profile.politicalPartyAffiliation || "");
-                    setSelectedOrganization("");
-                  }}
-                  disabled={isLoading.affiliations}
-                  className={`${isLoading.affiliations ? 'bg-gray-300 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300'} text-gray-700 px-4 py-2 rounded transition`}
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Data Privacy Section */}
+      </div>      {/* Data Privacy Section */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
           <h3 className="text-lg font-medium text-gray-800">Data & Privacy</h3>

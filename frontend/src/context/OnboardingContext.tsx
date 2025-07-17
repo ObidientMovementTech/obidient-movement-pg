@@ -31,7 +31,6 @@ export interface ProfileDetails {
   income_bracket: string;
 
   // Political Preferences
-  party_affiliation: string;
   top_political_issues: string[];
 
   // Engagement & Mobilization
@@ -100,7 +99,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     household_size: "",
     income_bracket: "",
 
-    party_affiliation: "",
     top_political_issues: [],
 
     is_volunteering: "",

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import KYCFormStepPersonalInfo from "./KYCFormStepPersonalInfo";
 import KYCFormStepValidID from "./KYCFormStepValidID";
 import KYCFormStepSelfie from "./KYCFormStepSelfie";
 import Progressbar from "../../../components/Progressbar";
@@ -9,10 +8,9 @@ import { toast } from "react-hot-toast";
 
 export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page: string) => void }) {
   const navigate = useNavigate(); // Get the navigate function
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1); // Now starts at 1 (Valid ID), then 2 (Selfie)
   const [isLoading, setIsLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
-  const [personalInfo, setPersonalInfo] = useState<any>(null);
   const [validID, setValidID] = useState<any>(null);
   const [selfie, setSelfie] = useState<any>(null);
   const [isSubmitSuccess, setIsSubmitSuccess] = useState(false);
@@ -32,24 +30,7 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
         if (kycData) {
           setKycStatus(kycData.kycStatus);
 
-          if (kycData.personalInfo) {
-            setPersonalInfo(kycData.personalInfo);
-
-            // If we have personal info data and draft/rejected status, determine what step to start from
-            if ((kycData.kycStatus === 'draft' || kycData.kycStatus === 'rejected')) {
-              // If we have valid ID data, check if we need to jump to step 3
-              if (kycData.validID?.idType && kycData.validID?.idNumber) {
-                if (!kycData.selfieImageUrl) {
-                  setStep(3); // They have personal info and valid ID, but no selfie
-                }
-              }
-              // If we have personal info but no valid ID, move to step 2
-              else if (Object.keys(kycData.personalInfo).length > 0) {
-                setStep(2);
-              }
-            }
-          }
-
+          // Set Valid ID data if it exists 
           if (kycData.validID) {
             setValidID({
               idType: kycData.validID.idType || "",
@@ -57,8 +38,17 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
               idImageUrl: kycData.validID.idImageUrl || null,
               idImageBase64: ""
             });
+
+            // If we have valid ID data and draft/rejected status, determine what step to start from
+            if ((kycData.kycStatus === 'draft' || kycData.kycStatus === 'rejected')) {
+              // If we have valid ID data but no selfie, go to step 2 (selfie)
+              if (kycData.validID?.idType && kycData.validID?.idNumber && !kycData.selfieImageUrl) {
+                setStep(2);
+              }
+            }
           }
 
+          // Set selfie data if it exists
           if (kycData.selfieImageUrl) {
             setSelfie({
               selfiePreviewUrl: kycData.selfieImageUrl,
@@ -81,14 +71,10 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
   const handleNext = (data: any) => {
     console.log(`handleNext called from step ${step} with data:`, data);
     if (step === 1) {
-      console.log("Setting personal info state:", data);
-      setPersonalInfo(data);
-    }
-    if (step === 2) {
       console.log("Setting valid ID state:", data);
       setValidID(data);
     }
-    if (step === 3) {
+    if (step === 2) {
       console.log("Setting selfie state:", data);
       setSelfie(data);
     }
@@ -104,10 +90,9 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
   // Debug the current state
   useEffect(() => {
     console.log("Current step:", step);
-    console.log("Personal info:", personalInfo);
     console.log("Valid ID:", validID);
     console.log("Selfie:", selfie);
-  }, [step, personalInfo, validID, selfie]);
+  }, [step, validID, selfie]);
 
   // Show KYC status message/banner
   const renderKycStatusMessage = () => {
@@ -176,14 +161,14 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
         {renderKycStatusMessage()}
         <Progressbar
           currentNumber={step}
+          totalSteps={2} // Updated: Only 2 steps now (Valid ID + Selfie)
           onStepClick={(clickedStep) => {
             // Only allow going back to previous steps or current step
             if (clickedStep <= step) {
               // If data is available for the clicked step, navigate to it
               if (
                 (clickedStep === 1) ||
-                (clickedStep === 2 && personalInfo) ||
-                (clickedStep === 3 && personalInfo && validID?.idType && validID?.idNumber)
+                (clickedStep === 2 && validID?.idType && validID?.idNumber)
               ) {
                 setStep(clickedStep);
               } else {
@@ -194,9 +179,8 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
           }}
           // Mark steps as completed if we have their data
           completedSteps={[
-            ...(personalInfo ? [1] : []),
-            ...(validID?.idType && validID?.idNumber && (validID?.idImageBase64 || validID?.idImageUrl) ? [2] : []),
-            ...(selfie?.selfieBase64 || selfie?.selfiePreviewUrl ? [3] : [])
+            ...(validID?.idType && validID?.idNumber && (validID?.idImageBase64 || validID?.idImageUrl) ? [1] : []),
+            ...(selfie?.selfieBase64 || selfie?.selfiePreviewUrl ? [2] : [])
           ]}
         />
       </div>
@@ -208,37 +192,25 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
       ) : (
         <>
           {step === 1 && (
-            <KYCFormStepPersonalInfo
-              initialData={personalInfo || undefined}
-              onNext={(data) => {
-                console.log("onNext callback triggered from KYCFormWrapper with data:", data);
-                handleNext(data);
-              }}
+            <KYCFormStepValidID
+              initialData={validID || undefined}
+              onNext={handleNext}
             /* No onBack for first step */
             />
           )}
 
           {step === 2 && (
-            <KYCFormStepValidID
-              initialData={validID || undefined}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-
-          {step === 3 && (
             <KYCFormStepSelfie
               initialData={selfie || undefined}
               onBack={handleBack}
               onNext={async (finalSelfieData) => {
                 const finalPayload = {
-                  personalInfo,
                   validID,
                   selfie: finalSelfieData,
                 };
 
                 // ✅ Type guards to prevent calling the API with nulls
-                if (!finalPayload.personalInfo || !finalPayload.validID) {
+                if (!finalPayload.validID) {
                   toast.error("Incomplete KYC data. Please fill all steps.");
                   return;
                 }
@@ -247,15 +219,9 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
                   setIsLoading(true);
 
                   // Validate that all required data is present before submitting
-                  if (!finalPayload.personalInfo.first_name || !finalPayload.personalInfo.last_name) {
-                    toast.error("Missing personal information. Please complete step 1.");
-                    setStep(1);
-                    return;
-                  }
-
                   if (!finalPayload.validID.idType || !finalPayload.validID.idNumber) {
-                    toast.error("Missing ID information. Please complete step 2.");
-                    setStep(2);
+                    toast.error("Missing ID information. Please complete step 1.");
+                    setStep(1);
                     return;
                   }
 
@@ -266,14 +232,16 @@ export default function KYCFormWrapper({ setActivePage }: { setActivePage: (page
 
                   if (!hasSelfie) {
                     toast.error("Missing selfie image. Please capture a selfie.");
-                    setStep(3); // Go back to selfie step
+                    setStep(2); // Go back to selfie step
                     return;
                   }
 
                   console.log("📸 Using selfie URL:", finalPayload.selfie.selfiePreviewUrl);
 
+                  // For the simplified KYC, we don't need personal info anymore
+                  // Personal info is now handled through profile completion
                   const response = await submitKYCData(
-                    finalPayload.personalInfo,
+                    null, // No personal info step
                     {
                       idType: finalPayload.validID.idType,
                       idNumber: finalPayload.validID.idNumber,

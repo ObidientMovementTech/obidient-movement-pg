@@ -14,7 +14,6 @@ export default function ProfileHero({
   onTabChange?: (tab: string) => void;
 }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [showAllOrgs, setShowAllOrgs] = useState(false);
 
   if (!profile) {
     return (
@@ -25,7 +24,6 @@ export default function ProfileHero({
   }
 
   const initials = profile.name?.charAt(0).toUpperCase() || "C";
-  const orgs = profile.organizationAffiliations ?? [];
 
   return (
     <>
@@ -58,30 +56,6 @@ export default function ProfileHero({
           <div className="sm:ml-56">
             <h1 className="text-2xl text-white  sm:text-3xl font-semibold tracking-tight">{profile.name}</h1>
             <p className="text-white font-[300] text-sm mt-1">{profile.email}</p>
-            {/* Affiliation Badges */}
-            <h1 className="text-white mt-4 text-lg font-semibold">Affliations:</h1>
-            {orgs.length > 0 && (
-              <div className="flex flex-wrap gap-2 my-2">
-                {orgs.slice(0, 2).map((org) => (
-                  <span key={org} className="bg-green-200/80 text-green-900 px-3 py-1 rounded-full text-xs font-semibold border border-green-300 shadow-sm">
-                    {org}
-                  </span>
-                ))}
-                {orgs.length > 2 && (
-                  <button
-                    className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold border border-green-300 shadow-sm focus:outline-none"
-                    onClick={() => setShowAllOrgs(true)}
-                  >
-                    +{orgs.length - 2} more
-                  </button>
-                )}
-              </div>
-            )}
-            {profile.politicalPartyAffiliation && profile.politicalPartyAffiliation !== '' && (
-              <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-medium border border-yellow-300">
-                {profile.politicalPartyAffiliation}
-              </span>
-            )}
 
             <div className="mt-4 flex flex-wrap gap-3">
               <button
@@ -128,28 +102,6 @@ export default function ProfileHero({
           </div>
         </div>
       </div>
-
-      {/* Show all organizations modal */}
-      {showAllOrgs && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-lg p-6 max-w-xs w-full">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">All Organizations</h2>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {orgs.map((org) => (
-                <span key={org} className="bg-green-200/80 text-green-900 px-3 py-1 rounded-full text-xs font-semibold border border-green-300 shadow-sm">
-                  {org}
-                </span>
-              ))}
-            </div>
-            <button
-              className="w-full bg-green-700 text-white rounded-lg py-2 font-semibold hover:bg-green-800 transition"
-              onClick={() => setShowAllOrgs(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Edit Profile Modal */}
       {isEditOpen && (

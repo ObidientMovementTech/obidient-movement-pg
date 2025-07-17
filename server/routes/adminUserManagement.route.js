@@ -42,4 +42,10 @@ router.delete('/users/:userId', adminUserManagementController.deleteUser);
 // Bulk operations
 router.post('/users/bulk', adminUserManagementController.bulkUpdateUsers);
 
+// Email verification management
+router.get('/users/unverified/stats', adminUserManagementController.getUnverifiedUsersStats);
+router.post('/users/:userId/resend-verification', adminUserManagementController.resendVerificationEmail);
+router.post('/users/resend-all-verification', adminUserManagementController.resendAllVerificationEmails);
+
+
 export default router;

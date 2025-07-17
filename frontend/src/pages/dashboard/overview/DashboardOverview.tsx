@@ -15,6 +15,8 @@ import {
 import { useUser } from "../../../context/UserContext";
 import { getOwnedVotingBlocs, getJoinedVotingBlocs } from "../../../services/votingBlocService";
 import Loading from "../../../components/Loader";
+import ProfileCompletionModal from "../../../components/ProfileCompletionModal";
+import EditProfileModal from "../../profile/EditProfileModal";
 
 interface DashboardOverviewProps {
   setActivePage: React.Dispatch<React.SetStateAction<string>>;
@@ -44,7 +46,27 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
   const [ownedVotingBlocs, setOwnedVotingBlocs] = useState<VotingBloc[]>([]);
   const [joinedVotingBlocs, setJoinedVotingBlocs] = useState<VotingBloc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Calculate profile completion score
+  const calculateProfileCompletion = (profile: any) => {
+    if (!profile) return 0;
+
+    const requiredFields = [
+      'userName', 'gender', 'ageRange', 'citizenship', 'stateOfOrigin',
+      'votingState', 'votingLGA', 'votingWard', 'isVoter', 'willVote'
+    ];
+
+    const completedFields = requiredFields.filter(field => {
+      const value = profile[field] || profile.personalInfo?.[field] ||
+        profile.onboardingData?.votingBehavior?.[field];
+      return value && value.toString().trim() !== '';
+    });
+
+    return (completedFields.length / requiredFields.length) * 100;
+  };
 
   useEffect(() => {
     Promise.all([getOwnedVotingBlocs(), getJoinedVotingBlocs()])
@@ -57,6 +79,22 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Show profile completion modal if completion is less than 80%
+  useEffect(() => {
+    if (profile && !loading) {
+      const completionScore = calculateProfileCompletion(profile);
+      // For testing: show modal if completion is less than 95% (easy to trigger)
+      // In production, you might want this to be 80% or lower
+      if (completionScore < 95) {
+        // Show modal after a brief delay to let the dashboard load
+        const timer = setTimeout(() => {
+          setProfileModalOpen(true);
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [profile, loading]);
 
   const totalMembers = ownedVotingBlocs.reduce((sum, bloc) => sum + (bloc.metrics?.totalMembers || 0), 0);
   const totalEngagement = ownedVotingBlocs.reduce((sum, bloc) => sum + (bloc.metrics?.engagementScore || 0), 0);
@@ -461,6 +499,25 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
           </div>
         )}
       </div>
+
+      {/* Profile Completion Modal */}
+      <ProfileCompletionModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        onCompleteProfile={() => {
+          setProfileModalOpen(false);
+          setEditProfileModalOpen(true);
+        }}
+      />
+
+      {/* Edit Profile Modal */}
+      {profile && (
+        <EditProfileModal
+          isOpen={editProfileModalOpen}
+          onClose={() => setEditProfileModalOpen(false)}
+          profile={profile}
+        />
+      )}
     </div>
   );
 }
