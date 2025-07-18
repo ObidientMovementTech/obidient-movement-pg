@@ -28,22 +28,25 @@ export default function Select({
   defaultSelected,
   disabled = false,
 }: SelectProps) {
-  const defaultOption = options.filter(
-    (option) => option.value?.toLocaleLowerCase() === defaultSelected?.toLocaleLowerCase()
+  // Find the default option every time defaultSelected changes
+  const defaultOption = options.find(
+    (option) => option.value?.toString().toLowerCase() === defaultSelected?.toString().toLowerCase()
   );
 
-  const initialOption = defaultOption[0] || null
-
-  const [selectedOption, setSelectedOption] = useState<SelectOptionType | null>(initialOption);
+  const [selectedOption, setSelectedOption] = useState<SelectOptionType | null>(defaultOption || null);
 
   function onSelectItem(value: SelectOptionType) {
     setSelectedOption(value);
     onChange(value);
   }
 
+  // Update selectedOption when defaultSelected or options change
   useEffect(() => {
-    setSelectedOption(initialOption)
-  }, [initialOption])
+    const newDefaultOption = options.find(
+      (option) => option.value?.toString().toLowerCase() === defaultSelected?.toString().toLowerCase()
+    );
+    setSelectedOption(newDefaultOption || null);
+  }, [defaultSelected, options]);
 
 
   return (

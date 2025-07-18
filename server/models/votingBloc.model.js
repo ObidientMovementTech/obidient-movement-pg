@@ -139,7 +139,7 @@ class VotingBloc {
 
       // Get members
       const membersResult = await client.query(
-        `SELECT vm."userId", vm."joinDate", u.name, u.email, u.phone 
+        `SELECT vm."userId", vm."joinDate", u.name, u.email, u.phone, u."countryCode"
          FROM "votingBlocMembers" vm
          JOIN users u ON vm."userId" = u.id
          WHERE vm."votingBlocId" = $1 

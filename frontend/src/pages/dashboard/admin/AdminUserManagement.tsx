@@ -439,6 +439,51 @@ export default function AdminUserManagement() {
     });
   };
 
+  const handleCleanupDuplicateAutoBlocs = async () => {
+    showConfirmation({
+      title: 'Cleanup Duplicate Auto Voting Blocs',
+      message: `Are you sure you want to clean up all duplicate auto-generated voting blocs?\n\nThis operation will:\n• Find users with multiple auto-generated voting blocs\n• Keep the oldest voting bloc for each user\n• Delete all duplicate auto-generated voting blocs\n• Cannot be undone once started\n\nThis is a maintenance operation to fix data integrity issues.`,
+      confirmText: 'Clean Up Duplicates',
+      confirmStyle: 'warning',
+      onConfirm: async () => {
+        setConfirmationModal(prev => ({ ...prev, loading: true }));
+
+        try {
+          const response = await fetch('/api/admin/cleanup/duplicate-auto-blocs', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (data.success) {
+            const { usersWithDuplicates, usersCleaned, blocsDeleted } = data.stats;
+
+            if (blocsDeleted === 0) {
+              setSuccess(`✅ No duplicate auto voting blocs found. Your data is clean!`);
+            } else {
+              setSuccess(`✅ Cleanup completed successfully!\n\n• ${usersCleaned} users cleaned\n• ${blocsDeleted} duplicate voting blocs deleted\n• ${usersWithDuplicates} users had duplicates`);
+            }
+          } else {
+            setError(data.message || 'Failed to cleanup duplicates');
+          }
+
+          setConfirmationModal(prev => ({ ...prev, isOpen: false, loading: false }));
+        } catch (error: any) {
+          setError(`Failed to cleanup duplicates: ${error.message}`);
+          setConfirmationModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
+  };
+
   const handleBulkAction = async () => {
     if (selectedUsers.length === 0 || !bulkAction) return;
 
@@ -685,6 +730,16 @@ export default function AdminUserManagement() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Cleanup Duplicate Auto Voting Blocs Button */}
+          <button
+            onClick={() => handleCleanupDuplicateAutoBlocs()}
+            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center gap-2"
+            title="Clean up duplicate auto-generated voting blocs"
+          >
+            <Trash2 size={20} />
+            Cleanup Duplicate Auto Blocs
+          </button>
+
           {/* Bulk Email Button - Show if we have unverified stats or if stats haven't loaded yet (safety fallback) */}
           {(!unverifiedStats || (unverifiedStats && unverifiedStats.count > 0)) && (
             <button

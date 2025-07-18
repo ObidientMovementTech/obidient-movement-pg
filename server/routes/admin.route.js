@@ -14,6 +14,7 @@ import {
   syncAllOutdatedBlocs,
   updateSyncPreferences
 } from '../controllers/templateSync.controller.js';
+import { cleanupDuplicateAutoBlocs } from '../controllers/auth.controller.js';
 import adminUserManagementRoutes from './adminUserManagement.route.js';
 
 const router = express.Router();
@@ -32,5 +33,8 @@ router.put('/sync/preferences/:votingBlocId', protect, isAdmin, updateSyncPrefer
 
 // User management routes
 router.use('/user-management', adminUserManagementRoutes);
+
+// Cleanup and maintenance routes
+router.post('/cleanup/duplicate-auto-blocs', protect, isAdmin, cleanupDuplicateAutoBlocs);
 
 export default router;

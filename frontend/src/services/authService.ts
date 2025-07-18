@@ -7,8 +7,14 @@ export const registerUser = async (data: {
   email: string;
   phone: string;
   password: string;
+  countryCode?: string;
   votingState?: string;
   votingLGA?: string;
+  pendingVotingBlocJoin?: {
+    joinCode: string;
+    votingBlocName: string;
+    timestamp: string;
+  };
 }) => {
   try {
     const response = await axios.post(`${API_BASE}/auth/register`, data, {

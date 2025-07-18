@@ -127,10 +127,72 @@ export default function EditProfileModal({
 
   useEffect(() => {
     if (isOpen) {
+      // Debug: Log the profile object to see what data is available
+      console.log('🔍 EditProfileModal - Profile object:', {
+        profile: profile,
+        personalInfo: profile.personalInfo,
+        onboardingData: profile.onboardingData,
+        directFields: {
+          userName: profile.userName,
+          gender: profile.gender,
+          ageRange: profile.ageRange,
+          citizenship: profile.citizenship,
+          stateOfOrigin: profile.stateOfOrigin,
+          votingState: profile.votingState,
+          votingLGA: profile.votingLGA,
+          votingWard: profile.votingWard,
+          isVoter: profile.isVoter,
+          willVote: profile.willVote
+        }
+      });
+
       setName(profile.name);
       setPhone(profile.phone);
       setImageUrl(profile.profileImage);
       setFileSrc(null);
+
+      // Use flattened fields directly from the profile object (with fallback to nested structure)
+      const newUserName = profile.userName || profile.personalInfo?.user_name || '';
+      const newGender = profile.gender || profile.personalInfo?.gender || '';
+      const newAgeRange = profile.ageRange || profile.personalInfo?.age_range || '';
+      const newCitizenship = profile.citizenship || profile.personalInfo?.citizenship || '';
+      const newStateOfOrigin = profile.stateOfOrigin || profile.personalInfo?.state_of_origin || '';
+      const newVotingState = profile.votingState || profile.personalInfo?.voting_engagement_state || '';
+      const newVotingLGA = profile.votingLGA || profile.personalInfo?.lga || '';
+      const newVotingWard = profile.votingWard || profile.personalInfo?.ward || '';
+      const newIsVoter = profile.isVoter || profile.onboardingData?.votingBehavior?.is_registered || '';
+      const newWillVote = profile.willVote || profile.onboardingData?.votingBehavior?.likely_to_vote || '';
+
+      // Debug: Log the resolved values
+      console.log('🔍 EditProfileModal - Resolved values:', {
+        newUserName,
+        newGender,
+        newAgeRange,
+        newCitizenship,
+        newStateOfOrigin,
+        newVotingState,
+        newVotingLGA,
+        newVotingWard,
+        newIsVoter,
+        newWillVote
+      });
+
+      setUserName(newUserName);
+      setGender(newGender);
+      setAgeRange(newAgeRange);
+      setCitizenship(newCitizenship);
+      setStateOfOrigin(newStateOfOrigin);
+      setVotingState(newVotingState);
+      setVotingLGA(newVotingLGA);
+      setVotingWard(newVotingWard);
+      setIsVoter(newIsVoter);
+      setWillVote(newWillVote);
+
+      // Update cascading dropdown states
+      setSelectedState(newVotingState);
+      setSelectedLGA(newVotingLGA);
+
+      console.log('✅ EditProfileModal - All fields initialized');
     }
   }, [isOpen, profile]);
 
@@ -347,8 +409,10 @@ export default function EditProfileModal({
                   options={genderOptions}
                   defaultSelected={gender}
                   onChange={(opt) => {
+                    console.log('🔄 Gender changed:', opt);
                     if (opt) setGender(opt.value);
                   }}
+                  key={`gender-${gender}`} // Force re-render when gender changes
                 />
               </div>
 
@@ -359,8 +423,10 @@ export default function EditProfileModal({
                   options={ageRangeOptions}
                   defaultSelected={ageRange}
                   onChange={(opt) => {
+                    console.log('🔄 Age Range changed:', opt);
                     if (opt) setAgeRange(opt.value);
                   }}
+                  key={`ageRange-${ageRange}`} // Force re-render when ageRange changes
                 />
               </div>
 
@@ -371,6 +437,7 @@ export default function EditProfileModal({
                   options={citizenshipOptions}
                   defaultSelected={citizenship}
                   onChange={(opt) => {
+                    console.log('🔄 Citizenship changed:', opt);
                     if (opt) {
                       setCitizenship(opt.value);
                       // Set default country based on citizenship
@@ -381,6 +448,7 @@ export default function EditProfileModal({
                       }
                     }
                   }}
+                  key={`citizenship-${citizenship}`} // Force re-render when citizenship changes
                 />
               </div>
 
@@ -407,8 +475,10 @@ export default function EditProfileModal({
                   options={states}
                   defaultSelected={stateOfOrigin}
                   onChange={(opt) => {
+                    console.log('🔄 State of Origin changed:', opt);
                     if (opt) setStateOfOrigin(opt.value);
                   }}
+                  key={`stateOfOrigin-${stateOfOrigin}`} // Force re-render when stateOfOrigin changes
                 />
               </div>
 
@@ -419,6 +489,7 @@ export default function EditProfileModal({
                   options={states}
                   defaultSelected={selectedState}
                   onChange={(opt) => {
+                    console.log('🔄 Voting State changed:', opt);
                     const newState = opt?.value || '';
                     setSelectedState(newState);
                     setVotingState(newState);
@@ -427,6 +498,7 @@ export default function EditProfileModal({
                     setVotingLGA('');
                     setVotingWard('');
                   }}
+                  key={`votingState-${selectedState}`} // Force re-render when selectedState changes
                 />
               </div>
 
@@ -437,6 +509,7 @@ export default function EditProfileModal({
                   options={getLgas(selectedState)}
                   defaultSelected={selectedLGA}
                   onChange={(opt) => {
+                    console.log('🔄 Voting LGA changed:', opt);
                     const newLGA = opt?.value || '';
                     setSelectedLGA(newLGA);
                     setVotingLGA(newLGA);
@@ -444,6 +517,7 @@ export default function EditProfileModal({
                     setVotingWard('');
                   }}
                   disabled={!selectedState}
+                  key={`votingLGA-${selectedLGA}`} // Force re-render when selectedLGA changes
                 />
               </div>
 
@@ -454,9 +528,11 @@ export default function EditProfileModal({
                   options={getWards(selectedLGA, selectedState)}
                   defaultSelected={votingWard}
                   onChange={(opt) => {
+                    console.log('🔄 Voting Ward changed:', opt);
                     if (opt) setVotingWard(opt.value);
                   }}
                   disabled={!selectedLGA}
+                  key={`votingWard-${votingWard}`} // Force re-render when votingWard changes
                 />
               </div>
 
@@ -467,8 +543,10 @@ export default function EditProfileModal({
                   options={yesNoOptions}
                   defaultSelected={isVoter}
                   onChange={(opt) => {
+                    console.log('🔄 Voter Registration changed:', opt);
                     if (opt) setIsVoter(opt.value);
                   }}
+                  key={`isVoter-${isVoter}`} // Force re-render when isVoter changes
                 />
               </div>
 
@@ -479,8 +557,10 @@ export default function EditProfileModal({
                   options={yesNoOptions}
                   defaultSelected={willVote}
                   onChange={(opt) => {
+                    console.log('🔄 Voting Intention changed:', opt);
                     if (opt) setWillVote(opt.value);
                   }}
+                  key={`willVote-${willVote}`} // Force re-render when willVote changes
                 />
               </div>
             </div>

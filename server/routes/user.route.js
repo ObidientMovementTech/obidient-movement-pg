@@ -14,7 +14,8 @@ import {
   requestEmailChange,
   verifyEmailChange,
   updateNotificationPreferences,
-  deleteAccount
+  deleteAccount,
+  getProfileCompletion
 } from '../controllers/user.controller.js'
 import { parseFileUpload } from '../utils/s3Upload.js';
 
@@ -23,6 +24,9 @@ const router = express.Router();
 // Use serverless-compatible file upload middleware instead of multer
 router.post('/upload-profile-image', protect, parseFileUpload('file'), uploadProfileImage);
 router.patch('/me', protect, updateMe);
+
+// Profile completion (safe read-only endpoint)
+router.get('/profile-completion', protect, getProfileCompletion);
 
 // Password change endpoints
 router.post('/change-password-request', authenticateUser, requestPasswordChange);

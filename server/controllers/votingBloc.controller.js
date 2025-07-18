@@ -1276,6 +1276,7 @@ export const getMemberMetadata = async (req, res) => {
         name: member.name,
         email: member.email,
         phone: member.phone,
+        countryCode: member.countryCode,
         metadata: metadata || {
           joinDate: member.joinDate || new Date(),
           decisionTag: 'Undecided',

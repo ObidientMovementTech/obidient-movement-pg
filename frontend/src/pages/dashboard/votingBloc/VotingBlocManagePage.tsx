@@ -47,6 +47,8 @@ import BroadcastMessageModal from "../../../components/modals/BroadcastMessageMo
 import PrivateMessageModal from "../../../components/modals/PrivateMessageModal";
 import FlyerModal from "../../../components/modals/FlyerModal";
 
+import { formatPhoneForWhatsApp } from "../../../utils/phoneUtils";
+
 export default function VotingBlocManagePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -314,17 +316,22 @@ export default function VotingBlocManagePage() {
     }
   };
 
-  const openWhatsAppChat = (phoneNumber: string) => {
+  const openWhatsAppChat = (phoneNumber: string, countryCode?: string) => {
     if (!phoneNumber) {
       setToast({ message: "No phone number available for this member", type: "error" });
       return;
     }
 
-    // Clean phone number (remove spaces, dashes, etc.)
-    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    // Format phone number properly for WhatsApp
+    const formattedPhone = formatPhoneForWhatsApp(phoneNumber, countryCode);
+
+    if (!formattedPhone) {
+      setToast({ message: "Invalid phone number format", type: "error" });
+      return;
+    }
 
     // Create WhatsApp URL
-    const whatsappUrl = `https://wa.me/${cleanPhone}`;
+    const whatsappUrl = `https://wa.me/${formattedPhone}`;
 
     // Open WhatsApp
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
@@ -939,7 +946,7 @@ export default function VotingBlocManagePage() {
 
                             {member.phone && (
                               <button
-                                onClick={() => openWhatsAppChat(member.phone)}
+                                onClick={() => openWhatsAppChat(member.phone, member.countryCode)}
                                 className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg"
                                 title="Chat on WhatsApp"
                               >
