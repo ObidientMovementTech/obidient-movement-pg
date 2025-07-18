@@ -42,7 +42,7 @@ app.use('/voting-blocs', votingBlocRoutes);
 
 // Placeholder route
 app.get('/', (req, res) => {
-  res.send('Recent Zoho Obidient Movement API running...');
+  res.send('Recent ZeptoMail Obidient Movement API running...');
 });
 
 // PostgreSQL connection and server startup
