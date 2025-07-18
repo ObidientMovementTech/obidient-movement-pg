@@ -50,22 +50,50 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Calculate profile completion score
+  // Calculate profile completion using the same logic as ProfileCompletionModal
   const calculateProfileCompletion = (profile: any) => {
     if (!profile) return 0;
 
+    // Use the same field logic as ProfileCompletionModal
     const requiredFields = [
-      'userName', 'gender', 'ageRange', 'citizenship', 'stateOfOrigin',
-      'votingState', 'votingLGA', 'votingWard', 'isVoter', 'willVote'
+      { key: 'userName', label: 'Username', getValue: (p: any) => p.userName || p.personalInfo?.user_name },
+      { key: 'gender', label: 'Gender', getValue: (p: any) => p.gender || p.personalInfo?.gender },
+      { key: 'ageRange', label: 'Age Range', getValue: (p: any) => p.ageRange || p.personalInfo?.age_range },
+      { key: 'stateOfOrigin', label: 'State of Origin', getValue: (p: any) => p.stateOfOrigin || p.personalInfo?.state_of_origin },
+      { key: 'votingState', label: 'Voting State', getValue: (p: any) => p.votingState || p.personalInfo?.voting_engagement_state },
+      { key: 'votingLGA', label: 'Voting LGA', getValue: (p: any) => p.votingLGA || p.personalInfo?.lga },
+      { key: 'votingWard', label: 'Voting Ward', getValue: (p: any) => p.votingWard || p.personalInfo?.ward },
+      { key: 'citizenship', label: 'Citizenship', getValue: (p: any) => p.citizenship || p.personalInfo?.citizenship },
+      { key: 'isVoter', label: 'Voter Status', getValue: (p: any) => p.isVoter || p.onboardingData?.votingBehavior?.is_registered },
+      { key: 'willVote', label: 'Voting Intention', getValue: (p: any) => p.willVote || p.onboardingData?.votingBehavior?.likely_to_vote },
+      { key: 'profileImage', label: 'Profile Image', getValue: (p: any) => p.profileImage }
     ];
 
     const completedFields = requiredFields.filter(field => {
-      const value = profile[field] || profile.personalInfo?.[field] ||
-        profile.onboardingData?.votingBehavior?.[field];
+      const value = field.getValue(profile);
       return value && value.toString().trim() !== '';
     });
 
-    return (completedFields.length / requiredFields.length) * 100;
+    const missingFields = requiredFields.filter(field => {
+      const value = field.getValue(profile);
+      return !value || value.toString().trim() === '';
+    });
+
+    const completionScore = (completedFields.length / requiredFields.length) * 100;
+
+    // Debug logging
+    console.log('🔍 Profile completion calculation (frontend):', {
+      completionScore: completionScore.toFixed(1),
+      completedFields: completedFields.length,
+      totalFields: requiredFields.length,
+      missingFields: missingFields.map(f => f.label),
+      fieldValues: requiredFields.map(field => ({
+        key: field.key,
+        value: field.getValue(profile) || 'MISSING'
+      }))
+    });
+
+    return completionScore;
   };
 
   useEffect(() => {
@@ -80,18 +108,22 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       .finally(() => setLoading(false));
   }, []);
 
-  // Show profile completion modal if completion is less than 80%
+  // Show profile completion modal if completion is less than 100%
   useEffect(() => {
     if (profile && !loading) {
+      // Use the same calculation logic as ProfileCompletionModal
       const completionScore = calculateProfileCompletion(profile);
-      // For testing: show modal if completion is less than 95% (easy to trigger)
-      // In production, you might want this to be 80% or lower
-      if (completionScore < 95) {
+
+      // Only show modal if profile is not 100% complete
+      if (completionScore < 100) {
+        console.log('🔍 Profile incomplete, showing modal in 1.5 seconds...');
         // Show modal after a brief delay to let the dashboard load
         const timer = setTimeout(() => {
           setProfileModalOpen(true);
         }, 1500);
         return () => clearTimeout(timer);
+      } else {
+        console.log('✅ Profile is 100% complete, not showing modal');
       }
     }
   }, [profile, loading]);

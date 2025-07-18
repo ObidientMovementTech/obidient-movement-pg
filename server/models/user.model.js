@@ -128,7 +128,10 @@ class User {
       selectFields = `id, name, email, phone, "profileImage", "emailVerified", role, 
                      "kycStatus", "twoFactorEnabled", "twoFactorQRCode", otp, "otpExpiry", 
                      "otpPurpose", "pendingEmail", "kycRejectionReason", "hasTakenCauseSurvey",
-                     "countryOfResidence", "createdAt", "updatedAt"`;
+                     "countryOfResidence", "createdAt", "updatedAt", "votingState", "votingLGA",
+                     "votingWard", gender, "ageRange", citizenship, "isVoter", "willVote",
+                     "userName", "countryCode", "stateOfOrigin", lga, ward, "votingEngagementState",
+                     "profileCompletionPercentage"`;
     }
 
     const result = await query(`SELECT ${selectFields} FROM users WHERE id = $1`, [id]);

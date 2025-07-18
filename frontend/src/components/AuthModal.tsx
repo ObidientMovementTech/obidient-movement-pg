@@ -5,6 +5,8 @@ import FormSelect from './select/FormSelect';
 import { statesLGAWardList } from '../utils/StateLGAWard';
 import { OptionType } from '../utils/lookups';
 import { formatStateName, formatLocationName } from '../utils/textUtils';
+import { countryCodes } from '../utils/countryCodes';
+import { formatPhoneForStorage } from '../utils/phoneUtils';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -44,6 +46,7 @@ export default function AuthModal({
     password: '',
     confirmPassword: '',
     phone: '',
+    countryCode: '+234', // Default to Nigeria
     votingState: '',
     votingLGA: ''
   });
@@ -68,10 +71,11 @@ export default function AuthModal({
   };
 
   const validatePhone = (phone: string): boolean => {
-    // Accepts numbers with optional +, spaces, dashes, and must be 8-20 digits
-    const phoneRegex = /^\+?[0-9\s\-]{8,20}$/;
-    // Should not contain @ (to prevent emails)
-    return phoneRegex.test(phone) && !phone.includes('@');
+    // Accepts numbers with optional +, dashes, and must be 8-20 digits
+    // Updated to not allow spaces since we're preventing them in input
+    const phoneRegex = /^\+?[0-9\-]{8,20}$/;
+    // Should not contain @ (to prevent emails) or spaces
+    return phoneRegex.test(phone) && !phone.includes('@') && !phone.includes(' ');
   };
 
   if (!isOpen) return null;
@@ -121,15 +125,44 @@ export default function AuthModal({
         }));
       }
 
-      await registerUser({
+      // Format phone number for storage (add leading zero for Nigerian numbers)
+      const formattedPhone = formatPhoneForStorage(signupData.phone, signupData.countryCode);
+
+      // Prepare registration data
+      const registrationData: {
+        name: string;
+        email: string;
+        password: string;
+        phone: string;
+        countryCode: string;
+        votingState?: string;
+        votingLGA?: string;
+        pendingVotingBlocJoin?: {
+          joinCode: string;
+          votingBlocName: string;
+          timestamp: string;
+        };
+      } = {
         name: signupData.name,
         email: signupData.email,
         password: signupData.password,
-        phone: signupData.phone,
+        phone: formattedPhone,
+        countryCode: signupData.countryCode,
         // Format location data as Title Case before sending to backend
         votingState: signupData.votingState ? formatStateName(signupData.votingState) : undefined,
         votingLGA: signupData.votingLGA ? formatLocationName(signupData.votingLGA) : undefined
-      });
+      };
+
+      // Add pending voting bloc join info if available
+      if (joinCode && votingBlocName) {
+        registrationData.pendingVotingBlocJoin = {
+          joinCode,
+          votingBlocName,
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      await registerUser(registrationData);
 
       // Show success message and switch to login
       setError('');
@@ -287,17 +320,46 @@ export default function AuthModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   WhatsApp Phone Number
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                  <input
-                    type="tel"
-                    required
-                    value={signupData.phone}
-                    onChange={(e) => setSignupData(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="Enter your WhatsApp phone number"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <select
+                      value={signupData.countryCode}
+                      onChange={(e) => setSignupData(prev => ({ ...prev, countryCode: e.target.value }))}
+                      className="w-20 pr-6 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                    >
+                      {countryCodes.slice(0, 10).map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {country.code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="relative flex-1">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="tel"
+                      required
+                      value={signupData.phone}
+                      onChange={(e) => {
+                        // Remove spaces and non-numeric characters except + and -
+                        const cleanValue = e.target.value.replace(/[^\d\-+]/g, '');
+                        setSignupData(prev => ({ ...prev, phone: cleanValue }));
+                      }}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        // Handle paste events to clean the pasted content
+                        const pastedText = e.clipboardData.getData('text');
+                        const cleanValue = pastedText.replace(/[^\d\-+]/g, '');
+                        setSignupData(prev => ({ ...prev, phone: cleanValue }));
+                      }}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="Enter your phone number"
+                    />
+                  </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter digits only (spaces are not allowed)
+                </p>
               </div>
 
               {/* Optional Voting Location Section */}

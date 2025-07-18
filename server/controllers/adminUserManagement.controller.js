@@ -1048,8 +1048,8 @@ export const adminUserManagementController = {
       // Generate confirmation token (just like in registration)
       const JWT_SECRET = process.env.JWT_SECRET;
       const emailToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
-      const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-      const link = `${apiBaseUrl}/auth/confirm-email/${emailToken}`;
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      const link = `${frontendUrl}/auth/confirm-email/${emailToken}`;
 
       // Send confirmation email (same as registration)
       await sendConfirmationEmail(user.name, user.email, link, "confirm");
@@ -1098,7 +1098,7 @@ export const adminUserManagementController = {
       const results = [];
       const errors = [];
       const JWT_SECRET = process.env.JWT_SECRET;
-      const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
       // Batch processing configuration - Optimized for ZeptoMail Pro
       const BATCH_SIZE = 50; // Send 50 emails per batch (ZeptoMail can handle this)
@@ -1121,7 +1121,7 @@ export const adminUserManagementController = {
           try {
             // Generate confirmation token (just like in registration)
             const emailToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
-            const link = `${apiBaseUrl}/auth/confirm-email/${emailToken}`;
+            const link = `${frontendUrl}/auth/confirm-email/${emailToken}`;
 
             // Send confirmation email (same as registration)
             await sendConfirmationEmail(user.name, user.email, link, "confirm");
@@ -1217,14 +1217,14 @@ export const adminUserManagementController = {
       const results = [];
       const errors = [];
       const JWT_SECRET = process.env.JWT_SECRET;
-      const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
       // Process each user
       for (const user of unverifiedUsers) {
         try {
           // Generate confirmation token (just like in registration)
           const emailToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
-          const link = `${apiBaseUrl}/auth/confirm-email/${emailToken}`;
+          const link = `${frontendUrl}/auth/confirm-email/${emailToken}`;
 
           // Send confirmation email (same as registration)
           await sendConfirmationEmail(user.name, user.email, link, "confirm");

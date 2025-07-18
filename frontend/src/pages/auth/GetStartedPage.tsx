@@ -14,6 +14,8 @@ import FormSelect from "../../components/select/FormSelect.js";
 import { statesLGAWardList } from "../../utils/StateLGAWard.js";
 import { OptionType } from "../../utils/lookups.js";
 import { formatStateName, formatLocationName } from "../../utils/textUtils.js";
+import { countryCodes } from "../../utils/countryCodes.js";
+import { formatPhoneForStorage } from "../../utils/phoneUtils.js";
 
 const GetStartedPage = () => {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ const GetStartedPage = () => {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [countryCode, setCountryCode] = useState("+234"); // Default to Nigeria
   const [confirmPassword, setConfirmPassword] = useState("");
   const [votingState, setVotingState] = useState("");
   const [votingLGA, setVotingLGA] = useState("");
@@ -74,9 +77,10 @@ const GetStartedPage = () => {
 
   const validatePhone = (phone: string): boolean => {
     // Accepts numbers with optional +, spaces, dashes, and must be 8-20 digits
-    const phoneRegex = /^\+?[0-9\s\-]{8,20}$/;
-    // Should not contain @ (to prevent emails)
-    return phoneRegex.test(phone) && !phone.includes('@');
+    // But now we're preventing spaces from being entered, so update validation
+    const phoneRegex = /^\+?[0-9\-]{8,20}$/;
+    // Should not contain @ (to prevent emails) or spaces
+    return phoneRegex.test(phone) && !phone.includes('@') && !phone.includes(' ');
   };
 
   const displayError = (msg: string) => {
@@ -114,10 +118,14 @@ const GetStartedPage = () => {
     }
 
     try {
+      // Format phone number for storage (add leading zero for Nigerian numbers)
+      const formattedPhone = formatPhoneForStorage(phone, countryCode);
+
       await registerUser({
         name,
         email,
-        phone,
+        phone: formattedPhone,
+        countryCode,
         password: validPassword,
         votingState: votingState ? formatStateName(votingState) : undefined,
         votingLGA: votingLGA ? formatLocationName(votingLGA) : undefined,
@@ -182,14 +190,41 @@ const GetStartedPage = () => {
 
       <div>
         <label className="block text-dark dark:text-gray-100 mb-2 text-sm">WhatsApp Phone Number</label>
-        <input
-          type="tel"
-          placeholder="WhatsApp Phone Number"
-          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          required
-        />
+        <div className="flex gap-2">
+          <select
+            value={countryCode}
+            onChange={(e) => setCountryCode(e.target.value)}
+            className="w-20 pr-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm"
+          >
+            {countryCodes.slice(0, 10).map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.code}
+              </option>
+            ))}
+          </select>
+          <input
+            type="tel"
+            placeholder="Phone Number"
+            className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            value={phone}
+            onChange={(e) => {
+              // Remove spaces and non-numeric characters except + and -
+              const cleanValue = e.target.value.replace(/[^\d\-+]/g, '');
+              setPhone(cleanValue);
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              // Handle paste events to clean the pasted content
+              const pastedText = e.clipboardData.getData('text');
+              const cleanValue = pastedText.replace(/[^\d\-+]/g, '');
+              setPhone(cleanValue);
+            }}
+            required
+          />
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Enter digits only (spaces are not allowed)
+        </p>
       </div>
 
       {/* Optional Voting Location Section */}
