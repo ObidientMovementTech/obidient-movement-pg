@@ -3,11 +3,33 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Create Email SMTP transporter (supports Gmail, Zoho, and other services)
+// Create Email SMTP transporter (supports ZeptoMail, Zoho, Gmail, and other services)
 export const createEmailTransporter = () => {
   const emailService = process.env.EMAIL_SERVICE || 'gmail';
 
-  if (emailService === 'zoho') {
+  if (emailService === 'zeptomail') {
+    // ZeptoMail configuration - Professional transactional email service
+    const port = parseInt(process.env.SMTP_PORT) || 587;
+    const isSSL = port === 465;
+    const host = process.env.SMTP_HOST || 'smtp.zeptomail.com';
+
+    return nodemailer.createTransport({
+      host: host,
+      port: port,
+      secure: isSSL, // true for 465 (SSL), false for 587 (TLS)
+      pool: true,
+      maxConnections: 50, // High volume support for ZeptoMail Pro
+      maxMessages: Infinity, // Unlimited messages per connection
+      rateLimit: 100, // ZeptoMail Pro can handle high rates
+      auth: {
+        user: process.env.EMAIL_USER, // emailapikey
+        pass: process.env.EMAIL_PASS  // API key
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+  } else if (emailService === 'zoho') {
     // Zoho configuration with TLS support
     const port = parseInt(process.env.SMTP_PORT) || 587;
     const isSSL = port === 465;
@@ -73,6 +95,6 @@ export const gmailTransporter = emailTransporter;
 export const verifyGmailConnection = verifyEmailConnection;
 
 export const sender = {
-  email: process.env.EMAIL_USER || process.env.GMAIL_USER,
+  email: process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || process.env.GMAIL_USER,
   name: process.env.EMAIL_FROM_NAME || "Obidient Movement"
 };
