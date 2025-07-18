@@ -1100,10 +1100,10 @@ export const adminUserManagementController = {
       const JWT_SECRET = process.env.JWT_SECRET;
       const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
 
-      // Batch processing configuration
-      const BATCH_SIZE = 10; // Send 10 emails, then pause
-      const BATCH_DELAY = 30000; // 30 seconds between batches
-      const EMAIL_DELAY = 2000; // 2 seconds between individual emails
+      // Batch processing configuration - Optimized for ZeptoMail Pro
+      const BATCH_SIZE = 50; // Send 50 emails per batch (ZeptoMail can handle this)
+      const BATCH_DELAY = 5000; // 5 seconds between batches (much faster)
+      const EMAIL_DELAY = 100; // 100ms between individual emails
 
       console.log(`📧 Starting bulk email operation for ${unverifiedUsers.length} users`);
       console.log(`📊 Batch size: ${BATCH_SIZE}, Batch delay: ${BATCH_DELAY / 1000}s, Email delay: ${EMAIL_DELAY / 1000}s`);
@@ -1237,9 +1237,9 @@ export const adminUserManagementController = {
             sentAt: new Date().toISOString()
           });
 
-          // Add a longer delay to avoid overwhelming Zoho and triggering spam detection
-          // 2 seconds delay = max 30 emails per minute (well within Zoho limits)
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Minimal delay for ZeptoMail Pro - can handle high volume
+          // 100ms delay = max 600 emails per minute (well within ZeptoMail limits)
+          await new Promise(resolve => setTimeout(resolve, 100));
 
         } catch (emailError) {
           console.error(`Failed to send email to ${user.email}:`, emailError);
