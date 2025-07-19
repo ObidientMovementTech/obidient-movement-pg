@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "init-db": "node initDB.js"
+    "init-db": "node initDB.js",
+    "update-cors": "node update-cors.js"
   },
   "keywords": [],
   "author": "",

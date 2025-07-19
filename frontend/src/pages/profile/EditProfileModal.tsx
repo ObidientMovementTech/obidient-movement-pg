@@ -9,6 +9,7 @@ import FormSelect from '../../components/select/FormSelect';
 import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
 import { statesLGAWardList } from '../../utils/StateLGAWard';
 import { formatStateName, formatLocationName } from '../../utils/textUtils';
+import { validateUsernameFormat, debouncedUsernameCheck } from '../../services/profileService';
 import axios from 'axios';
 
 export default function EditProfileModal({
@@ -31,6 +32,14 @@ export default function EditProfileModal({
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [toastInfo, setToastInfo] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Username validation state
+  const [usernameValidation, setUsernameValidation] = useState({
+    isValidating: false,
+    isValid: true,
+    message: '',
+    available: true
+  });
 
   // Enhanced profile fields from migration (with backward compatibility)
   const [userName, setUserName] = useState(
@@ -92,6 +101,52 @@ export default function EditProfileModal({
     }));
     setStates(stateOptions);
   }, []);
+
+  // Handle username change with validation
+  const handleUsernameChange = (newUsername: string) => {
+    setUserName(newUsername);
+
+    // Reset validation state
+    setUsernameValidation({
+      isValidating: true,
+      isValid: true,
+      message: 'Checking username...',
+      available: true
+    });
+
+    // If empty, reset validation
+    if (!newUsername.trim()) {
+      setUsernameValidation({
+        isValidating: false,
+        isValid: true,
+        message: '',
+        available: true
+      });
+      return;
+    }
+
+    // First validate format locally
+    const formatValidation = validateUsernameFormat(newUsername);
+    if (!formatValidation.valid) {
+      setUsernameValidation({
+        isValidating: false,
+        isValid: false,
+        message: formatValidation.message,
+        available: false
+      });
+      return;
+    }
+
+    // Then check availability with debouncing
+    debouncedUsernameCheck(newUsername, (result: any) => {
+      setUsernameValidation({
+        isValidating: false,
+        isValid: result.valid,
+        message: result.message,
+        available: result.available || false
+      });
+    });
+  };
 
   // Helper functions for cascading dropdowns (same as KYC)
   const getLgas = (stateName: string): OptionType[] => {
@@ -244,6 +299,15 @@ export default function EditProfileModal({
   };
 
   const handleSave = async () => {
+    // Validate username before saving
+    if (userName && userName.trim() && (!usernameValidation.isValid || !usernameValidation.available)) {
+      setToastInfo({
+        message: 'Please fix the username error before saving',
+        type: 'error'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Set country based on citizenship
@@ -393,13 +457,48 @@ export default function EditProfileModal({
                 <label htmlFor="userName" className="block text-sm font-medium text-gray-600 mb-1">
                   Username
                 </label>
-                <input
-                  id="userName"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="Enter your username"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006837] focus:border-[#006837] transition text-gray-900"
-                />
+                <div className="relative">
+                  <input
+                    id="userName"
+                    value={userName}
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    placeholder="Enter your username (letters, numbers, _ only)"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 transition text-gray-900 ${usernameValidation.isValid
+                        ? 'border-gray-300 focus:ring-[#006837] focus:border-[#006837]'
+                        : 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                      }`}
+                  />
+                  {usernameValidation.isValidating && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#006837]"></div>
+                    </div>
+                  )}
+                  {!usernameValidation.isValidating && !usernameValidation.isValid && (
+                    <div className="absolute right-3 top-2.5 text-red-500">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                  {!usernameValidation.isValidating && usernameValidation.isValid && usernameValidation.available && userName && userName.trim() && (
+                    <div className="absolute right-3 top-2.5 text-green-500">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                {usernameValidation.message && (
+                  <p className={`text-xs mt-1 ${usernameValidation.isValid && usernameValidation.available
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                    }`}>
+                    {usernameValidation.message}
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  3-20 characters. Letters, numbers, and underscores only. No spaces.
+                </p>
               </div>
 
               {/* Gender */}
@@ -569,11 +668,13 @@ export default function EditProfileModal({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={loading}
-                className={`px-6 py-2 rounded-lg text-white font-medium transition-colors ${loading ? 'bg-[#80a79a] cursor-not-allowed' : 'bg-[#006837] hover:bg-[#00592e]'
+                disabled={loading || usernameValidation.isValidating || (Boolean(userName?.trim()) && (!usernameValidation.isValid || !usernameValidation.available))}
+                className={`px-6 py-2 rounded-lg text-white font-medium transition-colors ${loading || usernameValidation.isValidating || (Boolean(userName?.trim()) && (!usernameValidation.isValid || !usernameValidation.available))
+                    ? 'bg-[#80a79a] cursor-not-allowed'
+                    : 'bg-[#006837] hover:bg-[#00592e]'
                   }`}
               >
-                {loading ? 'Saving...' : 'Save Changes'}
+                {loading ? 'Saving...' : usernameValidation.isValidating ? 'Validating...' : 'Save Changes'}
               </button>
             </div>
           </form>

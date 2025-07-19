@@ -6,6 +6,51 @@ import { generateOTP, createOTPExpiry, isOTPValid } from '../utils/otpUtils.js';
 import { generateTOTPSecret, generateQRCode, verifyTOTP } from '../utils/tfaUtils.js';
 import { sendOTPEmail } from '../utils/emailHandler.js';
 
+// Check if username is available
+export const checkUsernameAvailability = async (req, res) => {
+  try {
+    const { username } = req.query;
+    const currentUserId = req.userId; // From auth middleware
+
+    if (!username) {
+      return res.status(400).json({
+        available: false,
+        message: 'Username is required'
+      });
+    }
+
+    // Validate username format
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({
+        available: false,
+        message: 'Username must be 3-20 characters long and contain only letters, numbers, and underscores'
+      });
+    }
+
+    // Check if username exists (excluding current user)
+    const existingUser = await User.findOne({ userName: username });
+
+    if (existingUser && existingUser.id !== currentUserId) {
+      return res.status(200).json({
+        available: false,
+        message: 'Username is already taken'
+      });
+    }
+
+    return res.status(200).json({
+      available: true,
+      message: 'Username is available'
+    });
+  } catch (error) {
+    console.error('Username check error:', error);
+    res.status(500).json({
+      available: false,
+      message: 'Server error while checking username'
+    });
+  }
+};
+
 export const uploadProfileImage = async (req, res) => {
   try {
     if (!req.file) {

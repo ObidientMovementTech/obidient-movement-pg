@@ -449,7 +449,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
                     <li
                       key={bloc._id}
                       className="p-3 rounded-lg border border-gray-100 hover:border-[#006837]/20 hover:bg-[#006837]/5 transition cursor-pointer flex items-center"
-                      onClick={() => setActivePage("Create your Voting Bloc")}
+                      onClick={handleVisitAutoVotingBloc}
                     >
                       <div className="flex-1 min-w-0 flex items-center gap-3">
                         <div className="rounded-full w-8 h-8 flex-shrink-0 flex items-center justify-center bg-[#006837]/10 text-[#006837] font-medium">
@@ -521,10 +521,10 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
             {(ownedVotingBlocs.length > 0 || joinedVotingBlocs.length > 0) && (
               <div className="text-center">
                 <button
-                  onClick={() => setActivePage("Create your Voting Bloc")}
+                  onClick={handleVisitAutoVotingBloc}
                   className="text-sm text-[#006837] hover:text-[#004d2a] transition flex items-center gap-1 justify-center mx-auto"
                 >
-                  View All Voting Blocs <ArrowRight size={14} />
+                  View Your Voting Bloc <ArrowRight size={14} />
                 </button>
               </div>
             )}
