@@ -82,11 +82,15 @@ export const checkUsernameAvailability = async (username: string): Promise<Usern
       return { ...formatValidation, available: false };
     }
 
+    console.log('🔍 Checking username availability for:', username);
+
     // Then check availability on server
     const response = await axios.get(
       `${API_BASE}/users/check-username?username=${encodeURIComponent(username)}`,
       { withCredentials: true }
     );
+
+    console.log('✅ Username check response:', response.data);
 
     return {
       valid: response.data.available,
@@ -94,16 +98,25 @@ export const checkUsernameAvailability = async (username: string): Promise<Usern
       available: response.data.available
     };
   } catch (error: any) {
-    console.error('Error checking username availability:', error);
+    console.error('❌ Error checking username availability:', error);
+    console.error('❌ Error response:', error.response?.data);
+
+    // If there's an authentication error, treat it as unavailable
+    if (error.response?.status === 401) {
+      return {
+        valid: false,
+        message: 'Please log in to check username availability',
+        available: false
+      };
+    }
+
     return {
       valid: false,
       message: error.response?.data?.message || 'Error checking username availability',
       available: false
     };
   }
-};
-
-// Debounced username check function
+};// Debounced username check function
 let debounceTimer: NodeJS.Timeout | null = null;
 
 export const debouncedUsernameCheck = (
