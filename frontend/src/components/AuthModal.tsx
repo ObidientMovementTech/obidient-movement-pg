@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Mail, Lock, User, Phone, Eye, EyeOff } from 'lucide-react';
-import { loginUser, registerUser } from '../services/authService';
+import { loginUser, registerUser, resendVerificationEmail } from '../services/authService';
 import FormSelect from './select/FormSelect';
 import { statesLGAWardList } from '../utils/StateLGAWard';
 import { OptionType } from '../utils/lookups';
@@ -28,6 +28,8 @@ export default function AuthModal({
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>(initialTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [states, setStates] = useState<OptionType[]>([]);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -84,17 +86,54 @@ export default function AuthModal({
     e.preventDefault();
     setLoading(true);
     setError('');
+    setShowResendVerification(false);
 
     try {
-      await loginUser({
+      const result = await loginUser({
         email: loginData.email,
         password: loginData.password
       });
-      onAuthSuccess();
+
+      if (result.success) {
+        onAuthSuccess();
+      }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Login failed');
+      console.log('Login error:', error);
+
+      let errorMessage = 'Login failed. Please try again.';
+
+      if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Handle specific error types
+      if (error.errorType === 'EMAIL_NOT_FOUND') {
+        errorMessage = 'No account found with this email address. Please check your email or sign up for a new account.';
+      } else if (error.errorType === 'EMAIL_NOT_VERIFIED') {
+        errorMessage = 'Please verify your email address before logging in. Check your inbox for a verification email.';
+        setShowResendVerification(true);
+      } else if (error.errorType === 'INVALID_PASSWORD') {
+        errorMessage = 'Incorrect password. Please check your password and try again.';
+      } else if (error.errorType === 'NETWORK_ERROR') {
+        errorMessage = 'Connection error. Please check your internet connection and try again.';
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendingVerification(true);
+    try {
+      await resendVerificationEmail(loginData.email);
+      setError('Verification email sent! Please check your inbox and spam folder.');
+      setShowResendVerification(false);
+    } catch (error: any) {
+      setError(error.message || 'Failed to resend verification email. Please try again.');
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -162,15 +201,35 @@ export default function AuthModal({
         };
       }
 
-      await registerUser(registrationData);
+      const result = await registerUser(registrationData);
 
       // Show success message and switch to login
       setError('');
       setActiveTab('login');
       setLoginData(prev => ({ ...prev, email: signupData.email }));
-      alert('Registration successful! Please check your email to verify your account, then login.');
+
+      // Show success message based on server response
+      const successMsg = result.message || 'Registration successful! Please check your email to verify your account, then login.';
+      alert(successMsg);
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Registration failed');
+      console.log('Registration error:', error);
+
+      let errorMessage = 'Registration failed. Please try again.';
+
+      if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Handle specific error types
+      if (error.errorType === 'EMAIL_EXISTS') {
+        errorMessage = 'An account with this email already exists. Please use a different email or try logging in.';
+      } else if (error.errorType === 'PHONE_EXISTS') {
+        errorMessage = 'An account with this phone number already exists. Please use a different phone number.';
+      } else if (error.errorType === 'NETWORK_ERROR') {
+        errorMessage = 'Connection error. Please check your internet connection and try again.';
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -226,6 +285,18 @@ export default function AuthModal({
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
+              {showResendVerification && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendingVerification}
+                    className="text-blue-600 hover:text-blue-800 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {resendingVerification ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

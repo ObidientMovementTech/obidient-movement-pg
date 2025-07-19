@@ -26,18 +26,77 @@ export const registerUser = async (req, res) => {
       pendingVotingBlocJoin // New field for voting bloc join info
     } = req.body;
 
-    // Validate input
-    if (!name || !email || !phone || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
+    // Validate input with specific error messages
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required',
+        field: 'name'
+      });
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email address is required',
+        field: 'email'
+      });
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address',
+        field: 'email'
+      });
+    }
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required',
+        field: 'phone'
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+        field: 'password'
+      });
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+        field: 'password'
+      });
     }
 
+    // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this email address already exists. Please use a different email or try logging in.',
+        field: 'email',
+        errorType: 'EMAIL_EXISTS'
+      });
+    }
+
+    // Check if phone number already exists (optional validation)
+    const existingPhone = await User.findOne({ phone });
+    if (existingPhone) {
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this phone number already exists. Please use a different phone number.',
+        field: 'phone',
+        errorType: 'PHONE_EXISTS'
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -88,13 +147,18 @@ export const registerUser = async (req, res) => {
     // Try to send the email before responding
     try {
       await sendConfirmationEmail(name, email, link, "confirm");
-      res.status(201).json({ message: 'User registered successfully, confirmation email sent' });
+      res.status(201).json({
+        success: true,
+        message: 'Account created successfully! Please check your email to verify your account.',
+        emailSent: true
+      });
     } catch (emailError) {
       console.error('Registration email error:', emailError.message);
 
       // Still create the user but inform about the email issue
       res.status(201).json({
-        message: 'User registered successfully, but there was an issue sending the confirmation email. Please use the resend confirmation option.',
+        success: true,
+        message: 'Account created successfully, but there was an issue sending the verification email. You can request a new verification email from the login page.',
         emailSent: false
       });
 
@@ -110,7 +174,32 @@ export const registerUser = async (req, res) => {
     }
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
+    // Handle specific database errors
+    if (error.code === '23505') { // PostgreSQL unique constraint violation
+      if (error.constraint && error.constraint.includes('email')) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this email address already exists.',
+          field: 'email',
+          errorType: 'EMAIL_EXISTS'
+        });
+      }
+      if (error.constraint && error.constraint.includes('phone')) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this phone number already exists.',
+          field: 'phone',
+          errorType: 'PHONE_EXISTS'
+        });
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Unable to create account at this time. Please try again later.',
+      errorType: 'SERVER_ERROR'
+    });
   }
 };
 
@@ -119,21 +208,64 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate input
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email address is required',
+        field: 'email'
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+        field: 'password'
+      });
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address',
+        field: 'email'
+      });
+    }
+
     // 1. Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: "Invalid email or password!" });
+      return res.status(401).json({
+        success: false,
+        message: "No account found with this email address. Please check your email or sign up for a new account.",
+        field: 'email',
+        errorType: 'EMAIL_NOT_FOUND'
+      });
     }
 
     // 2. Check if email is verified
     if (!user.emailVerified) {
-      return res.status(403).json({ message: "Please confirm your email to log in." });
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email address before logging in. Check your inbox for a verification email.",
+        field: 'email',
+        errorType: 'EMAIL_NOT_VERIFIED',
+        email: user.email // Include email for resend verification option
+      });
     }
 
     // 3. Compare password
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email or password!" });
+      return res.status(401).json({
+        success: false,
+        message: "Incorrect password. Please check your password and try again.",
+        field: 'password',
+        errorType: 'INVALID_PASSWORD'
+      });
     }
 
     // 4. Check if 2FA is enabled
@@ -146,6 +278,7 @@ export const loginUser = async (req, res) => {
       );
 
       return res.status(200).json({
+        success: true,
         message: "2FA verification required",
         requires2FA: true,
         tempToken,
@@ -176,14 +309,19 @@ export const loginUser = async (req, res) => {
     };
 
     return res.status(200).json({
-      message: "Logged in successfully",
+      success: true,
+      message: "Login successful! Welcome back.",
       user: userResponse,
       token: authToken,
     });
 
   } catch (error) {
     console.error("Login error:", error);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({
+      success: false,
+      message: "Unable to log in at this time. Please try again later.",
+      errorType: 'SERVER_ERROR'
+    });
   }
 };
 
@@ -406,17 +544,41 @@ export const resendConfirmationEmail = async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Email address is required',
+        field: 'email'
+      });
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address',
+        field: 'email'
+      });
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email address. Please check your email or sign up for a new account.',
+        field: 'email',
+        errorType: 'EMAIL_NOT_FOUND'
+      });
     }
 
     if (user.emailVerified) {
-      return res.status(400).json({ message: 'Email is already verified' });
+      return res.status(400).json({
+        success: false,
+        message: 'Email address is already verified. You can proceed to login.',
+        field: 'email',
+        errorType: 'EMAIL_ALREADY_VERIFIED'
+      });
     }
 
     // Generate a new confirmation token
@@ -427,14 +589,26 @@ export const resendConfirmationEmail = async (req, res) => {
     // Send the confirmation email
     try {
       await sendConfirmationEmail(user.name, user.email, link, "confirm");
-      res.status(200).json({ message: 'Confirmation email sent successfully' });
+      res.status(200).json({
+        success: true,
+        message: 'Verification email sent successfully! Please check your inbox and spam folder.',
+        emailSent: true
+      });
     } catch (emailError) {
       console.error(`Failed to send confirmation email: ${emailError.message}`);
-      res.status(500).json({ message: 'Failed to send confirmation email' });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email. Please try again later.',
+        errorType: 'EMAIL_SEND_ERROR'
+      });
     }
   } catch (error) {
     console.error('Error resending confirmation email:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Unable to resend verification email at this time. Please try again later.',
+      errorType: 'SERVER_ERROR'
+    });
   }
 };
 

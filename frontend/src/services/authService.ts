@@ -23,9 +23,21 @@ export const registerUser = async (data: {
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message);
+      // Return the full error response data which includes detailed error info
+      throw {
+        message: error.response.data.message || "Registration failed. Please try again.",
+        field: error.response.data.field,
+        errorType: error.response.data.errorType,
+        success: false,
+        status: error.response.status,
+        ...error.response.data
+      };
     }
-    throw new Error("Registration failed. Please try again.");
+    throw {
+      message: "Registration failed. Please check your connection and try again.",
+      success: false,
+      errorType: 'NETWORK_ERROR'
+    };
   }
 };
 
@@ -33,10 +45,30 @@ export const loginUser = async (data: {
   email: string;
   password: string;
 }) => {
-  const response = await axios.post(`${API_BASE}/auth/login`, data, {
-    withCredentials: true,
-  });
-  return response.data;
+  try {
+    const response = await axios.post(`${API_BASE}/auth/login`, data, {
+      withCredentials: true,
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      // Return the full error response data which includes detailed error info
+      throw {
+        message: error.response.data.message || "Login failed. Please try again.",
+        field: error.response.data.field,
+        errorType: error.response.data.errorType,
+        success: false,
+        status: error.response.status,
+        email: error.response.data.email, // For email not verified case
+        ...error.response.data
+      };
+    }
+    throw {
+      message: "Login failed. Please check your connection and try again.",
+      success: false,
+      errorType: 'NETWORK_ERROR'
+    };
+  }
 };
 
 export const getCurrentUser = async () => {
@@ -65,6 +97,29 @@ export const verify2FALogin = async (tempToken: string, code: string) => {
       throw new Error(error.response.data.message);
     }
     throw new Error("2FA verification failed. Please try again.");
+  }
+};
+
+export const resendVerificationEmail = async (email: string) => {
+  try {
+    const response = await axios.post(`${API_BASE}/auth/resend-confirmation`,
+      { email },
+      { withCredentials: true }
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw {
+        message: error.response.data.message || "Failed to resend verification email.",
+        success: false,
+        ...error.response.data
+      };
+    }
+    throw {
+      message: "Failed to resend verification email. Please try again.",
+      success: false,
+      errorType: 'NETWORK_ERROR'
+    };
   }
 };
 

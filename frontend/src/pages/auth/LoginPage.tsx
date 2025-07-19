@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { Link, useNavigate } from "react-router";
 import Toast from "../../components/Toast.js";
-import { loginUser, verify2FALogin } from "../../services/authService.js";
+import { loginUser, verify2FALogin, resendVerificationEmail } from "../../services/authService.js";
 import Login2FAModal from "../../components/modals/Login2FAModal.js";
 import { useUserContext } from "../../context/UserContext.js";
 
@@ -16,6 +16,8 @@ export default function LoginPage() {
   const [showToast, setShowToast] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   // 2FA States
   const [loginToken, setLoginToken] = useState(""); // Temporary token for 2FA process
@@ -45,10 +47,24 @@ export default function LoginPage() {
     setShowToast(true);
   };
 
+  const handleResendVerification = async () => {
+    setResendingVerification(true);
+    try {
+      await resendVerificationEmail(email);
+      displayToast('Verification email sent! Please check your inbox and spam folder.', 'success');
+      setShowResendVerification(false);
+    } catch (error: any) {
+      displayToast(error.message || 'Failed to resend verification email. Please try again.', 'error');
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoginLoading(true);
     setShowToast(false);
+    setShowResendVerification(false);
 
     try {
       const res = await loginUser({ email, password });
@@ -61,15 +77,7 @@ export default function LoginPage() {
         return;
       }
 
-      const user = res.user;
-
-      if (!user.emailVerified) {
-        displayToast("Please verify your email before logging in.", "error");
-        setIsLoginLoading(false);
-        return;
-      }
-
-      displayToast("Login successful!", "success");
+      displayToast(res.message || "Login successful!", "success");
 
       // Refresh user profile to update context
       await refreshProfile();
@@ -81,10 +89,30 @@ export default function LoginPage() {
       } else {
         navigate("/dashboard");
       }
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.message || "Invalid credentials or server error.";
-      displayToast(msg, "error");
+    } catch (error: any) {
+      console.log('Login error:', error);
+
+      let errorMessage = 'Login failed. Please try again.';
+
+      if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Handle specific error types with detailed messages
+      if (error.errorType === 'EMAIL_NOT_FOUND') {
+        errorMessage = 'No account found with this email address. Please check your email or sign up for a new account.';
+      } else if (error.errorType === 'EMAIL_NOT_VERIFIED') {
+        errorMessage = 'Please verify your email address before logging in. Check your inbox for a verification email.';
+        setShowResendVerification(true);
+      } else if (error.errorType === 'INVALID_PASSWORD') {
+        errorMessage = 'Incorrect password. Please check your password and try again.';
+      } else if (error.errorType === 'NETWORK_ERROR') {
+        errorMessage = 'Connection error. Please check your internet connection and try again.';
+      } else if (error.errorType === 'SERVER_ERROR') {
+        errorMessage = 'Server error. Please try again later.';
+      }
+
+      displayToast(errorMessage, "error");
     } finally {
       setIsLoginLoading(false);
     }
@@ -196,6 +224,20 @@ export default function LoginPage() {
 
       {showToast && (
         <Toast message={message} type={toastType} onClose={() => setShowToast(false)} />
+      )}
+
+      {/* Resend Verification Email Button */}
+      {showResendVerification && (
+        <div className="text-center mt-4">
+          <button
+            type="button"
+            onClick={handleResendVerification}
+            disabled={resendingVerification}
+            className="text-blue-600 hover:text-blue-800 underline disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {resendingVerification ? 'Sending...' : 'Resend verification email'}
+          </button>
+        </div>
       )}
 
       {/* 2FA Verification Modal */}
