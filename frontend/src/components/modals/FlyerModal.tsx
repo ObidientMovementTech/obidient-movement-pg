@@ -54,7 +54,7 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
         console.error('Failed to preload background image');
         setBackgroundImageLoaded(true);
       };
-      bgImg.src = '/mobilize-dp.png';
+      bgImg.src = '/mobilize-dp2.png';
     }
   }, [isOpen]);
 
@@ -323,18 +323,21 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
                       {/* Name and details on the left */}
                       <div className="flex-1 min-w-0">
                         <p
-                          className="font-bold text-gray-900 leading-tight break-words truncate"
+                          className="font-bold text-gray-900 leading-tight break-words"
                           style={{
                             fontSize: '1.2rem',
                             lineHeight: 1.1,
                             maxWidth: '180px',
-                            marginBottom: 0
+                            marginBottom: '2px',
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word',
+                            hyphens: 'auto'
                           }}
                         >
                           {getUserName()}
                         </p>
                         <p
-                          className="text-gray-600 mt-1 truncate"
+                          className="text-gray-600 mt-1"
                           style={{ fontSize: '1rem', maxWidth: '180px' }}
                         >
                           Mobilizer
@@ -350,7 +353,7 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
                             <img
                               src={profileImgSrc}
                               alt={getUserName()}
-                              // crossOrigin="anonymous"
+                              crossOrigin="anonymous"
                               className="w-full h-full object-cover"
                               onError={() => setProfileImgSrc('/photo.png')}
                             />
