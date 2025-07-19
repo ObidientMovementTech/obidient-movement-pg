@@ -22,6 +22,7 @@
     "@weston/react-world-flags": "^2.0.0",
     "axios": "^1.9.0",
     "browser-image-compression": "^2.0.2",
+    "canvas-confetti": "^1.9.3",
     "chart.js": "^4.4.9",
     "date-fns": "^4.1.0",
     "dom-to-image": "^2.6.0",
@@ -30,6 +31,7 @@
     "gsap": "^3.13.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.510.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
@@ -53,6 +55,7 @@
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@tailwindcss/line-clamp": "^0.4.4",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/dompurify": "^3.0.5",
     "@types/node": "^22.15.18",
     "@types/react": "^18.3.17",
