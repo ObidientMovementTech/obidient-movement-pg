@@ -7,6 +7,7 @@ import {
   CheckCircle, XCircle, UserCheck, UserX, Eye, Loader2, X, AlertTriangle, Mail, Send
 } from 'lucide-react';
 import { adminUserManagementService } from '../../../services/adminUserManagementService';
+import { adminMaintenanceService } from '../../../services/adminMaintenanceService';
 
 interface User {
   id: string;
@@ -449,19 +450,7 @@ export default function AdminUserManagement() {
         setConfirmationModal(prev => ({ ...prev, loading: true }));
 
         try {
-          const response = await fetch('/api/admin/cleanup/duplicate-auto-blocs', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
+          const data = await adminMaintenanceService.cleanupDuplicateAutoBlocs();
 
           if (data.success) {
             const { usersWithDuplicates, usersCleaned, blocsDeleted } = data.stats;
@@ -477,7 +466,7 @@ export default function AdminUserManagement() {
 
           setConfirmationModal(prev => ({ ...prev, isOpen: false, loading: false }));
         } catch (error: any) {
-          setError(`Failed to cleanup duplicates: ${error.message}`);
+          setError(`Failed to cleanup duplicates: ${error.response?.data?.message || error.message}`);
           setConfirmationModal(prev => ({ ...prev, loading: false }));
         }
       }
