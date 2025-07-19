@@ -617,7 +617,492 @@ export const statesLGAWardList = [
   },
   {
     "state": "Akwa Ibom",
-    "lgas": [],
+    "lgas": [
+      {
+        "lga": "abak",
+        "wards": [
+          "abak-urban-i",
+          "abak-urban-ii",
+          "abak-urban-iii",
+          "abak-urban-iv",
+          "afaha-obong-i",
+          "afaha-obong-ii",
+          "midim-i",
+          "midim-ii",
+          "otoro-i",
+          "otoro-ii",
+          "otoro-iii"
+        ]
+      },
+      {
+        "lga": "eastern-obolo",
+        "wards": [
+          "eastern-obolo-i",
+          "eastern-obolo-ii",
+          "eastern-obolo-iii",
+          "eastern-obolo-iv",
+          "eastern-obolo-ix",
+          "eastern-obolo-v",
+          "eastern-obolo-vi",
+          "eastern-obolo-vii",
+          "eastern-obolo-viii",
+          "eastern-obolo-x"
+        ]
+      },
+      {
+        "lga": "eket",
+        "wards": [
+          "central-i",
+          "central-ii",
+          "central-iii",
+          "central-iv",
+          "central-v",
+          "okon-i",
+          "okon-ii",
+          "urban-i",
+          "urban-ii",
+          "urban-iii",
+          "urban-iv"
+        ]
+      },
+      {
+        "lga": "esit-eket",
+        "wards": [
+          "akpautong",
+          "ebe-ekpi",
+          "ebighi-okpono",
+          "edor",
+          "ekpene-obo",
+          "etebi-akwata",
+          "etebi-idung-assan",
+          "ikpa",
+          "ntak-inyang",
+          "uquo"
+        ]
+      },
+      {
+        "lga": "essien-udim",
+        "wards": [
+          "adiasim",
+          "afaha",
+          "ekpeyong-i",
+          "ekpeyong-ii",
+          "ikpe-annang",
+          "odoro-ikot-i",
+          "odoro-ikot-ii",
+          "okon",
+          "ukana-east",
+          "ukana-west-i",
+          "ukana-west-ii"
+        ]
+      },
+      {
+        "lga": "etim-ekpo",
+        "wards": [
+          "etim-ekpo-i",
+          "etim-ekpo-ii",
+          "etim-ekpo-iii",
+          "etim-ekpo-iv",
+          "etim-ekpo-ix",
+          "etim-ekpo-v",
+          "etim-ekpo-vi",
+          "etim-ekpo-vii",
+          "etim-ekpo-viii",
+          "etim-ekpo-x"
+        ]
+      },
+      {
+        "lga": "etinan",
+        "wards": [
+          "etinan-urban-i",
+          "etinan-urban-ii",
+          "etinan-urban-iii",
+          "etinan-urban-iv",
+          "etinan-urban-v",
+          "northern-iman-i",
+          "northern-iman-ii",
+          "southern-iman-i",
+          "southern-iman-ii",
+          "southern-iman-iii",
+          "southern-iman-iv"
+        ]
+      },
+      {
+        "lga": "ibeno",
+        "wards": [
+          "ibeno-i",
+          "ibeno-ii",
+          "ibeno-iii",
+          "ibeno-iv",
+          "ibeno-ix",
+          "ibeno-v",
+          "ibeno-vii",
+          "ibeno-viii",
+          "ibeno-vi",
+          "ibeno-x"
+        ]
+      },
+      {
+        "lga": "ibesikpo-asutan",
+        "wards": [
+          "asutan-i",
+          "asutan-ii",
+          "asutan-iii",
+          "asutan-iv",
+          "asutan-v",
+          "ibesikpo-i",
+          "ibesikpo-ii",
+          "ibesikpo-iii",
+          "ibesikpo-iv",
+          "ibesikpo-v"
+        ]
+      },
+      {
+        "lga": "ibiono-ibom",
+        "wards": [
+          "ibiono-central-i",
+          "ibiono-central-ii",
+          "ibiono-eastern-i",
+          "ibiono-eastern-ii",
+          "ibiono-northern-i",
+          "ibiono-northern-ii",
+          "ibiono-southern-i",
+          "ibiono-southern-ii",
+          "ibiono-western-i",
+          "ibiono-western-ii",
+          "ikpanya"
+        ]
+      },
+      {
+        "lga": "ika",
+        "wards": [
+          "achan-ii",
+          "achan-iii",
+          "achan-ika",
+          "ito-i",
+          "ito-ii",
+          "ito-iii",
+          "odoro-i",
+          "odoro-ii",
+          "urban-i",
+          "urban-ii"
+        ]
+      },
+      {
+        "lga": "ikono",
+        "wards": [
+          "itak",
+          "ediene-i",
+          "ediene-ii",
+          "ikono-middle-i",
+          "ikono-middle-ii",
+          "ikono-middle-iii",
+          "ikono-middle-iv",
+          "ikono-south",
+          "ndiya-ikot-idana",
+          "nkwot-i",
+          "nkwot-ii"
+        ]
+      },
+      {
+        "lga": "ikot-abasi",
+        "wards": [
+          "edemaya-i",
+          "edemaya-ii",
+          "edemaya-iii",
+          "ikpa-ibekwe-i",
+          "ikpa-ibekwe-ii",
+          "ikpa-nung-asang-i",
+          "ikpa-nung-asang-ii",
+          "ukpum-ete-i",
+          "ukpum-ete-ii",
+          "ukpum-okon"
+        ]
+      },
+      {
+        "lga": "ikot-ekpene",
+        "wards": [
+          "ikot-ekpene-i",
+          "ikot-ekpene-ii",
+          "ikot-ekpene-iii",
+          "ikot-ekpene-iv",
+          "ikot-ekpene-ix",
+          "ikot-ekpene-v",
+          "ikot-ekpene-vi",
+          "ikot-ekpene-vii",
+          "ikot-ekpene-viii",
+          "ikot-ekpene-x",
+          "ikot-ekpene-xi"
+        ]
+      },
+      {
+        "lga": "ini",
+        "wards": [
+          "ikono-north-i",
+          "ikono-north-ii",
+          "ikono-north-iii",
+          "ikpe-i",
+          "ikpe-ii",
+          "itu-mbonuso",
+          "iwerre",
+          "nkari",
+          "odoro-ukwok",
+          "usuk-ukwok"
+        ]
+      },
+      {
+        "lga": "itu",
+        "wards": [
+          "east-itam-i",
+          "east-itam-ii",
+          "east-itam-iii",
+          "east-itam-iv",
+          "east-itam-v",
+          "mbiase-ayadehe",
+          "oku-iboku",
+          "west-itam-i",
+          "west-itam-ii",
+          "west-itam-iii"
+        ]
+      },
+      {
+        "lga": "mbo",
+        "wards": [
+          "ebughu-i",
+          "ebughu-ii",
+          "efiat-i",
+          "efiat-ii",
+          "enwang-i",
+          "enwang-ii",
+          "ibaka",
+          "uda-i",
+          "uda-ii",
+          "udesi"
+        ]
+      },
+      {
+        "lga": "mkpat-enin",
+        "wards": [
+          "ibiaku-i",
+          "ibiaku-ii",
+          "ibiaku-iii",
+          "ikpa-ibom-i",
+          "ikpa-ibom-ii",
+          "ikpa-ibom-iii",
+          "ikpa-ibom-iv",
+          "ikpa-ikono-i",
+          "ikpa-ikono-ii",
+          "ikpa-ikono-iii",
+          "ukpum-minya-i",
+          "ukpum-minya-ii",
+          "ukpum-minya-iii",
+          "ukpum-minya-iv"
+        ]
+      },
+      {
+        "lga": "nsit-atai",
+        "wards": [
+          "eastern-nsit-i",
+          "eastern-nsit-ii",
+          "eastern-nsit-iii",
+          "eastern-nsit-iv",
+          "eastern-nsit-ix",
+          "eastern-nsit-v",
+          "eastern-nsit-vi",
+          "eastern-nsit-vii",
+          "eastern-nsit-viii",
+          "eastern-nsit-x"
+        ]
+      },
+      {
+        "lga": "nsit-ibom",
+        "wards": [
+          "asang-i",
+          "asang-ii",
+          "asang-iii",
+          "asang-iv",
+          "asang-v",
+          "mbaiso-i",
+          "mbaiso-ii",
+          "mbaiso-iii",
+          "mbaiso-iv",
+          "mbaiso-v"
+        ]
+      },
+      {
+        "lga": "nsit-ubium",
+        "wards": [
+          "ibiakpan-obotim-i",
+          "ibiakpan-obotim-ii",
+          "itreto",
+          "ndiya",
+          "ubium-north-i",
+          "ubium-north-ii",
+          "ubium-north-iii",
+          "ubium-south-i",
+          "ubium-south-ii",
+          "ubium-south-iii"
+        ]
+      },
+      {
+        "lga": "obot-akara",
+        "wards": [
+          "ikot-abia-i",
+          "ikot-abia-ii",
+          "ikot-abia-iii",
+          "nto-edino-i",
+          "nto-edino-ii",
+          "nto-edino-iii",
+          "nto-edino-iv",
+          "obot-akara-i",
+          "obot-akara-ii",
+          "obot-akara-iii"
+        ]
+      },
+      {
+        "lga": "okobo",
+        "wards": [
+          "akai-mbukpo-udung",
+          "ekeya",
+          "eweme-i",
+          "eweme-ii",
+          "nung-atai-ube-i",
+          "nung-atai-ube-ii",
+          "offi-i",
+          "offi-ii",
+          "okopedi-i",
+          "okopedi-ii"
+        ]
+      },
+      {
+        "lga": "onna",
+        "wards": [
+          "awa-i",
+          "awa-ii",
+          "awa-iii",
+          "awa-iv",
+          "nung-idem-i",
+          "nung-idem-ii",
+          "oniong-east-i",
+          "oniong-east-ii",
+          "oniong-east-iii",
+          "oniong-west-i",
+          "oniong-west-ii",
+          "oniong-west-iii"
+        ]
+      },
+      {
+        "lga": "oron",
+        "wards": [
+          "oron-urban-ix",
+          "oron-urban-x",
+          "oron-urban-i",
+          "oron-urban-ii",
+          "oron-urban-iii",
+          "oron-urban-iv",
+          "oron-urban-v",
+          "oron-urban-vi",
+          "oron-urban-vii",
+          "oron-urban-viii"
+        ]
+      },
+      {
+        "lga": "oruk-anam",
+        "wards": [
+          "abak-midim-i",
+          "abak-midim-ii",
+          "abak-midim-iii",
+          "abak-midim-iv",
+          "ekparakwa",
+          "ibesit-nung-ikot-i",
+          "ibesit-nung-ikot-ii",
+          "ikot-ibritam-i",
+          "ikot-ibritam-ii",
+          "ndot-ikot-okoro-i",
+          "ndot-ikot-okoro-ii",
+          "ndot-ikot-okoro-iii",
+          "ndot-ikot-okoro-vi"
+        ]
+      },
+      {
+        "lga": "udung-uko",
+        "wards": [
+          "udung-uko-i",
+          "udung-uko-ii",
+          "udung-uko-iii",
+          "udung-uko-iv",
+          "udung-uko-ix",
+          "udung-uko-v",
+          "udung-uko-vi",
+          "udung-uko-vii",
+          "udung-uko-viii",
+          "udung-uko-x"
+        ]
+      },
+      {
+        "lga": "ukanafun",
+        "wards": [
+          "northern-afaha-i",
+          "northern-afaha-ii",
+          "northern-ukanafun-i",
+          "northern-ukanafun-ii",
+          "southern-afaha-adat-ifang-i",
+          "southern-afaha-adat-ifang-ii",
+          "southern-afaha-adat-ifang-iii",
+          "southern-afaha-adat-ifang-iv",
+          "southern-ukanafun-i",
+          "southern-ukanafun-ii",
+          "ukanafun-urban"
+        ]
+      },
+      {
+        "lga": "uruan",
+        "wards": [
+          "central-uruan-ii",
+          "central-uruan-i",
+          "central-uruan-iii",
+          "northern-uruan-i",
+          "northern-uruan-ii",
+          "southern-uruan-i",
+          "southern-uruan-ii",
+          "southern-uruan-iii",
+          "southern-uruan-iv",
+          "southern-uruan-v",
+          "southern-uruan-vi"
+        ]
+      },
+      {
+        "lga": "urue-offong-oruko",
+        "wards": [
+          "oruko-i",
+          "oruko-ii",
+          "oruko-iii",
+          "oruko-iv",
+          "oruko-v",
+          "urue-offong-i",
+          "urue-offong-ii",
+          "urue-offong-iii",
+          "urue-offong-iv",
+          "urue-offong-v"
+        ]
+      },
+      {
+        "lga": "uyo",
+        "wards": [
+          "etoi-i",
+          "etoi-ii",
+          "ikono-i",
+          "ikono-ii",
+          "offot-i",
+          "offot-ii",
+          "oku-i",
+          "oku-ii",
+          "uyo-urban-i",
+          "uyo-urban-ii",
+          "uyo-urban-iii"
+        ]
+      }
+    ],
     "zone": "South South",
     "zone_abbreviation": "SS",
     "state_abbreviation": "AK"
@@ -2391,7 +2876,292 @@ export const statesLGAWardList = [
   },
   {
     "state": "Cross River",
-    "lgas": [],
+    "lgas": [
+      {
+        "lga": "abi",
+        "wards": [
+          "adadama",
+          "afafanyi",
+          "ebasi-emon",
+          "ediba",
+          "ekureku-i",
+          "ekureku-ii",
+          "igombe",
+          "imabana-i",
+          "imabana-ii",
+          "itigidi"
+        ]
+      },
+      {
+        "lga": "akamkpa",
+        "wards": [
+          "aka-ekpuchi",
+          "akamkpa-urban",
+          "awi",
+          "eku",
+          "iko",
+          "ikpai",
+          "mbarakom",
+          "oban",
+          "ojor",
+          "uyanga"
+        ]
+      },
+      {
+        "lga": "akpabuyo",
+        "wards": [
+          "atimbo-east",
+          "atimbo-west",
+          "eneyo",
+          "idebe",
+          "ikang-central",
+          "ikang-north",
+          "ikang-south",
+          "ikot-edem-odo",
+          "ikot-eyo",
+          "ikot-nakanda"
+        ]
+      },
+      {
+        "lga": "bakassi",
+        "wards": [
+          "abana",
+          "akpankanya",
+          "akwa",
+          "ambai-ehom",
+          "atai-ema",
+          "efut-inwang",
+          "ekpot-abia",
+          "ikang",
+          "ikot-effiong",
+          "ikot-eneyo"
+        ]
+      },
+      {
+        "lga": "bekwarra",
+        "wards": [
+          "abuochiche",
+          "afrike-one",
+          "afrike-two",
+          "beten",
+          "gakem",
+          "ibiadeghe",
+          "otukpuru",
+          "ugbudu",
+          "ukpah",
+          "ukpare"
+        ]
+      },
+      {
+        "lga": "biase",
+        "wards": [
+          "abayong",
+          "adim",
+          "agwagwune",
+          "akpet-abung",
+          "biakpan",
+          "ehom",
+          "erei-north",
+          "erei-south",
+          "ibom",
+          "umon-south"
+        ]
+      },
+      {
+        "lga": "boki",
+        "wards": [
+          "abo",
+          "alankwu",
+          "beebo-bumaji",
+          "boje",
+          "buanchor",
+          "bukalom",
+          "bunjaco",
+          "esekwe",
+          "kajon-kashie",
+          "ogep-osokom",
+          "oku-bushuyu"
+        ]
+      },
+      {
+        "lga": "calabar-municipal",
+        "wards": [
+          "ward-eight",
+          "ward-five",
+          "ward-four",
+          "ward-nine",
+          "ward-one",
+          "ward-seven",
+          "ward-six",
+          "ward-ten",
+          "ward-three",
+          "ward-two"
+        ]
+      },
+      {
+        "lga": "calabar-south",
+        "wards": [
+          "ward-eight",
+          "ward-eleven",
+          "ward-five",
+          "ward-four",
+          "ward-nine",
+          "ward-one",
+          "ward-seven",
+          "ward-six",
+          "ward-ten",
+          "ward-three",
+          "ward-two"
+        ]
+      },
+      {
+        "lga": "etung",
+        "wards": [
+          "abia",
+          "abijang",
+          "agbokim",
+          "ajassor",
+          "bendeghe-ekiem",
+          "effraya",
+          "etomi",
+          "itaka",
+          "mkpot",
+          "nsofang"
+        ]
+      },
+      {
+        "lga": "ikom",
+        "wards": [
+          "abanyum",
+          "abijang",
+          "akparabong",
+          "ikom-urban",
+          "nde",
+          "nnam",
+          "nta",
+          "ofutop-i",
+          "ofutop-ii",
+          "yala-nkum"
+        ]
+      },
+      {
+        "lga": "obanliku",
+        "wards": [
+          "basang",
+          "bebi",
+          "becheve",
+          "bendi-i",
+          "bendi-ii",
+          "bishiri",
+          "bisu",
+          "busi",
+          "shankun",
+          "udeshi"
+        ]
+      },
+      {
+        "lga": "obubra",
+        "wards": [
+          "ababene",
+          "apiapum",
+          "iyamoyong",
+          "obubra-urban",
+          "ochon",
+          "ofat",
+          "ofodua",
+          "ofumbongha-yala",
+          "osopong-i",
+          "osopong-ii",
+          "ovonum"
+        ]
+      },
+      {
+        "lga": "obudu",
+        "wards": [
+          "alege-ubang",
+          "angiaba-begiaka",
+          "begiading",
+          "ipong",
+          "north-ukpah",
+          "obudu-urban-i",
+          "obudu-urban-ii",
+          "south-ukpah",
+          "utugwang-central",
+          "utugwang-north",
+          "utugwang-south"
+        ]
+      },
+      {
+        "lga": "odukpani",
+        "wards": [
+          "adiabo-ikot-mbo",
+          "akamkpa",
+          "creek-town",
+          "eki",
+          "ekong-anaku",
+          "eniong",
+          "ikot-ansa",
+          "ikot-effiong",
+          "new-netim",
+          "obomitiat",
+          "odot",
+          "odukpani-central",
+          "onimankiong"
+        ]
+      },
+      {
+        "lga": "ogoja",
+        "wards": [
+          "ekajuk-i",
+          "ekajuk-ii",
+          "mbube-east",
+          "mbube-west-i",
+          "mbube-west-ii",
+          "nkum-ibor",
+          "nkum-irede",
+          "ogoja-urban-i",
+          "ogoja-urban-ii",
+          "ugaga"
+        ]
+      },
+      {
+        "lga": "yakurr",
+        "wards": [
+          "abankang",
+          "afrekpe-ekpenti",
+          "ajere",
+          "assiga",
+          "biko-biko",
+          "ibom",
+          "ikomi",
+          "ikpakapit",
+          "mkpani",
+          "nko",
+          "ntan",
+          "ugep-urban",
+          "ugep-urban-ii"
+        ]
+      },
+      {
+        "lga": "yala",
+        "wards": [
+          "ebo",
+          "gabu",
+          "igede",
+          "ijiraga",
+          "maa",
+          "okpoma",
+          "okuku",
+          "wanikade",
+          "wanihem",
+          "wanokom",
+          "woda",
+          "yahe",
+          "yala-okpudu",
+          "yala-ogoja"
+        ]
+      }
+    ],
     "zone": "South South",
     "zone_abbreviation": "SS",
     "state_abbreviation": "CR"
