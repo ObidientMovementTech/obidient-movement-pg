@@ -83,6 +83,9 @@ class User {
     } else if (criteria.id) {
       whereClause = 'WHERE id = $1';
       values = [criteria.id];
+    } else if (criteria.userName) {
+      whereClause = 'WHERE "userName" = $1';
+      values = [criteria.userName];
     }
 
     const result = await query(`SELECT * FROM users ${whereClause}`, values);

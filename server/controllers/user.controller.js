@@ -12,6 +12,8 @@ export const checkUsernameAvailability = async (req, res) => {
     const { username } = req.query;
     const currentUserId = req.userId; // From auth middleware
 
+    console.log('🔍 Username availability check:', { username, currentUserId });
+
     if (!username) {
       return res.status(400).json({
         available: false,
@@ -30,20 +32,23 @@ export const checkUsernameAvailability = async (req, res) => {
 
     // Check if username exists (excluding current user)
     const existingUser = await User.findOne({ userName: username });
+    console.log('🔍 Existing user found:', existingUser ? { id: existingUser.id, userName: existingUser.userName } : null);
 
     if (existingUser && existingUser.id !== currentUserId) {
+      console.log('❌ Username taken by different user');
       return res.status(200).json({
         available: false,
         message: 'Username is already taken'
       });
     }
 
+    console.log('✅ Username available');
     return res.status(200).json({
       available: true,
       message: 'Username is available'
     });
   } catch (error) {
-    console.error('Username check error:', error);
+    console.error('❌ Username check error:', error);
     res.status(500).json({
       available: false,
       message: 'Server error while checking username'
