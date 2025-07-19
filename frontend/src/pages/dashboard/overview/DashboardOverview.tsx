@@ -132,8 +132,9 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       };
 
       const shouldShowBirthdayModal = checkBirthdayTime();
+      const hasSeenBirthdayModal = localStorage.getItem('hasSeenBirthdayModal2025');
 
-      if (shouldShowBirthdayModal) {
+      if (shouldShowBirthdayModal && !hasSeenBirthdayModal) {
         // Show birthday modal first
         console.log('🎂 Showing birthday modal for Peter Obi...');
         const timer = setTimeout(() => {
@@ -176,6 +177,21 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
         return () => clearTimeout(timer);
       }
     }
+  };
+
+  // Helper function to check if it's birthday time (for promotional section)
+  const isBirthdayTime = () => {
+    const now = new Date();
+    const watTime = new Date(now.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
+    const birthday = new Date('2025-07-19T00:00:00');
+    const birthdayEnd = new Date('2025-07-20T00:00:00');
+    const birthdayWAT = new Date(birthday.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
+    const birthdayEndWAT = new Date(birthdayEnd.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
+    return watTime >= birthdayWAT && watTime < birthdayEndWAT;
+  };
+
+  const handleBirthdayPromoClick = () => {
+    window.open('https://x.com/obidientupdate/status/1946483306498761104/video/2', '_blank');
   };
 
   const totalMembers = ownedVotingBlocs.reduce((sum, bloc) => sum + (bloc.metrics?.totalMembers || 0), 0);
@@ -255,7 +271,71 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
         </div>
       </div>
 
-      {/* Voting Bloc Call-to-Action Section */}
+      {/* Birthday Celebration Promotional Section */}
+      {isBirthdayTime() && (
+        <div className="bg-gradient-to-r from-gray-700 via-gray-600 to-gray-800 p-4 md:p-5 rounded-xl shadow-lg text-white relative overflow-hidden">
+          {/* Exciting background decoration */}
+          <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/20 rounded-full -translate-y-10 translate-x-10 animate-pulse"></div>
+          <div className="absolute bottom-0 left-0 w-16 h-16 bg-yellow-400/20 rounded-full translate-y-8 -translate-x-8 animate-pulse delay-1000"></div>
+
+          <div className="absolute top-1/4 left-1/3 w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-700"></div>
+
+          <div className="relative z-10">
+            {/* Mobile Layout */}
+            <div className="block md:hidden text-center space-y-3">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <div className="p-2 bg-green-500/20 rounded-full animate-bounce">
+                  <Sparkles size={20} className="text-green-400" />
+                </div>
+                <div className="p-2 bg-yellow-500/20 rounded-full animate-pulse">
+                  <Target size={20} className="text-yellow-400" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-xl font-bold">Celebrate Peter Obi! 🎉</h2>
+                <p className="text-base font-medium text-gray-200">Join the Challenge & win a dinner date with P.O!</p>
+              </div>
+              <button
+                onClick={handleBirthdayPromoClick}
+                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg text-sm transform hover:scale-105"
+              >
+                <Zap size={16} className="mr-2" />
+                Learn How to Participate
+                <ArrowRight size={16} className="ml-2" />
+              </button>
+            </div>
+
+            {/* Desktop Layout */}
+            <div className="hidden md:flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex gap-2">
+                  <div className="p-3 bg-green-500/20 rounded-full animate-bounce">
+                    <Sparkles size={24} className="text-green-400" />
+                  </div>
+                  <div className="p-3 bg-yellow-500/20 rounded-full animate-pulse delay-300">
+                    <Target size={24} className="text-yellow-400" />
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
+                    Celebrate Peter Obi! 🎉
+                  </h2>
+                  <p className="text-sm lg:text-base font-medium text-gray-200">Join the Challenge & win a dinner date with P.O!</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleBirthdayPromoClick}
+                className="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg whitespace-nowrap transform hover:scale-105"
+              >
+                <Zap size={18} className="mr-2" />
+                Learn How to Participate
+                <ArrowRight size={18} className="ml-2" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}      {/* Voting Bloc Call-to-Action Section */}
       <div className="relative bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 rounded-2xl overflow-hidden shadow-xl">
         <div className="relative p-6 md:p-8 lg:p-10">
           <div className="flex flex-col lg:flex-row items-center gap-8">

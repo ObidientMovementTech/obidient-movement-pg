@@ -1573,7 +1573,7 @@ export default function VotingBlocManagePage() {
             </h3>
             <p className="text-gray-700 mb-3 text-sm">See a quick video guide on inviting members, sharing your bloc, and managing your group.</p>
             <a
-              href="https://drive.google.com/file/d/1cosd4uwEnR0XYpgGwzEbMQPk9t7M5Fr7/view?usp=drive_link"
+              href="https://drive.google.com/file/d/1DIYnSeLdSl6QVTHlzPhDSCxGHOmOtg5V/view?usp=sharing"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-md"

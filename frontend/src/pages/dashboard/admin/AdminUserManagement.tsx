@@ -721,13 +721,13 @@ export default function AdminUserManagement() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">Manage user accounts, roles, and permissions</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col md:flex-row items-center gap-3">
           {/* Cleanup Duplicate Auto Voting Blocs Button */}
           <button
             onClick={() => handleCleanupDuplicateAutoBlocs()}

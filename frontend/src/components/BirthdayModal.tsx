@@ -54,7 +54,10 @@ export default function BirthdayModal({ isOpen, onClose }: BirthdayModalProps) {
       return isBirthdayTime;
     };
 
-    if (isOpen && checkBirthdayTime()) {
+    // Check if user has already seen the birthday modal today
+    const hasSeenBirthdayModal = localStorage.getItem('hasSeenBirthdayModal2025');
+
+    if (isOpen && checkBirthdayTime() && !hasSeenBirthdayModal) {
       setShowModal(true);
     } else {
       setShowModal(false);
@@ -62,8 +65,15 @@ export default function BirthdayModal({ isOpen, onClose }: BirthdayModalProps) {
   }, [isOpen]);
 
   const handleClose = () => {
+    // Mark that user has seen the birthday modal
+    localStorage.setItem('hasSeenBirthdayModal2025', 'true');
     setShowModal(false);
     onClose();
+  };
+
+  const handleLearnHow = () => {
+    // Open the Twitter video in a new tab
+    window.open('https://x.com/obidientupdate/status/1946483306498761104/video/2', '_blank');
   };
 
   if (!showModal) return null;
@@ -110,7 +120,7 @@ export default function BirthdayModal({ isOpen, onClose }: BirthdayModalProps) {
           </button>
 
           {/* Birthday Design Image */}
-          <div className="relative z-0 flex justify-center">
+          <div className="relative z-10 flex flex-col items-center">
             <img
               src="/PO-Birthday.png"
               alt="Peter Obi Birthday"
@@ -118,6 +128,14 @@ export default function BirthdayModal({ isOpen, onClose }: BirthdayModalProps) {
               style={{ maxHeight: '500px' }}
               onClick={handleClose}
             />
+
+            {/* Learn How Button */}
+            <button
+              onClick={handleLearnHow}
+              className="mt-4 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              Learn How
+            </button>
           </div>
         </div>
       </div>
