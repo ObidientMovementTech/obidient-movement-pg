@@ -16,6 +16,7 @@ import { useUser } from "../../../context/UserContext";
 import { getOwnedVotingBlocs, getJoinedVotingBlocs } from "../../../services/votingBlocService";
 import Loading from "../../../components/Loader";
 import ProfileCompletionModal from "../../../components/ProfileCompletionModal";
+import BirthdayModal from "../../../components/BirthdayModal";
 import EditProfileModal from "../../profile/EditProfileModal";
 
 interface DashboardOverviewProps {
@@ -47,6 +48,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
   const [joinedVotingBlocs, setJoinedVotingBlocs] = useState<VotingBloc[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [birthdayModalOpen, setBirthdayModalOpen] = useState(false);
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -108,25 +110,73 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       .finally(() => setLoading(false));
   }, []);
 
-  // Show profile completion modal if completion is less than 100%
+  // Modal priority logic: Birthday modal first, then profile completion modal
   useEffect(() => {
     if (profile && !loading) {
-      // Use the same calculation logic as ProfileCompletionModal
-      const completionScore = calculateProfileCompletion(profile);
+      // First, check if it's birthday time and should show birthday modal
+      const checkBirthdayTime = () => {
+        const now = new Date();
+        // Convert to West African Time
+        const watTime = new Date(now.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
 
-      // Only show modal if profile is not 100% complete
-      if (completionScore < 100) {
-        console.log('🔍 Profile incomplete, showing modal in 1.5 seconds...');
-        // Show modal after a brief delay to let the dashboard load
+        // Birthday is on July 19, 2025 - Peter Obi's birthday
+        const birthday = new Date('2025-07-19T00:00:00');
+        const birthdayEnd = new Date('2025-07-20T00:00:00'); // Ends at midnight on July 20
+
+        // Convert birthday dates to WAT for comparison
+        const birthdayWAT = new Date(birthday.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
+        const birthdayEndWAT = new Date(birthdayEnd.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
+
+        const isBirthdayTime = watTime >= birthdayWAT && watTime < birthdayEndWAT;
+        return isBirthdayTime;
+      };
+
+      const shouldShowBirthdayModal = checkBirthdayTime();
+
+      if (shouldShowBirthdayModal) {
+        // Show birthday modal first
+        console.log('🎂 Showing birthday modal for Peter Obi...');
         const timer = setTimeout(() => {
-          setProfileModalOpen(true);
-        }, 1500);
+          setBirthdayModalOpen(true);
+        }, 1000);
         return () => clearTimeout(timer);
       } else {
-        console.log('✅ Profile is 100% complete, not showing modal');
+        // Check profile completion if no birthday modal
+        const completionScore = calculateProfileCompletion(profile);
+
+        // Only show modal if profile is not 100% complete
+        if (completionScore < 100) {
+          console.log('🔍 Profile incomplete, showing modal in 1.5 seconds...');
+          // Show modal after a brief delay to let the dashboard load
+          const timer = setTimeout(() => {
+            setProfileModalOpen(true);
+          }, 1500);
+          return () => clearTimeout(timer);
+        } else {
+          console.log('✅ Profile is 100% complete, not showing modal');
+        }
       }
     }
   }, [profile, loading]);
+
+  // Handle birthday modal close - then check profile completion
+  const handleBirthdayModalClose = () => {
+    setBirthdayModalOpen(false);
+
+    // After birthday modal closes, check if we need to show profile completion modal
+    if (profile) {
+      const completionScore = calculateProfileCompletion(profile);
+
+      if (completionScore < 100) {
+        console.log('🔍 Birthday modal closed, checking profile completion...');
+        // Show profile modal after a brief delay
+        const timer = setTimeout(() => {
+          setProfileModalOpen(true);
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  };
 
   const totalMembers = ownedVotingBlocs.reduce((sum, bloc) => sum + (bloc.metrics?.totalMembers || 0), 0);
   const totalEngagement = ownedVotingBlocs.reduce((sum, bloc) => sum + (bloc.metrics?.engagementScore || 0), 0);
@@ -531,6 +581,12 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
           </div>
         )}
       </div>
+
+      {/* Birthday Modal - Shows first with priority */}
+      <BirthdayModal
+        isOpen={birthdayModalOpen}
+        onClose={handleBirthdayModalClose}
+      />
 
       {/* Profile Completion Modal */}
       <ProfileCompletionModal
