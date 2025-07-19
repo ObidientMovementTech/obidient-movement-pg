@@ -2661,6 +2661,7 @@ const statesLGAsAndWards = {
       }
     }
   },
+  
   "Cross River": {
     "lgas": {
       "Abi": {
