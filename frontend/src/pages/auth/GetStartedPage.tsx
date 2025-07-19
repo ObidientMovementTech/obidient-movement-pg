@@ -121,7 +121,7 @@ const GetStartedPage = () => {
       // Format phone number for storage (add leading zero for Nigerian numbers)
       const formattedPhone = formatPhoneForStorage(phone, countryCode);
 
-      await registerUser({
+      const result = await registerUser({
         name,
         email,
         phone: formattedPhone,
@@ -130,13 +130,31 @@ const GetStartedPage = () => {
         votingState: votingState ? formatStateName(votingState) : undefined,
         votingLGA: votingLGA ? formatLocationName(votingLGA) : undefined,
       });
-      setMessage("Signup successful! Please check your email.");
+
+      setMessage(result.message || "Signup successful! Please check your email.");
       setToastType("success");
       setShowToast(true);
       navigate("/auth/verify");
     } catch (error: any) {
-      const msg = error?.response?.data?.message || "Signup failed";
-      displayError(msg);
+      console.log('Registration error:', error);
+
+      // Handle specific error types with detailed messages
+      let errorMessage = "Signup failed. Please try again.";
+
+      if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Add specific handling for common error types
+      if (error.errorType === 'EMAIL_EXISTS') {
+        errorMessage = "An account with this email already exists. Please use a different email or try logging in.";
+      } else if (error.errorType === 'PHONE_EXISTS') {
+        errorMessage = "An account with this phone number already exists. Please use a different phone number.";
+      } else if (error.errorType === 'NETWORK_ERROR') {
+        errorMessage = "Connection error. Please check your internet connection and try again.";
+      }
+
+      displayError(errorMessage);
     } finally {
       setIsLoading(false);
     }
