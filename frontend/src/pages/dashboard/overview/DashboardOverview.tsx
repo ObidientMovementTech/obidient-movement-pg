@@ -184,7 +184,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
     const now = new Date();
     const watTime = new Date(now.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
     const birthday = new Date('2025-07-19T00:00:00');
-    const birthdayEnd = new Date('2025-07-20T00:00:00');
+    const birthdayEnd = new Date('2025-07-21T18:00:00');
     const birthdayWAT = new Date(birthday.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
     const birthdayEndWAT = new Date(birthdayEnd.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
     return watTime >= birthdayWAT && watTime < birthdayEndWAT;

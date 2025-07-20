@@ -464,8 +464,8 @@ export default function EditProfileModal({
                     onChange={(e) => handleUsernameChange(e.target.value)}
                     placeholder="Enter your username (letters, numbers, _ only)"
                     className={`w-full px-4 py-2 border rounded-lg focus:ring-2 transition text-gray-900 ${usernameValidation.isValid
-                        ? 'border-gray-300 focus:ring-[#006837] focus:border-[#006837]'
-                        : 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                      ? 'border-gray-300 focus:ring-[#006837] focus:border-[#006837]'
+                      : 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       }`}
                   />
                   {usernameValidation.isValidating && (
@@ -490,8 +490,8 @@ export default function EditProfileModal({
                 </div>
                 {usernameValidation.message && (
                   <p className={`text-xs mt-1 ${usernameValidation.isValid && usernameValidation.available
-                      ? 'text-green-600'
-                      : 'text-red-600'
+                    ? 'text-green-600'
+                    : 'text-red-600'
                     }`}>
                     {usernameValidation.message}
                   </p>
@@ -670,8 +670,8 @@ export default function EditProfileModal({
                 onClick={handleSave}
                 disabled={loading || usernameValidation.isValidating || (Boolean(userName?.trim()) && (!usernameValidation.isValid || !usernameValidation.available))}
                 className={`px-6 py-2 rounded-lg text-white font-medium transition-colors ${loading || usernameValidation.isValidating || (Boolean(userName?.trim()) && (!usernameValidation.isValid || !usernameValidation.available))
-                    ? 'bg-[#80a79a] cursor-not-allowed'
-                    : 'bg-[#006837] hover:bg-[#00592e]'
+                  ? 'bg-[#80a79a] cursor-not-allowed'
+                  : 'bg-[#006837] hover:bg-[#00592e]'
                   }`}
               >
                 {loading ? 'Saving...' : usernameValidation.isValidating ? 'Validating...' : 'Save Changes'}
