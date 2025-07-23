@@ -87,7 +87,7 @@ export const registerUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-
+      
       return res.status(409).json({
         success: false,
         message: 'An account with this email address already exists. Please use a different email or try logging in.',
@@ -106,7 +106,7 @@ export const registerUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-
+      
       return res.status(409).json({
         success: false,
         message: 'An account with this phone number already exists. Please use a different phone number.',
@@ -210,7 +210,7 @@ export const registerUser = async (req, res) => {
       userAgent: req.get('User-Agent'),
       timestamp: new Date().toISOString()
     });
-
+    
     console.error('Register error:', error);
 
     // Handle specific database errors
@@ -282,7 +282,7 @@ export const loginUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-
+      
       return res.status(401).json({
         success: false,
         message: "No account found with this email address. Please check your email or sign up for a new account.",
@@ -300,7 +300,7 @@ export const loginUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-
+      
       return res.status(403).json({
         success: false,
         message: "Please verify your email address before logging in. Check your inbox for a verification email.",
@@ -320,7 +320,7 @@ export const loginUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-
+      
       return res.status(401).json({
         success: false,
         message: "Incorrect password. Please check your password and try again.",
@@ -395,7 +395,7 @@ export const loginUser = async (req, res) => {
       userAgent: req.get('User-Agent'),
       timestamp: new Date().toISOString()
     });
-
+    
     console.error("Login error:", error);
     return res.status(500).json({
       success: false,

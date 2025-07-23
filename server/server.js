@@ -17,13 +17,13 @@ import evaluationRoutes from './routes/evaluation.route.js';
 import kycRoutes from './routes/kyc.route.js';
 import votingBlocRoutes from './routes/votingBloc.route.js';
 import { verifyEmailConnection } from './config/email.js';
-import {
-  helmetConfig,
-  generalRateLimit,
-  sanitizeInput,
-  requestLogger,
+import { 
+  helmetConfig, 
+  generalRateLimit, 
+  sanitizeInput, 
+  requestLogger, 
   detectSuspiciousActivity,
-  logger
+  logger 
 } from './middlewares/security.middleware.js';
 
 // Load env variables
@@ -46,8 +46,8 @@ app.use(hpp());
 app.set('trust proxy', 1);
 
 // Basic middlewares
-app.use(cors({
-  origin: CLIENT_URL,
+app.use(cors({ 
+  origin: CLIENT_URL, 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -75,7 +75,7 @@ app.get('/', (req, res) => {
 connectDB().then(async () => {
   // Verify Email connection
   await verifyEmailConnection();
-
+  
   // Log server startup
   logger.info('Server starting up', {
     port: PORT,
@@ -83,7 +83,7 @@ connectDB().then(async () => {
     clientUrl: CLIENT_URL,
     timestamp: new Date().toISOString()
   });
-
+  
   // Development - use HTTP
   app.listen(PORT, () => {
     console.log(`🌐 HTTP Server running on port ${PORT}`);
