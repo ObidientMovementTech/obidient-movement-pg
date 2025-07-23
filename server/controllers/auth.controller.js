@@ -7,6 +7,7 @@ import generateToken from '../utils/generateToken.js';
 import { sendConfirmationEmail } from '../utils/emailHandler.js';
 import dotenv from 'dotenv';
 import speakeasy from 'speakeasy';
+import { logger } from '../middlewares/security.middleware.js';
 
 dotenv.config();
 
@@ -80,6 +81,13 @@ export const registerUser = async (req, res) => {
     // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      logger.warn('Registration attempt with existing email', {
+        email,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
+      });
+
       return res.status(409).json({
         success: false,
         message: 'An account with this email address already exists. Please use a different email or try logging in.',
@@ -91,6 +99,14 @@ export const registerUser = async (req, res) => {
     // Check if phone number already exists (optional validation)
     const existingPhone = await User.findOne({ phone });
     if (existingPhone) {
+      logger.warn('Registration attempt with existing phone', {
+        phone,
+        email,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
+      });
+
       return res.status(409).json({
         success: false,
         message: 'An account with this phone number already exists. Please use a different phone number.',
@@ -125,6 +141,19 @@ export const registerUser = async (req, res) => {
     }
 
     const newUser = await User.create(userData);
+
+    // Log successful registration
+    logger.info('User registered successfully', {
+      userId: newUser.id,
+      email: newUser.email,
+      name: newUser.name,
+      countryCode: newUser.countryCode || 'NG',
+      votingState: newUser.votingState || 'N/A',
+      isDiaspora: !!newUser.countryCode && newUser.countryCode !== 'NG',
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    });
 
     // Generate auth token
     const authToken = generateToken(newUser.id);
@@ -173,6 +202,15 @@ export const registerUser = async (req, res) => {
       }, 2000);
     }
   } catch (error) {
+    logger.error('Registration error', {
+      error: error.message,
+      stack: error.stack,
+      email: req.body.email,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    });
+
     console.error('Register error:', error);
 
     // Handle specific database errors
@@ -238,6 +276,13 @@ export const loginUser = async (req, res) => {
     // 1. Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
+      logger.warn('Login attempt with non-existent email', {
+        email,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
+      });
+
       return res.status(401).json({
         success: false,
         message: "No account found with this email address. Please check your email or sign up for a new account.",
@@ -248,6 +293,14 @@ export const loginUser = async (req, res) => {
 
     // 2. Check if email is verified
     if (!user.emailVerified) {
+      logger.warn('Login attempt with unverified email', {
+        email,
+        userId: user.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
+      });
+
       return res.status(403).json({
         success: false,
         message: "Please verify your email address before logging in. Check your inbox for a verification email.",
@@ -260,6 +313,14 @@ export const loginUser = async (req, res) => {
     // 3. Compare password
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      logger.warn('Login attempt with incorrect password', {
+        email,
+        userId: user.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
+      });
+
       return res.status(401).json({
         success: false,
         message: "Incorrect password. Please check your password and try again.",
@@ -308,6 +369,16 @@ export const loginUser = async (req, res) => {
       // Include any other fields you want to return
     };
 
+    // Log successful login
+    logger.info('User logged in successfully', {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    });
+
     return res.status(200).json({
       success: true,
       message: "Login successful! Welcome back.",
@@ -316,6 +387,15 @@ export const loginUser = async (req, res) => {
     });
 
   } catch (error) {
+    logger.error('Login error', {
+      error: error.message,
+      stack: error.stack,
+      email: req.body.email,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    });
+
     console.error("Login error:", error);
     return res.status(500).json({
       success: false,
