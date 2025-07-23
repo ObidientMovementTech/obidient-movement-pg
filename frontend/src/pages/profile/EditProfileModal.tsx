@@ -540,8 +540,13 @@ export default function EditProfileModal({
                     if (opt) {
                       setCitizenship(opt.value);
                       // Set default country based on citizenship
-                      if (opt.value === 'Nigerian Citizen' || opt.value === 'Diasporan') {
+                      if (opt.value === 'Nigerian Citizen') {
                         setCountryCode('Nigeria');
+                      } else if (opt.value === 'Diasporan') {
+                        // Keep existing country or clear for user to enter diaspora country
+                        if (!countryCode || countryCode === 'Nigeria') {
+                          setCountryCode(''); // Clear for user to enter diaspora country
+                        }
                       } else if (opt.value === 'Foreigner') {
                         setCountryCode(''); // Clear country for foreigners to enter manually
                       }
@@ -551,19 +556,24 @@ export default function EditProfileModal({
                 />
               </div>
 
-              {/* Country - Only show for Foreigners */}
-              {citizenship === 'Foreigner' && (
+              {/* Country - Show for Foreigners and Diasporans */}
+              {(citizenship === 'Foreigner' || citizenship === 'Diasporan') && (
                 <div>
                   <label htmlFor="countryCode" className="block text-sm font-medium text-gray-600 mb-1">
-                    Country
+                    Country {citizenship === 'Diasporan' ? 'of Residence' : ''}
                   </label>
                   <input
                     id="countryCode"
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
-                    placeholder="Enter your country"
+                    placeholder={citizenship === 'Diasporan' ? 'Enter your country of residence' : 'Enter your country'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006837] focus:border-[#006837] transition text-gray-900"
                   />
+                  {citizenship === 'Diasporan' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter the country where you currently reside as a Nigerian in the diaspora
+                    </p>
+                  )}
                 </div>
               )}
 

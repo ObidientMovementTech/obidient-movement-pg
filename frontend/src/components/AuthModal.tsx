@@ -50,7 +50,9 @@ export default function AuthModal({
     phone: '',
     countryCode: '+234', // Default to Nigeria
     votingState: '',
-    votingLGA: ''
+    votingLGA: '',
+    isDiaspora: false,
+    country: ''
   });
 
   // Initialize states list
@@ -176,6 +178,8 @@ export default function AuthModal({
         countryCode: string;
         votingState?: string;
         votingLGA?: string;
+        country?: string;
+        isDiaspora?: boolean;
         pendingVotingBlocJoin?: {
           joinCode: string;
           votingBlocName: string;
@@ -188,8 +192,10 @@ export default function AuthModal({
         phone: formattedPhone,
         countryCode: signupData.countryCode,
         // Format location data as Title Case before sending to backend
-        votingState: signupData.votingState ? formatStateName(signupData.votingState) : undefined,
-        votingLGA: signupData.votingLGA ? formatLocationName(signupData.votingLGA) : undefined
+        votingState: !signupData.isDiaspora && signupData.votingState ? formatStateName(signupData.votingState) : undefined,
+        votingLGA: !signupData.isDiaspora && signupData.votingLGA ? formatLocationName(signupData.votingLGA) : undefined,
+        country: signupData.isDiaspora ? signupData.country : undefined,
+        isDiaspora: signupData.isDiaspora
       };
 
       // Add pending voting bloc join info if available
@@ -433,47 +439,89 @@ export default function AuthModal({
                 </p>
               </div>
 
-              {/* Optional Voting Location Section */}
+              {/* Voting Location Section */}
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <FormSelect
-                      label="Voting State"
-                      options={states}
-                      defaultSelected={signupData.votingState}
-                      onChange={(opt) => {
-                        if (opt) {
-                          setSignupData(prev => ({
-                            ...prev,
-                            votingState: opt.value,
-                            votingLGA: '' // Reset LGA when state changes
-                          }));
-                        } else {
-                          setSignupData(prev => ({
-                            ...prev,
-                            votingState: '',
-                            votingLGA: ''
-                          }));
-                        }
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <FormSelect
-                      label="Voting LGA"
-                      options={getLgas(signupData.votingState)}
-                      defaultSelected={signupData.votingLGA}
-                      onChange={(opt) => {
-                        setSignupData(prev => ({
-                          ...prev,
-                          votingLGA: opt ? opt.value : ''
-                        }));
-                      }}
-                      disabled={!signupData.votingState}
-                    />
-                  </div>
+                {/* Diaspora/Foreign User Checkbox */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isDiaspora"
+                    checked={signupData.isDiaspora}
+                    onChange={(e) => {
+                      setSignupData(prev => ({
+                        ...prev,
+                        isDiaspora: e.target.checked,
+                        // Clear opposing fields when switching modes
+                        votingState: e.target.checked ? '' : prev.votingState,
+                        votingLGA: e.target.checked ? '' : prev.votingLGA,
+                        country: e.target.checked ? prev.country : ''
+                      }));
+                    }}
+                    className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <label htmlFor="isDiaspora" className="text-sm text-gray-700">
+                    I am a Nigerian in the diaspora or a foreigner
+                  </label>
                 </div>
+
+                {/* Conditional Rendering: Country or State/LGA */}
+                {signupData.isDiaspora ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Country of Residence
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter your country of residence"
+                      value={signupData.country}
+                      onChange={(e) => setSignupData(prev => ({ ...prev, country: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter the country where you currently reside
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <FormSelect
+                        label="Voting State"
+                        options={states}
+                        defaultSelected={signupData.votingState}
+                        onChange={(opt) => {
+                          if (opt) {
+                            setSignupData(prev => ({
+                              ...prev,
+                              votingState: opt.value,
+                              votingLGA: '' // Reset LGA when state changes
+                            }));
+                          } else {
+                            setSignupData(prev => ({
+                              ...prev,
+                              votingState: '',
+                              votingLGA: ''
+                            }));
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <FormSelect
+                        label="Voting LGA"
+                        options={getLgas(signupData.votingState)}
+                        defaultSelected={signupData.votingLGA}
+                        onChange={(opt) => {
+                          setSignupData(prev => ({
+                            ...prev,
+                            votingLGA: opt ? opt.value : ''
+                          }));
+                        }}
+                        disabled={!signupData.votingState}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
