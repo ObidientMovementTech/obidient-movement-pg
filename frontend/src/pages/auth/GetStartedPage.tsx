@@ -29,6 +29,8 @@ const GetStartedPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [votingState, setVotingState] = useState("");
   const [votingLGA, setVotingLGA] = useState("");
+  const [isDiaspora, setIsDiaspora] = useState(false);
+  const [country, setCountry] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [message, setMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
@@ -127,8 +129,10 @@ const GetStartedPage = () => {
         phone: formattedPhone,
         countryCode,
         password: validPassword,
-        votingState: votingState ? formatStateName(votingState) : undefined,
-        votingLGA: votingLGA ? formatLocationName(votingLGA) : undefined,
+        votingState: !isDiaspora && votingState ? formatStateName(votingState) : undefined,
+        votingLGA: !isDiaspora && votingLGA ? formatLocationName(votingLGA) : undefined,
+        country: isDiaspora ? country : undefined,
+        isDiaspora,
       });
 
       setMessage(result.message || "Signup successful! Please check your email.");
@@ -245,46 +249,80 @@ const GetStartedPage = () => {
         </p>
       </div>
 
-      {/* Optional Voting Location Section */}
+      {/* Voting Location Section */}
       <div className="space-y-4">
-        {/* <div className="flex justify-center">
-          <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-            <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-              Optional: Personalize your voting bloc with location
-            </span>
-          </div>
-        </div> */}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <FormSelect
-              label="Voting State"
-              options={states}
-              defaultSelected={votingState}
-              onChange={(opt) => {
-                if (opt) {
-                  setVotingState(opt.value);
-                  setVotingLGA(''); // Reset LGA when state changes
-                } else {
-                  setVotingState('');
-                  setVotingLGA('');
-                }
-              }}
-            />
-          </div>
-
-          <div>
-            <FormSelect
-              label="Voting LGA"
-              options={getLgas(votingState)}
-              defaultSelected={votingLGA}
-              onChange={(opt) => {
-                setVotingLGA(opt ? opt.value : '');
-              }}
-              disabled={!votingState}
-            />
-          </div>
+        {/* Diaspora/Foreign User Checkbox */}
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="isDiaspora"
+            checked={isDiaspora}
+            onChange={(e) => {
+              setIsDiaspora(e.target.checked);
+              // Clear voting location fields when switching to diaspora
+              if (e.target.checked) {
+                setVotingState('');
+                setVotingLGA('');
+              } else {
+                setCountry('');
+              }
+            }}
+            className="h-4 w-4 text-accent-green border-gray-300 rounded focus:ring-accent-green"
+          />
+          <label htmlFor="isDiaspora" className="text-sm text-gray-700 dark:text-gray-200">
+            I am a Nigerian in the diaspora or a foreigner
+          </label>
         </div>
+
+        {/* Conditional Rendering: Country or State/LGA */}
+        {isDiaspora ? (
+          <div>
+            <label className="block text-dark dark:text-gray-100 mb-2 text-sm">
+              Country of Residence
+            </label>
+            <input
+              type="text"
+              placeholder="Enter your country of residence"
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Enter the country where you currently reside
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <FormSelect
+                label="Voting State"
+                options={states}
+                defaultSelected={votingState}
+                onChange={(opt) => {
+                  if (opt) {
+                    setVotingState(opt.value);
+                    setVotingLGA(''); // Reset LGA when state changes
+                  } else {
+                    setVotingState('');
+                    setVotingLGA('');
+                  }
+                }}
+              />
+            </div>
+
+            <div>
+              <FormSelect
+                label="Voting LGA"
+                options={getLgas(votingState)}
+                defaultSelected={votingLGA}
+                onChange={(opt) => {
+                  setVotingLGA(opt ? opt.value : '');
+                }}
+                disabled={!votingState}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
