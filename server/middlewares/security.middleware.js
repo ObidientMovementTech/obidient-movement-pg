@@ -154,7 +154,7 @@ export const sanitizeInput = (req, res, next) => {
     const sanitized = {};
 
     for (let key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         if (typeof obj[key] === 'string') {
           sanitized[key] = sanitizeString(obj[key]);
         } else if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
@@ -360,7 +360,7 @@ export const detectSuspiciousActivity = (req, res, next) => {
     if (!obj || typeof obj !== 'object') return;
 
     for (let key in obj) {
-      if (obj.hasOwnProperty(key) && typeof obj[key] === 'string') {
+      if (Object.prototype.hasOwnProperty.call(obj, key) && typeof obj[key] === 'string') {
         for (let pattern of suspiciousPatterns) {
           if (pattern.test(obj[key])) {
             logger.error('Suspicious activity detected', {
