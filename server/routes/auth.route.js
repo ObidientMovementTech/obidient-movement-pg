@@ -35,7 +35,7 @@ router.post('/register',
 
 router.post('/login',
   loginRateLimit,
-  validateLogin,
+  // validateLogin,
   handleValidationErrors,
   loginUser
 );
