@@ -9,7 +9,8 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "init-db": "node initDB.js",
-    "update-cors": "node update-cors.js"
+    "update-cors": "node update-cors.js",
+    "check-cors": "node check-cors.js"
   },
   "keywords": [],
   "author": "",
