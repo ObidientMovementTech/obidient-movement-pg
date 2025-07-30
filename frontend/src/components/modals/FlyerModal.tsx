@@ -33,28 +33,42 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
   };
 
   const getProfileImage = () => {
-    return profile?.profileImage || '';
+    const originalImage = profile?.profileImage || '';
+
+    // If it's an S3 image, use our proxy to avoid CORS issues
+    if (originalImage && originalImage.includes('amazonaws.com')) {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      return `${apiUrl}/api/proxy-image?url=${encodeURIComponent(originalImage)}`;
+    }
+
+    return originalImage;
   };
 
   // Fallback image state for profile image
   const [profileImgSrc, setProfileImgSrc] = useState(getProfileImage());
+  const [profileImgLoading, setProfileImgLoading] = useState(false);
+
   React.useEffect(() => {
-    setProfileImgSrc(getProfileImage());
+    const newProfileImage = getProfileImage();
+    setProfileImgSrc(newProfileImage);
+    setProfileImgLoading(!!newProfileImage); // Show loading if there's an image to load
   }, [profile, isOpen]);
 
   // Only preload background image for the flyer
   React.useEffect(() => {
     if (isOpen) {
       setBackgroundImageLoaded(false);
-      // Preload background image only
+
+      // Preload background image
       const bgImg = new Image();
       bgImg.crossOrigin = 'anonymous';
-      bgImg.onload = () => setBackgroundImageLoaded(true);
-      bgImg.onerror = () => {
-        console.error('Failed to preload background image');
+      bgImg.onload = () => {
         setBackgroundImageLoaded(true);
       };
-      bgImg.src = '/mobilize-dp2.png';
+      bgImg.onerror = () => {
+        setBackgroundImageLoaded(true); // Continue anyway
+      };
+      bgImg.src = '/mobilize-dp.png';
     }
   }, [isOpen]);
 
@@ -68,59 +82,61 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
     try {
       setIsDownloading(true);
 
-      // Ensure both images are fully loaded
+      // Ensure all images are loaded
       const images = flyerRef.current.querySelectorAll('img');
 
-      // Force reload images with crossOrigin to ensure they're canvas-compatible
-      await Promise.all(Array.from(images).map(img => {
+      // Wait for all images to be ready
+      await Promise.all(Array.from(images).map((img) => {
         return new Promise((resolve) => {
           if (img.complete && img.naturalWidth > 0) {
+            if (!img.crossOrigin) {
+              img.crossOrigin = 'anonymous';
+            }
             resolve(img);
           } else {
-            const newImg = new Image();
-            newImg.crossOrigin = 'anonymous';
-            newImg.onload = () => {
-              img.src = newImg.src;
-              resolve(newImg);
-            };
-            newImg.onerror = () => {
-              console.warn('Failed to load image:', img.src);
-              resolve(img); // Continue even if image fails
-            };
-            newImg.src = img.src;
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(img); // Continue even if image fails
+
+            if (!img.src.includes('?')) {
+              img.src = img.src + '?download=true';
+            }
           }
         });
       }));
 
-      // Small delay to ensure rendering is complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Small delay to ensure DOM is stable
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Create canvas with high quality settings
       const canvas = await html2canvas(flyerRef.current, {
-        scale: 3, // Higher scale for better quality
+        scale: 3,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
         scrollX: 0,
         scrollY: 0,
-        logging: true,
+        logging: false, // Disable logging
         imageTimeout: 30000,
         removeContainer: false,
         foreignObjectRendering: false,
-        ignoreElements: (_element) => {
-          // Don't ignore any elements
-          return false;
+        onclone: (clonedDoc) => {
+          const clonedImages = clonedDoc.querySelectorAll('img');
+          clonedImages.forEach(img => {
+            img.crossOrigin = 'anonymous';
+          });
         }
       });
 
-      // Resize canvas to exact dimensions if needed
+      // Resize to exact dimensions
       const targetCanvas = document.createElement('canvas');
       targetCanvas.width = 540;
       targetCanvas.height = 675;
       const ctx = targetCanvas.getContext('2d');
 
       if (ctx) {
-        // Draw the captured canvas onto the target canvas with exact dimensions
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 540, 675);
         ctx.drawImage(canvas, 0, 0, 540, 675);
       }
 
@@ -136,6 +152,8 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
           link.click();
           document.body.removeChild(link);
           URL.revokeObjectURL(url);
+        } else {
+          throw new Error('Failed to create blob from canvas');
         }
       }, 'image/png', 0.98);
 
@@ -153,50 +171,52 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
     try {
       setIsSharing(true);
 
-      // Ensure both images are fully loaded
+      // Ensure all images are loaded
       const images = flyerRef.current.querySelectorAll('img');
 
-      // Force reload images with crossOrigin
       await Promise.all(Array.from(images).map(img => {
         return new Promise((resolve) => {
           if (img.complete && img.naturalWidth > 0) {
             resolve(img);
           } else {
-            const newImg = new Image();
-            newImg.crossOrigin = 'anonymous';
-            newImg.onload = () => {
-              img.src = newImg.src;
-              resolve(newImg);
-            };
-            newImg.onerror = () => {
-              console.warn('Failed to load image:', img.src);
-              resolve(img);
-            };
-            newImg.src = img.src;
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(img);
+
+            if (!img.src.includes('?t=')) {
+              img.src = img.src + '?t=' + Date.now();
+            }
           }
         });
       }));
 
-      // Small delay to ensure rendering is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Generate image for sharing
       const canvas = await html2canvas(flyerRef.current, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false,
         imageTimeout: 30000,
+        onclone: (clonedDoc) => {
+          const clonedImages = clonedDoc.querySelectorAll('img');
+          clonedImages.forEach(img => {
+            img.crossOrigin = 'anonymous';
+          });
+        }
       });
 
-      // Resize to exact dimensions for sharing
+      // Resize for sharing
       const targetCanvas = document.createElement('canvas');
       targetCanvas.width = 540;
       targetCanvas.height = 675;
       const ctx = targetCanvas.getContext('2d');
 
       if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 540, 675);
         ctx.drawImage(canvas, 0, 0, 540, 675);
       }
 
@@ -204,11 +224,11 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
       targetCanvas.toBlob(async (blob) => {
         if (!blob) return;
 
-        const shareText = `I am mobilizing 100 voters for ${votingBloc?.targetCandidate || 'Peter Obi'}! Join my voting bloc and let's make a difference together. #ObidientMovement`;
+        const votingBlocLink = votingBloc?.joinCode ? `${window.location.origin}/voting-bloc/${votingBloc.joinCode}` : '';
+        const shareText = `I am mobilizing 100 voters for ${votingBloc?.targetCandidate || 'Peter Obi'}! Join my voting bloc and let's make a difference together. ${votingBlocLink} #ObidientMovement`;
         const sanitizedName = getUserName().replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toLowerCase();
 
         if (typeof navigator !== 'undefined' && 'share' in navigator && platform === 'native') {
-          // Use native sharing if available
           try {
             await navigator.share({
               title: 'Join My Voting Bloc',
@@ -219,7 +239,6 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
             console.error('Native sharing failed:', error);
           }
         } else {
-          // Fallback to platform-specific sharing
           const encodedText = encodeURIComponent(shareText);
           let shareUrl = '';
 
@@ -234,7 +253,6 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
               shareUrl = `https://wa.me/?text=${encodedText}`;
               break;
             case 'instagram':
-              // Instagram doesn't support direct sharing, so download the image
               downloadFlyer();
               return;
             default:
@@ -245,10 +263,10 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
             window.open(shareUrl, '_blank', 'noopener,noreferrer');
           }
         }
-      }, 'image/png', 0.95);
+      }, 'image/png', 0.92);
 
     } catch (error) {
-      console.error('Error sharing flyer:', error);
+      console.error(`Error sharing to ${platform}:`, error);
       alert('Failed to share flyer. Please try again.');
     } finally {
       setIsSharing(false);
@@ -301,7 +319,6 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
                     className="absolute inset-0 w-full h-full object-fill"
                     crossOrigin="anonymous"
                     onError={(e) => {
-                      console.error('Failed to load background image');
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
                     }}
@@ -349,16 +366,29 @@ const FlyerModal: React.FC<FlyerModalProps> = ({ isOpen, onClose, userProfile, v
                           className="rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-lg flex items-center justify-center"
                           style={{ width: '170px', height: '170px' }}
                         >
+                          {profileImgLoading && (
+                            <div className="absolute inset-0 bg-gray-200 rounded-full flex items-center justify-center z-10">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                            </div>
+                          )}
                           {profileImgSrc ? (
                             <img
                               src={profileImgSrc}
                               alt={getUserName()}
                               crossOrigin="anonymous"
                               className="w-full h-full object-cover"
-                              onError={() => setProfileImgSrc('/photo.png')}
+                              onError={() => {
+                                setProfileImgLoading(false);
+                                setProfileImgSrc(''); // This will show initials
+                              }}
+                              onLoad={() => {
+                                setProfileImgLoading(false);
+                              }}
                             />
                           ) : (
-                            <span className="text-white" style={{ fontSize: '5rem' }}>{getInitials()}</span>
+                            <span className="text-white font-bold" style={{ fontSize: '4rem' }}>
+                              {getInitials()}
+                            </span>
                           )}
                         </div>
                       </div>

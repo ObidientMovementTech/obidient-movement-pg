@@ -19,13 +19,14 @@ export const updateS3CorsPolicy = async () => {
       CORSRules: [
         {
           AllowedHeaders: ["*"],
-          AllowedMethods: ["GET", "HEAD"],
+          AllowedMethods: ["GET", "HEAD", "POST"],
           AllowedOrigins: [
-            process.env.CLIENT_URL || "http://localhost:5173",
-            "https://d2e8w9vgjfh4nu.cloudfront.net", // Add your CloudFront domain if you have one
-            "https://canvas.localhost", // For html2canvas
-            "https://localhost:*", // For local development
-            "http://localhost:*", // For local development
+            "https://member.obidients.com", // Production domain
+            "http://localhost:5173", // Local development
+            "http://localhost:3000", // Alternative local port
+            "http://localhost:4173", // Vite preview
+            "http://localhost:5000", // Server proxy
+            "https://localhost:5173", // HTTPS local
           ],
           ExposeHeaders: ["ETag"],
           MaxAgeSeconds: 3600,
@@ -40,8 +41,10 @@ export const updateS3CorsPolicy = async () => {
 
     await s3Client.send(command);
     console.log("✅ S3 CORS policy updated successfully");
+    console.log("📋 Allowed origins:", corsConfiguration.CORSRules[0].AllowedOrigins);
   } catch (error) {
     console.error("❌ Failed to update S3 CORS policy:", error);
+    throw error;
   }
 };
 

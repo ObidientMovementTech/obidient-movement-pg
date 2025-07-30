@@ -206,94 +206,65 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       </div>
 
       {/* Member Actions Promotional Section */}
-      <div className="bg-gradient-to-r from-gray-700 via-gray-600 to-gray-800 p-4 md:p-5 rounded-xl shadow-lg text-white relative overflow-hidden">
-        <div className="relative z-10">
-          {/* Mobile Layout - Stacked vertically */}
-          <div className="block md:hidden space-y-6">
-            {/* Left Column Content */}
-            <div className="text-left space-y-3">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-green-500/20 rounded-full">
-                  <Users size={18} className="text-green-400" />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-medium">Ready to serve?</h2>
-                <p className="text-sm font-normal text-gray-200">We're looking for committed citizens ready to build a New Nigeria.</p>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+        {/* Ready to Serve Card */}
+        <div className="bg-white rounded-lg border shadow-sm hover:shadow-md transition p-3 md:p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-green-100 rounded-full flex-shrink-0">
+              <Users size={18} className="text-green-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm md:text-base font-medium text-gray-800 mb-1">Ready to volunteer in a Directorate?</h2>
+              <p className="text-xs md:text-sm font-normal text-gray-600 mb-3">We're looking for committed citizens ready to build a New Nigeria.</p>
               <button
                 onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrFnoRGia5YiQasZ', '_blank')}
-                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-colors duration-200 shadow-md hover:shadow-lg text-sm"
+                className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-medium rounded-md hover:from-green-600 hover:to-green-700 transition-colors duration-200 shadow-sm hover:shadow text-xs"
               >
-                <UserPlus size={16} className="mr-2" />
+                <UserPlus size={14} className="mr-1.5" />
                 Join a Directorate
-                <ArrowRight size={16} className="ml-2" />
-              </button>
-            </div>
-
-            {/* Right Column Content */}
-            <div className="text-left space-y-3 border-t border-white/20 pt-6">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-yellow-500/20 rounded-full">
-                  <MessageSquare size={18} className="text-yellow-400" />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-medium">Got feedback?</h2>
-                <p className="text-sm font-normal text-gray-200">This is your space to speak up.</p>
-              </div>
-              <button
-                onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrKjgILZBOktw58M', '_blank')}
-                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-semibold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-colors duration-200 shadow-md hover:shadow-lg text-sm"
-              >
-                <MessageSquare size={16} className="mr-2" />
-                Drop a feedback
-                <ArrowRight size={16} className="ml-2" />
+                <ArrowRight size={14} className="ml-1.5" />
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Desktop Layout - 2 columns side by side */}
-          <div className="hidden md:grid md:grid-cols-2 md:gap-8">
-            {/* Left Column Content */}
-            <div className="text-left space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-3 bg-green-500/20 rounded-full">
-                  <Users size={22} className="text-green-400" />
-                </div>
-              </div>
-              <div>
-                <h2 className="text-lg lg:text-xl font-medium">Ready to serve?</h2>
-                <p className="text-sm font-normal text-gray-200 mt-2">We're looking for committed citizens ready to build a New Nigeria.</p>
-              </div>
+        {/* Ready to Run for Office Card */}
+        <div className="bg-white rounded-lg border shadow-sm hover:shadow-md transition p-3 md:p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-blue-100 rounded-full flex-shrink-0">
+              <Vote size={18} className="text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm md:text-base font-medium text-gray-800 mb-1">Ready to Run for Public Office in 2027?</h2>
+              <p className="text-xs md:text-sm font-normal text-gray-600 mb-3">Submit your interest to run for local, state, or national elective public office.</p>
               <button
-                onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrFnoRGia5YiQasZ', '_blank')}
-                className="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-colors duration-200 shadow-md hover:shadow-lg"
+                onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrw5U5T2X5YuzkVo', '_blank')}
+                className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-md hover:from-blue-600 hover:to-blue-700 transition-colors duration-200 shadow-sm hover:shadow text-xs"
               >
-                <UserPlus size={18} className="mr-2" />
-                Join a Directorate
-                <ArrowRight size={18} className="ml-2" />
+                <Vote size={14} className="mr-1.5" />
+                Submit your Interest
+                <ArrowRight size={14} className="ml-1.5" />
               </button>
             </div>
+          </div>
+        </div>
 
-            {/* Right Column Content */}
-            <div className="text-left space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-3 bg-yellow-500/20 rounded-full">
-                  <MessageSquare size={22} className="text-yellow-400" />
-                </div>
-              </div>
-              <div>
-                <h2 className="text-lg lg:text-xl font-medium">Got feedback?</h2>
-                <p className="text-sm font-normal text-gray-200 mt-2">This is your space to speak up.</p>
-              </div>
+        {/* Got Feedback Card */}
+        <div className="bg-white rounded-lg border shadow-sm hover:shadow-md transition p-3 md:p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-yellow-100 rounded-full flex-shrink-0">
+              <MessageSquare size={18} className="text-yellow-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm md:text-base font-medium text-gray-800 mb-1">Got feedback?</h2>
+              <p className="text-xs md:text-sm font-normal text-gray-600 mb-3">This is your space to speak up.</p>
               <button
                 onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrKjgILZBOktw58M', '_blank')}
-                className="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-semibold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-colors duration-200 shadow-md hover:shadow-lg"
+                className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-md hover:from-yellow-600 hover:to-yellow-700 transition-colors duration-200 shadow-sm hover:shadow text-xs"
               >
-                <MessageSquare size={18} className="mr-2" />
+                <MessageSquare size={14} className="mr-1.5" />
                 Drop a feedback
-                <ArrowRight size={18} className="ml-2" />
+                <ArrowRight size={14} className="ml-1.5" />
               </button>
             </div>
           </div>
