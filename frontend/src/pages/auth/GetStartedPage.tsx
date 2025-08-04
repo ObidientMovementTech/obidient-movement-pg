@@ -149,8 +149,29 @@ const GetStartedPage = () => {
         errorMessage = error.message;
       }
 
+      // Handle validation errors with specific field information
+      if (error.errorType === 'VALIDATION_ERROR' && error.fieldErrors) {
+        const fieldMessages = [];
+
+        if (error.fieldErrors.email) {
+          fieldMessages.push("Email: " + error.fieldErrors.email.join(', '));
+        }
+        if (error.fieldErrors.phone) {
+          fieldMessages.push("Phone: " + error.fieldErrors.phone.join(', '));
+        }
+        if (error.fieldErrors.password) {
+          fieldMessages.push("Password: " + error.fieldErrors.password.join(', '));
+        }
+        if (error.fieldErrors.name) {
+          fieldMessages.push("Name: " + error.fieldErrors.name.join(', '));
+        }
+
+        if (fieldMessages.length > 0) {
+          errorMessage = fieldMessages.join('\n');
+        }
+      }
       // Add specific handling for common error types
-      if (error.errorType === 'EMAIL_EXISTS') {
+      else if (error.errorType === 'EMAIL_EXISTS') {
         errorMessage = "An account with this email already exists. Please use a different email or try logging in.";
       } else if (error.errorType === 'PHONE_EXISTS') {
         errorMessage = "An account with this phone number already exists. Please use a different phone number.";
