@@ -131,18 +131,22 @@ export const sanitizeInput = (req, res, next) => {
   const sanitizeString = (str) => {
     if (typeof str !== 'string') return str;
 
-    // XSS protection
+    // XSS protection - but preserve valid characters for names and addresses
     let sanitized = xss(str, {
       whiteList: {}, // No HTML allowed
       stripIgnoreTag: true,
       stripIgnoreTagBody: ['script']
     });
 
-    // SQL injection protection - remove dangerous patterns
-    sanitized = sanitized.replace(/['";\\]/g, ''); // Remove quotes and backslashes
+    // SQL injection protection - only remove truly dangerous patterns
+    // Don't remove single quotes as they're common in names (O'Brien, etc.)
+    sanitized = sanitized.replace(/[";\\]/g, ''); // Remove dangerous quotes and backslashes
     sanitized = sanitized.replace(/--/g, ''); // Remove SQL comments
     sanitized = sanitized.replace(/\/\*/g, ''); // Remove SQL block comments
     sanitized = sanitized.replace(/\*\//g, ''); // Remove SQL block comments
+
+    // Remove potential SQL injection patterns but preserve normal punctuation
+    sanitized = sanitized.replace(/\b(union|select|insert|delete|drop|create|alter|truncate|exec|execute)\b/gi, '');
 
     return sanitized;
   };
@@ -224,31 +228,30 @@ export const requestLogger = (req, res, next) => {
 // Registration input validation
 export const validateRegistration = [
   body('name')
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters')
-    .matches(/^[a-zA-Z\s'-]+$/)
-    .withMessage('Name can only contain letters, spaces, hyphens and apostrophes')
-    .trim()
-    .escape(),
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Name must be between 2 and 100 characters')
+    .matches(/^[a-zA-Z\s'.-]+$/)
+    .withMessage('Name can only contain letters, spaces, hyphens, apostrophes, and periods')
+    .trim(),
 
   body('email')
     .isEmail()
     .withMessage('Please provide a valid email address')
     .normalizeEmail()
-    .isLength({ max: 100 })
-    .withMessage('Email must not exceed 100 characters'),
+    .isLength({ max: 150 })
+    .withMessage('Email must not exceed 150 characters'),
 
   body('phone')
-    .isMobilePhone()
-    .withMessage('Please provide a valid phone number')
-    .isLength({ min: 10, max: 15 })
-    .withMessage('Phone number must be between 10 and 15 characters'),
+    .isLength({ min: 8, max: 25 })
+    .withMessage('Phone number must be between 8 and 25 characters')
+    .matches(/^[\+]?[0-9\-\s().]+$/)
+    .withMessage('Phone number can only contain numbers, spaces, hyphens, parentheses, periods, and plus sign'),
 
   body('password')
-    .isLength({ min: 8, max: 128 })
-    .withMessage('Password must be between 8 and 128 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
+    .isLength({ min: 6, max: 128 })
+    .withMessage('Password must be between 6 and 128 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
 
   body('countryCode')
     .optional()
@@ -304,11 +307,11 @@ export const validatePasswordReset = [
 
 // New password validation
 export const validateNewPassword = [
-  body('password')
-    .isLength({ min: 8, max: 128 })
-    .withMessage('Password must be between 8 and 128 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
+  body('newPassword')
+    .isLength({ min: 6, max: 128 })
+    .withMessage('Password must be between 6 and 128 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
 ];
 
 // Validation result handler
@@ -321,16 +324,50 @@ export const handleValidationErrors = (req, res, next) => {
       value: error.value
     }));
 
+    // Create a more user-friendly error message
+    const fieldErrors = {};
+    errorMessages.forEach(error => {
+      if (!fieldErrors[error.field]) {
+        fieldErrors[error.field] = [];
+      }
+      fieldErrors[error.field].push(error.message);
+    });
+
+    // Create a readable error message
+    const errorFields = Object.keys(fieldErrors);
+    let userMessage = 'Please check the following fields: ';
+
+    if (errorFields.includes('email')) {
+      userMessage += 'Email format is invalid. ';
+    }
+    if (errorFields.includes('phone')) {
+      userMessage += 'Phone number format is invalid. ';
+    }
+    if (errorFields.includes('password')) {
+      userMessage += 'Password must be at least 6 characters with uppercase, lowercase, and number. ';
+    }
+    if (errorFields.includes('name')) {
+      userMessage += 'Name contains invalid characters or is too short/long. ';
+    }
+
     logger.warn('Validation errors', {
       ip: req.ip,
       errors: errorMessages,
+      requestBody: req.body,
       timestamp: new Date().toISOString()
+    });
+
+    console.log('Validation errors for registration:', {
+      errors: errorMessages,
+      requestBody: req.body,
+      fieldErrors
     });
 
     return res.status(400).json({
       success: false,
-      message: 'Invalid input data',
+      message: userMessage.trim() || 'Please check your input and try again.',
       errors: errorMessages,
+      fieldErrors,
       errorType: 'VALIDATION_ERROR'
     });
   }
@@ -342,18 +379,17 @@ export const detectSuspiciousActivity = (req, res, next) => {
   const suspiciousPatterns = [
     /\b(script|javascript|vbscript|onload|onerror)\b/i,
     /\b(union|select|insert|delete|drop|create|alter|truncate)\b/i,
-    /<[^>]*>/g, // HTML tags
+    /<script[^>]*>.*?<\/script>/gi, // Script tags
     /\$\{.*\}/g, // Template literals
     /eval\(/i,
     /document\./i,
     /window\./i,
-    /--/g, // SQL comments
-    /\/\*/g, // SQL block comments start
-    /\*\//g, // SQL block comments end
-    /;/g, // SQL statement terminator (in suspicious contexts)
+    /--\s*$/g, // SQL comments at end of line
+    /\/\*.*?\*\//g, // SQL block comments
     /\bor\s+1\s*=\s*1\b/i, // Classic SQL injection
     /\band\s+1\s*=\s*1\b/i,
-    /\bwhere\s+1\s*=\s*1\b/i
+    /\bwhere\s+1\s*=\s*1\b/i,
+    /\bunion\s+select\b/i
   ];
 
   const checkForSuspiciousContent = (obj, objName = 'request') => {
@@ -361,6 +397,9 @@ export const detectSuspiciousActivity = (req, res, next) => {
 
     for (let key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key) && typeof obj[key] === 'string') {
+        // Skip phone number field from suspicious pattern checking
+        if (key === 'phone' || key === 'phoneNumber') continue;
+
         for (let pattern of suspiciousPatterns) {
           if (pattern.test(obj[key])) {
             logger.error('Suspicious activity detected', {
