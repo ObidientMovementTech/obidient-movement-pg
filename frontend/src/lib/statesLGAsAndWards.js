@@ -11774,17 +11774,16 @@ const statesLGAsAndWards = {
         "wards": [
           "City Centre",
           "Garki",
-          "Gudu",
           "Gui",
           "Gwagwa",
+          "Gwarinpa",
           "Jiwa",
           "Kabusa",
           "Karshi",
           "Nyanya",
           "Orozo",
           "Wuse",
-          "Kar",
-          "Durumi"
+          "Karu",
         ]
       },
       "Bwari": {

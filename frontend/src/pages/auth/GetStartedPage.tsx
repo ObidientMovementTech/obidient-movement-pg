@@ -237,10 +237,11 @@ const GetStartedPage = () => {
           <select
             value={countryCode}
             onChange={(e) => setCountryCode(e.target.value)}
-            className="w-20 pr-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm"
+            className="w-20 pr-1 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm"
+            title="Select country code"
           >
-            {countryCodes.slice(0, 10).map((country) => (
-              <option key={country.code} value={country.code}>
+            {countryCodes.map((country) => (
+              <option key={country.code} value={country.code} title={country.name}>
                 {country.code}
               </option>
             ))}
