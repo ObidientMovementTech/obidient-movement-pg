@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { X, Mail, Lock, User, Phone, Eye, EyeOff } from 'lucide-react';
-import { loginUser, registerUser, resendVerificationEmail } from '../services/authService';
-import FormSelect from './select/FormSelect';
-import { statesLGAWardList } from '../utils/StateLGAWard';
-import { OptionType } from '../utils/lookups';
-import { formatStateName, formatLocationName } from '../utils/textUtils';
-import { countryCodes } from '../utils/countryCodes';
-import { formatPhoneForStorage } from '../utils/phoneUtils';
+import { useState, useEffect } from "react";
+import { X, Mail, Lock, User, Phone, Eye, EyeOff } from "lucide-react";
+import { registerUser, loginUser, resendVerificationEmail } from "../services/authService.js";
+import FormSelect from "./select/FormSelect.js";
+import { statesLGAWardList } from "../utils/StateLGAWard.js";
+import { OptionType } from "../utils/lookups.js";
+import { formatStateName, formatLocationName } from "../utils/textUtils.js";
+import { formatPhoneForStorage } from "../utils/phoneUtils.js";
+import ListBoxComp from "./select/ListBox.js";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -398,19 +398,11 @@ export default function AuthModal({
                   WhatsApp Phone Number
                 </label>
                 <div className="flex gap-2">
-                  <div className="relative">
-                    <select
-                      value={signupData.countryCode}
-                      onChange={(e) => setSignupData(prev => ({ ...prev, countryCode: e.target.value }))}
-                      className="w-20 pr-1 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-                      title="Select country code"
-                    >
-                      {countryCodes.map((country) => (
-                        <option key={country.code} value={country.code} title={country.name}>
-                          {country.code}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:border-transparent">
+                    <ListBoxComp
+                      defaultSelected={signupData.countryCode}
+                      onChange={(country) => setSignupData(prev => ({ ...prev, countryCode: country.code }))}
+                    />
                   </div>
                   <div className="relative flex-1">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
