@@ -14,8 +14,8 @@ import FormSelect from "../../components/select/FormSelect.js";
 import { statesLGAWardList } from "../../utils/StateLGAWard.js";
 import { OptionType } from "../../utils/lookups.js";
 import { formatStateName, formatLocationName } from "../../utils/textUtils.js";
-import { countryCodes } from "../../utils/countryCodes.js";
 import { formatPhoneForStorage } from "../../utils/phoneUtils.js";
+import ListBoxComp from "../../components/select/ListBox.js";
 
 const GetStartedPage = () => {
   const navigate = useNavigate();
@@ -234,18 +234,12 @@ const GetStartedPage = () => {
       <div>
         <label className="block text-dark dark:text-gray-100 mb-2 text-sm">WhatsApp Phone Number</label>
         <div className="flex gap-2">
-          <select
-            value={countryCode}
-            onChange={(e) => setCountryCode(e.target.value)}
-            className="w-20 pr-1 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm"
-            title="Select country code"
-          >
-            {countryCodes.map((country) => (
-              <option key={country.code} value={country.code} title={country.name}>
-                {country.code}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 px-3 py-2">
+            <ListBoxComp
+              defaultSelected={countryCode}
+              onChange={(country) => setCountryCode(country.code)}
+            />
+          </div>
           <input
             type="tel"
             placeholder="Phone Number"
