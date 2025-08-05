@@ -402,10 +402,11 @@ export default function AuthModal({
                     <select
                       value={signupData.countryCode}
                       onChange={(e) => setSignupData(prev => ({ ...prev, countryCode: e.target.value }))}
-                      className="w-20 pr-6 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                      className="w-20 pr-1 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                      title="Select country code"
                     >
-                      {countryCodes.slice(0, 10).map((country) => (
-                        <option key={country.code} value={country.code}>
+                      {countryCodes.map((country) => (
+                        <option key={country.code} value={country.code} title={country.name}>
                           {country.code}
                         </option>
                       ))}
