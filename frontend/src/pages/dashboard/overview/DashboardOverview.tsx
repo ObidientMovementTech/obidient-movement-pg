@@ -17,6 +17,7 @@ import { getOwnedVotingBlocs, getJoinedVotingBlocs } from "../../../services/vot
 import Loading from "../../../components/Loader";
 import ProfileCompletionModal from "../../../components/ProfileCompletionModal";
 import EditProfileModal from "../../profile/EditProfileModal";
+import TwitterFollowModal from "../../../components/modals/TwitterFollowModal";
 
 interface DashboardOverviewProps {
   setActivePage: React.Dispatch<React.SetStateAction<string>>;
@@ -48,6 +49,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
   const [loading, setLoading] = useState(true);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
+  const [twitterFollowModalOpen, setTwitterFollowModalOpen] = useState(false);
   const navigate = useNavigate();
 
   // Calculate profile completion using the same logic as ProfileCompletionModal
@@ -124,6 +126,31 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
         return () => clearTimeout(timer);
       } else {
         console.log('✅ Profile is 100% complete, not showing modal');
+      }
+    }
+  }, [profile, loading]);
+
+  // Twitter follow modal logic: Show after profile modal or if profile is complete
+  useEffect(() => {
+    if (profile && !loading) {
+      const completionScore = calculateProfileCompletion(profile);
+      const lastDismissed = localStorage.getItem('twitter-follow-dismissed');
+      const lastShown = localStorage.getItem('twitter-follow-last-shown');
+      const currentTime = Date.now();
+
+      // Don't show if dismissed in the last 7 days
+      const dismissedRecently = lastDismissed && (currentTime - parseInt(lastDismissed)) < (7 * 24 * 60 * 60 * 1000);
+
+      // Don't show if already shown in the last 24 hours
+      const shownRecently = lastShown && (currentTime - parseInt(lastShown)) < (24 * 60 * 60 * 1000);
+
+      if (!dismissedRecently && !shownRecently) {
+        const delay = completionScore < 100 ? 4000 : 2000; // Show later if profile modal is shown first
+        const timer = setTimeout(() => {
+          setTwitterFollowModalOpen(true);
+          localStorage.setItem('twitter-follow-last-shown', currentTime.toString());
+        }, delay);
+        return () => clearTimeout(timer);
       }
     }
   }, [profile, loading]);
@@ -616,6 +643,12 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
           profile={profile}
         />
       )}
+
+      {/* Twitter Follow Modal */}
+      <TwitterFollowModal
+        isOpen={twitterFollowModalOpen}
+        onClose={() => setTwitterFollowModalOpen(false)}
+      />
     </div>
   );
 }
