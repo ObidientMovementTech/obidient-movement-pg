@@ -241,6 +241,7 @@ export const updateMemberTags = async (id: string, memberId: string, data: {
   contactTag?: 'No Response' | 'Messaged recently' | 'Called recently' | 'Not Reachable';
   notes?: string;
   engagementLevel?: 'Low' | 'Medium' | 'High';
+  pvcStatus?: 'Unregistered' | 'Registered but no PVC' | 'Registered with PVC';
 }) => {
   const res = await axios.put(`${API_BASE}/voting-blocs/${id}/members/${memberId}/tags`, data, {
     withCredentials: true,

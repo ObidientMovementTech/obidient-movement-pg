@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Mail, Phone, MessageCircle, Send } from "lucide-react";
+import { X, Mail, Send } from "lucide-react";
 import { InviteMemberForm } from "../../types/votingBloc";
 
 interface InviteMemberModalProps {
@@ -30,10 +30,6 @@ export default function InviteMemberModal({
       newErrors.email = 'Email is required for email invitations';
     } else if (form.inviteType === 'email' && !/\S+@\S+\.\S+/.test(form.email)) {
       newErrors.email = 'Please enter a valid email address';
-    }
-
-    if ((form.inviteType === 'whatsapp' || form.inviteType === 'sms') && !form.phone) {
-      newErrors.phone = 'Phone number is required for WhatsApp/SMS invitations';
     }
 
     if (!form.message.trim()) {
@@ -74,9 +70,7 @@ export default function InviteMemberModal({
   };
 
   const defaultMessages = {
-    email: "I'd like to invite you to join our voting bloc! Together, we can make a real difference in our community. Your voice and participation would be incredibly valuable to our cause.",
-    whatsapp: "Hi! I'm inviting you to join our voting bloc. Let's work together to create positive change in our community 🗳️ Your voice matters!",
-    sms: "You're invited to join our voting bloc! Together we can make a meaningful difference in our community. Hope you'll join us!"
+    email: "I'd like to invite you to join our voting bloc! Together, we can make a real difference in our community. Your voice and participation would be incredibly valuable to our cause."
   };
 
   if (!isOpen) return null;
@@ -100,11 +94,9 @@ export default function InviteMemberModal({
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Invitation Method
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {[
-                { type: 'email', icon: Mail, label: 'Email' },
-                { type: 'whatsapp', icon: MessageCircle, label: 'WhatsApp' },
-                { type: 'sms', icon: Phone, label: 'SMS' }
+                { type: 'email', icon: Mail, label: 'Email' }
               ].map(({ type, icon: Icon, label }) => (
                 <button
                   key={type}
@@ -143,26 +135,6 @@ export default function InviteMemberModal({
               />
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
-          )}
-
-          {/* Phone Input */}
-          {(form.inviteType === 'whatsapp' || form.inviteType === 'sms') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${errors.phone ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                placeholder="Enter phone number (e.g., +2348012345678)"
-              />
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
               )}
             </div>
           )}

@@ -232,6 +232,28 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
         </div>
       </div>
 
+      {/* PVC Campaign Banner */}
+      <div className="flex justify-center">
+        <a
+          href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID" // Replace with actual YouTube URL
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block hover:scale-105 transition-transform duration-300 shadow-lg hover:shadow-xl rounded-lg overflow-hidden relative group"
+        >
+          <img
+            src="/ObiMERD2.png"
+            alt="Get Your PVC & GO MERD - Make Election Rigging Difficult"
+            className="w-full max-w-7xl h-auto rounded-lg"
+          />
+          {/* Overlay Text Pill */}
+          <div className="absolute bottom-2 right-2 max-w-xs md:bottom-4 md:right-4 bg-black/30 backdrop-blur-sm text-white px-2 py-1 md:px-4 md:py-2 rounded-full text-[8px] md:text-sm font-medium transition-all duration-300 group-hover:bg-black/80 group-hover:scale-105 flex items-center gap-1 md:gap-2">
+            <span>Click here</span>
+            <ArrowRight size={8} className="md:hidden group-hover:translate-x-1 transition-transform" />
+            <ArrowRight size={14} className="hidden md:block group-hover:translate-x-1 transition-transform" />
+          </div>
+        </a>
+      </div>
+
       {/* Voting Bloc Call-to-Action Section */}
       <div className="relative bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 rounded-2xl overflow-hidden shadow-xl">
         <div className="relative p-6 md:p-8 lg:p-10">

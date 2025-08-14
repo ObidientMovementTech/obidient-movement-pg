@@ -1032,6 +1032,7 @@ This document outlines the current API structure after migration to PostgreSQL. 
       "decisionTag": "Undecided|Not-interested|Committed|Voted",
       "contactTag": "No Response|Messaged recently|Called recently|Not Reachable",
       "engagementLevel": "Low|Medium|High",
+      "pvcStatus": "Unregistered|Registered but no PVC|Registered with PVC",
       "notes": "string",
       "location": {
         "state": "string",
@@ -1059,6 +1060,7 @@ This document outlines the current API structure after migration to PostgreSQL. 
   "decisionTag": "Undecided|Not-interested|Committed|Voted (optional)",
   "contactTag": "No Response|Messaged recently|Called recently|Not Reachable (optional)",
   "engagementLevel": "Low|Medium|High (optional)",
+  "pvcStatus": "Unregistered|Registered but no PVC|Registered with PVC (optional)",
   "notes": "string (optional)"
 }
 ```
@@ -1933,6 +1935,7 @@ This document outlines the current API structure after migration to PostgreSQL. 
     decisionTag: String (enum: Undecided|Not-interested|Committed|Voted),
     contactTag: String (enum: No Response|Messaged recently|Called recently|Not Reachable),
     engagementLevel: String (enum: Low|Medium|High),
+    pvcStatus: String (enum: Unregistered|Registered but no PVC|Registered with PVC),
     notes: String,
     location: {
       state: String,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Send, Mail, MessageCircle, Phone, Smartphone } from "lucide-react";
+import { X, Send, Mail, Smartphone } from "lucide-react";
 import { BroadcastMessageForm } from "../../types/votingBloc";
 
 interface BroadcastMessageModalProps {
@@ -85,20 +85,6 @@ export default function BroadcastMessageModal({
       label: 'Email',
       description: 'Send via email notifications',
       color: 'blue'
-    },
-    {
-      id: 'whatsapp',
-      icon: MessageCircle,
-      label: 'WhatsApp',
-      description: 'Send via WhatsApp messages',
-      color: 'green'
-    },
-    {
-      id: 'sms',
-      icon: Phone,
-      label: 'SMS',
-      description: 'Send via text messages',
-      color: 'purple'
     },
     {
       id: 'in-app',

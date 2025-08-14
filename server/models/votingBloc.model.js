@@ -183,6 +183,7 @@ class VotingBloc {
         contactTag: row.contactTag,
         lastContactDate: row.lastContactDate,
         engagementLevel: row.engagementLevel,
+        pvcStatus: row.pvcStatus,
         notes: row.notes,
         location: {
           state: row.memberLocationState || '',
@@ -462,6 +463,7 @@ class VotingBloc {
         decisionTag = 'Undecided',
         contactTag = 'No Response',
         engagementLevel = 'Medium',
+        pvcStatus = 'Unregistered',
         notes = '',
         memberLocationState,
         memberLocationLga,
@@ -470,20 +472,21 @@ class VotingBloc {
 
       await client.query(
         `INSERT INTO "votingBlocMemberMetadata" (
-          "votingBlocId", "userId", "decisionTag", "contactTag", "engagementLevel", notes,
+          "votingBlocId", "userId", "decisionTag", "contactTag", "engagementLevel", "pvcStatus", notes,
           "memberLocationState", "memberLocationLga", "memberLocationWard"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT ("votingBlocId", "userId") 
         DO UPDATE SET
           "decisionTag" = EXCLUDED."decisionTag",
           "contactTag" = EXCLUDED."contactTag",
           "engagementLevel" = EXCLUDED."engagementLevel",
+          "pvcStatus" = EXCLUDED."pvcStatus",
           notes = EXCLUDED.notes,
           "memberLocationState" = EXCLUDED."memberLocationState",
           "memberLocationLga" = EXCLUDED."memberLocationLga",
           "memberLocationWard" = EXCLUDED."memberLocationWard",
           "updatedAt" = NOW()`,
-        [votingBlocId, userId, decisionTag, contactTag, engagementLevel, notes, memberLocationState, memberLocationLga, memberLocationWard]
+        [votingBlocId, userId, decisionTag, contactTag, engagementLevel, pvcStatus, notes, memberLocationState, memberLocationLga, memberLocationWard]
       );
 
       // Update member count
@@ -766,9 +769,9 @@ class VotingBloc {
           await client.query(
             `INSERT INTO "votingBlocMemberMetadata" (
               "votingBlocId", "userId", "joinDate", "decisionTag", "contactTag", 
-              "engagementLevel", "notes", "lastContactDate", "memberLocationState", 
+              "engagementLevel", "pvcStatus", "notes", "lastContactDate", "memberLocationState", 
               "memberLocationLga", "memberLocationWard"
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
             [
               this.id,
               metadata.userId,
@@ -776,6 +779,7 @@ class VotingBloc {
               metadata.decisionTag || 'Undecided',
               metadata.contactTag || 'No Response',
               metadata.engagementLevel || 'Medium',
+              metadata.pvcStatus || 'Unregistered',
               metadata.notes || '',
               metadata.lastContactDate || null,
               metadata.location?.state || '',

@@ -75,6 +75,7 @@ export default function VotingBlocManagePage() {
   const [broadcastLoading, setBroadcastLoading] = useState(false);
   const [privateMessageLoading, setPrivateMessageLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState<string | null>(null);
+  const [updateTagsLoading, setUpdateTagsLoading] = useState(false);
 
   // Member management states
   const [membersWithMetadata, setMembersWithMetadata] = useState<any[]>([]);
@@ -83,6 +84,7 @@ export default function VotingBlocManagePage() {
   const [contactFilter, setContactFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [engagementFilter, setEngagementFilter] = useState<string>('all');
+  const [pvcStatusFilter, setPvcStatusFilter] = useState<string>('all');
   const [editingMember, setEditingMember] = useState<any>(null);
   const [showMemberTagModal, setShowMemberTagModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -236,8 +238,10 @@ export default function VotingBlocManagePage() {
     contactTag?: 'No Response' | 'Messaged recently' | 'Called recently' | 'Not Reachable';
     notes?: string;
     engagementLevel?: 'Low' | 'Medium' | 'High';
+    pvcStatus?: 'Unregistered' | 'Registered but no PVC' | 'Registered with PVC';
   }) => {
     try {
+      setUpdateTagsLoading(true);
       await updateMemberTags(id!, memberId, tags);
       setToast({ message: "Member tags updated successfully!", type: "success" });
       await fetchMemberMetadata(); // Refresh member data
@@ -245,6 +249,8 @@ export default function VotingBlocManagePage() {
       setEditingMember(null);
     } catch (error) {
       setToast({ message: "Failed to update member tags", type: "error" });
+    } finally {
+      setUpdateTagsLoading(false);
     }
   };
 
@@ -256,6 +262,7 @@ export default function VotingBlocManagePage() {
     const matchesDecision = decisionFilter === 'all' || member.metadata?.decisionTag === decisionFilter;
     const matchesContact = contactFilter === 'all' || member.metadata?.contactTag === contactFilter;
     const matchesEngagement = engagementFilter === 'all' || member.metadata?.engagementLevel === engagementFilter;
+    const matchesPvcStatus = pvcStatusFilter === 'all' || member.metadata?.pvcStatus === pvcStatusFilter;
 
     const matchesLocation = locationFilter === 'all' ||
       member.metadata?.location?.state?.toLowerCase().includes(locationFilter.toLowerCase()) ||
@@ -263,7 +270,7 @@ export default function VotingBlocManagePage() {
       member.personalInfo?.currentLocation?.state?.toLowerCase().includes(locationFilter.toLowerCase()) ||
       member.personalInfo?.currentLocation?.lga?.toLowerCase().includes(locationFilter.toLowerCase());
 
-    return matchesSearch && matchesDecision && matchesContact && matchesEngagement && matchesLocation;
+    return matchesSearch && matchesDecision && matchesContact && matchesEngagement && matchesPvcStatus && matchesLocation;
   });
 
   const copyBlocLink = () => {
@@ -837,6 +844,17 @@ export default function VotingBlocManagePage() {
                       <option value="High">High Engagement</option>
                     </select>
 
+                    <select
+                      value={pvcStatusFilter}
+                      onChange={(e) => setPvcStatusFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                    >
+                      <option value="all">All PVC Status</option>
+                      <option value="Unregistered">Unregistered</option>
+                      <option value="Registered but no PVC">Registered but no PVC</option>
+                      <option value="Registered with PVC">Registered with PVC</option>
+                    </select>
+
                     <input
                       type="text"
                       placeholder="Filter by location..."
@@ -902,6 +920,13 @@ export default function VotingBlocManagePage() {
                               'bg-red-100 text-red-800'
                             }`}>
                             {member.metadata?.engagementLevel || 'Medium'}
+                          </span>
+
+                          <span className={`px-2 py-1 text-xs rounded-full ${member.metadata?.pvcStatus === 'Registered with PVC' ? 'bg-green-100 text-green-800' :
+                            member.metadata?.pvcStatus === 'Registered but no PVC' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                            {member.metadata?.pvcStatus || 'Unregistered'}
                           </span>
                         </div>
 
@@ -978,7 +1003,7 @@ export default function VotingBlocManagePage() {
                     <div className="text-center py-8 text-gray-500">
                       <Users size={36} className="sm:w-12 sm:h-12 mx-auto mb-4 text-gray-400" />
                       <p className="text-sm sm:text-base">No members found matching your criteria.</p>
-                      {(searchQuery || decisionFilter !== 'all' || contactFilter !== 'all' || locationFilter !== 'all' || engagementFilter !== 'all') && (
+                      {(searchQuery || decisionFilter !== 'all' || contactFilter !== 'all' || locationFilter !== 'all' || engagementFilter !== 'all' || pvcStatusFilter !== 'all') && (
                         <button
                           onClick={() => {
                             setSearchQuery('');
@@ -986,6 +1011,7 @@ export default function VotingBlocManagePage() {
                             setContactFilter('all');
                             setLocationFilter('all');
                             setEngagementFilter('all');
+                            setPvcStatusFilter('all');
                           }}
                           className="mt-2 text-green-600 hover:text-green-700 text-sm"
                         >
@@ -1458,6 +1484,7 @@ export default function VotingBlocManagePage() {
                 decisionTag: formData.get('decisionTag') as 'Undecided' | 'Not-interested' | 'Committed' | 'Voted',
                 contactTag: formData.get('contactTag') as 'No Response' | 'Messaged recently' | 'Called recently' | 'Not Reachable',
                 engagementLevel: formData.get('engagementLevel') as 'Low' | 'Medium' | 'High',
+                pvcStatus: formData.get('pvcStatus') as 'Unregistered' | 'Registered but no PVC' | 'Registered with PVC',
                 notes: formData.get('notes') as string,
               });
             }} className="space-y-4">
@@ -1510,6 +1537,21 @@ export default function VotingBlocManagePage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  PVC Status
+                </label>
+                <select
+                  name="pvcStatus"
+                  defaultValue={editingMember.metadata?.pvcStatus || 'Unregistered'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                >
+                  <option value="Unregistered">Unregistered</option>
+                  <option value="Registered but no PVC">Registered but no PVC</option>
+                  <option value="Registered with PVC">Registered with PVC</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Notes
                 </label>
                 <textarea
@@ -1534,9 +1576,19 @@ export default function VotingBlocManagePage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm sm:text-base"
+                  disabled={updateTagsLoading}
+                  className={`px-4 py-2 text-white rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 ${updateTagsLoading
+                      ? 'bg-green-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700'
+                    }`}
                 >
-                  Update Tags
+                  {updateTagsLoading && (
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {updateTagsLoading ? 'Updating...' : 'Update Tags'}
                 </button>
               </div>
             </form>
