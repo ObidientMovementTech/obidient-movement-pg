@@ -45,6 +45,7 @@ export interface VotingBloc {
       decisionTag: 'Undecided' | 'Not-interested' | 'Committed' | 'Voted';
       contactTag: 'No Response' | 'Messaged recently' | 'Called recently' | 'Not Reachable';
       engagementLevel: 'Low' | 'Medium' | 'High';
+      pvcStatus: 'Unregistered' | 'Registered but no PVC' | 'Registered with PVC';
       notes: string;
       lastContactDate?: string;
       location?: {

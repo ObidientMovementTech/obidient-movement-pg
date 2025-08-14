@@ -1196,7 +1196,7 @@ export const sendPrivateMessage = async (req, res) => {
 export const updateMemberTags = async (req, res) => {
   try {
     const { id, memberId } = req.params;
-    const { decisionTag, contactTag, notes, engagementLevel } = req.body;
+    const { decisionTag, contactTag, notes, engagementLevel, pvcStatus } = req.body;
 
     const votingBloc = await VotingBloc.findById(id);
     if (!votingBloc) {
@@ -1224,6 +1224,7 @@ export const updateMemberTags = async (req, res) => {
         decisionTag: decisionTag || 'Undecided',
         contactTag: contactTag || 'No Response',
         engagementLevel: engagementLevel || 'Medium',
+        pvcStatus: pvcStatus || 'Unregistered',
         notes: notes || ''
       });
     } else {
@@ -1235,6 +1236,7 @@ export const updateMemberTags = async (req, res) => {
       }
       if (notes !== undefined) memberMeta.notes = notes;
       if (engagementLevel) memberMeta.engagementLevel = engagementLevel;
+      if (pvcStatus) memberMeta.pvcStatus = pvcStatus;
     }
 
     await votingBloc.save();

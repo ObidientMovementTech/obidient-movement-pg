@@ -96,9 +96,9 @@ export const submitKYC = async (req, res) => {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
-    // Validate required data
-    if (!personalInfo || !validIDType || !validIDNumber) {
-      return res.status(400).json({ message: 'Missing required KYC information' });
+    // Validate required data (personal info is now optional since it's handled separately)
+    if (!validIDType || !validIDNumber) {
+      return res.status(400).json({ message: 'Missing required Valid ID information' });
     }
 
     // Get the user first to check what data we already have
@@ -150,6 +150,15 @@ export const submitKYC = async (req, res) => {
     if (personalInfo) {
       const transformedPersonalInfo = transformPersonalInfoFields(personalInfo);
       await User.findByIdAndUpdate(userId, { personalInfo: transformedPersonalInfo });
+    }
+
+    // Validate that we have both Valid ID and Selfie before marking as pending
+    if (!validIDUrl) {
+      return res.status(400).json({ message: 'Valid ID image is required to submit KYC' });
+    }
+
+    if (!selfieUrl) {
+      return res.status(400).json({ message: 'Selfie image is required to submit KYC' });
     }
 
     // Update KYC status to pending for review
