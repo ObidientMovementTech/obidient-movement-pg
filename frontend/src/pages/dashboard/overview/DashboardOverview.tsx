@@ -235,7 +235,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       {/* PVC Campaign Banner */}
       <div className="flex justify-center">
         <a
-          href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID" // Replace with actual YouTube URL
+          href="https://drive.google.com/file/d/13WlMN9-hVm07Nj7u5sWTLHX4VShXPGPl/view?usp=sharing" // Replace with actual YouTube URL
           target="_blank"
           rel="noopener noreferrer"
           className="block hover:scale-105 transition-transform duration-300 shadow-lg hover:shadow-xl rounded-lg overflow-hidden relative group"
@@ -270,7 +270,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
               </div>
 
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
-                Manage Your <span className="text-[#8cc63f]">Voting Bloc</span>
+                Mobilize your <span className="text-[#8cc63f]">Polling Unit</span>
                 <br />
                 <span className="text-lg md:text-xl lg:text-2xl font-normal text-white/90">
                   Unite voices, drive change
@@ -278,8 +278,8 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
               </h2>
 
               <p className="text-white/80 text-base md:text-lg mb-6 max-w-2xl">
-                Create a powerful coalition of like-minded citizens. Organize supporters,
-                coordinate campaigns, and amplify your political impact in your community.
+                Create a powerful coalition of like-minded citizens. Organize voters,
+                build a vote defender squad, and amplify the political impact of the Obidient movement in your community.
               </p>
 
               {/* Feature Highlights */}
@@ -288,19 +288,19 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Users size={18} />
                   </div>
-                  <span className="text-sm font-medium">Build Community</span>
+                  <span className="text-sm font-medium">Get Your PVC</span>
                 </div>
                 <div className="flex items-center gap-3 text-white/90">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Target size={18} />
                   </div>
-                  <span className="text-sm font-medium">Strategic Goals</span>
+                  <span className="text-sm font-medium">Vote Right</span>
                 </div>
                 <div className="flex items-center gap-3 text-white/90">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Zap size={18} />
                   </div>
-                  <span className="text-sm font-medium">Real Impact</span>
+                  <span className="text-sm font-medium">Defend Your Vote</span>
                 </div>
               </div>
 

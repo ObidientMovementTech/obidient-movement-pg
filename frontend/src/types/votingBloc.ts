@@ -55,6 +55,17 @@ export interface VotingBloc {
       };
     };
   }[];
+  manualMembers: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+    state: string;
+    lga: string;
+    ward: string;
+    addedBy: string;
+    addedAt: string;
+  }[];
   invitations: {
     invitedBy: string;
     invitedUser: string;
@@ -64,6 +75,8 @@ export interface VotingBloc {
   }[];
   metrics: {
     totalMembers: number;
+    platformMembers?: number;
+    manualMembers?: number;
     weeklyGrowth: number;
     monthlyGrowth: number;
     engagementScore: number;
