@@ -169,6 +169,20 @@ export const sendMemberInvitation = async (id: string, data: {
   return res.data;
 };
 
+// Add manual member (for offline/rural members without platform accounts)
+export const addManualMember = async (id: string, data: {
+  name: string;
+  phone: string;
+  state: string;
+  lga: string;
+  ward?: string;
+}) => {
+  const res = await axios.post(`${API_BASE}/voting-blocs/${id}/add-manual-member`, data, {
+    withCredentials: true,
+  });
+  return res.data;
+};
+
 // Resend invitation
 export const resendInvitation = async (id: string, invitationId: string) => {
   const res = await axios.post(`${API_BASE}/voting-blocs/${id}/resend-invitation`, {

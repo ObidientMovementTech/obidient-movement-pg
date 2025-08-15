@@ -16,6 +16,7 @@ import {
   leaveVotingBloc,
   getVotingBlocInvitations,
   sendMemberInvitation,
+  addManualMember,
   sendBroadcastMessage,
   removeMember,
   getMemberEngagement,
@@ -78,6 +79,9 @@ router.get('/:id/invitations', protect, getVotingBlocInvitations);
 
 // Send member invitation via email/phone
 router.post('/:id/invite-member', protect, sendMemberInvitation);
+
+// Add manual member (for offline/rural members)
+router.post('/:id/add-manual-member', protect, addManualMember);
 
 // Resend invitation
 router.post('/:id/resend-invitation', protect, resendInvitation);

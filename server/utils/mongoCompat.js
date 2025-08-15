@@ -89,14 +89,21 @@ export function transformVotingBloc(data) {
     };
   }
 
-  // Convert memberCount to number and create both totalMembers and memberCount
-  const memberCount = parseInt(data.memberCount || 0);
-  transformed.totalMembers = memberCount;
-  transformed.memberCount = memberCount;
+  // Use member counts from model (already calculated correctly)
+  const totalMemberCount = parseInt(data.totalMembers || data.memberCount || 0);
+  const platformMemberCount = parseInt(data.platformMemberCount || 0);
+  const manualMemberCount = parseInt(data.manualMemberCount || 0);
+
+  transformed.totalMembers = totalMemberCount;
+  transformed.memberCount = totalMemberCount;
+  transformed.platformMemberCount = platformMemberCount;
+  transformed.manualMemberCount = manualMemberCount;
 
   // Create metrics object for frontend compatibility
   transformed.metrics = {
-    totalMembers: memberCount,
+    totalMembers: totalMemberCount,
+    platformMembers: platformMemberCount,
+    manualMembers: manualMemberCount,
     weeklyGrowth: parseInt(data.weeklyGrowth || 0),
     monthlyGrowth: parseInt(data.monthlyGrowth || 0),
     engagementScore: parseInt(data.engagementScore || 0),
@@ -139,6 +146,23 @@ export function transformVotingBloc(data) {
       email: member.email,
       joinDate: member.joinDate
     }));
+  }
+
+  // Transform manualMembers array
+  if (Array.isArray(data.manualMembers)) {
+    transformed.manualMembers = data.manualMembers.map(member => ({
+      id: member.id,
+      firstName: member.firstName,
+      lastName: member.lastName,
+      phoneNumber: member.phoneNumber,
+      state: member.state,
+      lga: member.lga,
+      ward: member.ward,
+      addedBy: member.addedBy,
+      addedAt: member.addedAt
+    }));
+  } else {
+    transformed.manualMembers = [];
   }
 
   // Remove PostgreSQL-specific fields

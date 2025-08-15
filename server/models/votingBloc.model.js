@@ -137,11 +137,29 @@ class VotingBloc {
         [id]
       );
 
-      // Get members
+      // Get members (both platform and manual)
       const membersResult = await client.query(
-        `SELECT vm."userId", vm."joinDate", u.name, u.email, u.phone, u."countryCode"
+        `SELECT 
+          vm."userId", 
+          vm."joinDate", 
+          vm."memberType",
+          vm."firstName",
+          vm."lastName",
+          vm."phoneNumber",
+          vm."state",
+          vm."lga", 
+          vm."ward",
+          vm."decisionTag",
+          vm."contactTag",
+          vm."lastContactDate",
+          vm."engagementLevel",
+          vm."pvcStatus",
+          vm."notes",
+          u.name as "platformName", 
+          u.email, 
+          u."countryCode"
          FROM "votingBlocMembers" vm
-         JOIN users u ON vm."userId" = u.id
+         LEFT JOIN users u ON vm."userId" = u.id AND vm."memberType" = 'platform'
          WHERE vm."votingBlocId" = $1 
          ORDER BY vm."joinDate"`,
         [id]
@@ -172,8 +190,47 @@ class VotingBloc {
 
       // Attach related data
       votingBloc.toolkits = toolkitsResult.rows;
-      votingBloc.members = membersResult.rows.map(row => row.userId);
-      votingBloc.memberDetails = membersResult.rows;
+
+      // Process members to handle both platform and manual members
+      votingBloc.members = [];
+      votingBloc.memberDetails = [];
+      votingBloc.manualMembers = [];
+
+      membersResult.rows.forEach(row => {
+        if (row.memberType === 'manual') {
+          // Manual member with metadata
+          const manualMember = {
+            id: row.userId || `manual_${row.joinDate}`, // Use a unique identifier
+            firstName: row.firstName,
+            lastName: row.lastName,
+            phoneNumber: row.phoneNumber,
+            state: row.state,
+            lga: row.lga,
+            ward: row.ward,
+            addedAt: row.joinDate,
+            decisionTag: row.decisionTag,
+            contactTag: row.contactTag,
+            lastContactDate: row.lastContactDate,
+            engagementLevel: row.engagementLevel,
+            pvcStatus: row.pvcStatus,
+            notes: row.notes
+          };
+          votingBloc.manualMembers.push(manualMember);
+        } else {
+          // Platform member
+          if (row.userId) {
+            votingBloc.members.push(row.userId);
+            votingBloc.memberDetails.push({
+              userId: row.userId,
+              name: row.platformName,
+              email: row.email,
+              phone: row.phoneNumber,
+              countryCode: row.countryCode,
+              joinDate: row.joinDate
+            });
+          }
+        }
+      });
 
       // Transform member metadata to match expected format
       votingBloc.memberMetadata = metadataResult.rows.map(row => ({
@@ -200,8 +257,14 @@ class VotingBloc {
       }
 
       // Update metrics
-      votingBloc.totalMembers = membersResult.rows.length;
-      votingBloc.memberCount = membersResult.rows.length; // Virtual property
+      const totalPlatformMembers = votingBloc.members.length;
+      const totalManualMembers = votingBloc.manualMembers.length;
+      const totalMembers = totalPlatformMembers + totalManualMembers;
+
+      votingBloc.totalMembers = totalMembers;
+      votingBloc.memberCount = totalMembers;
+      votingBloc.platformMemberCount = totalPlatformMembers;
+      votingBloc.manualMemberCount = totalManualMembers;
 
       return new VotingBloc(votingBloc);
     } finally {

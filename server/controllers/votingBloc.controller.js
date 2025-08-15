@@ -7,6 +7,7 @@ import s3Client from '../config/aws.js';
 import { uploadToS3 } from '../utils/s3Upload.js';
 import { sendVotingBlocBroadcastEmail, sendVotingBlocPrivateMessageEmail, sendVotingBlocInvitationEmail, sendVotingBlocRemovalEmail } from '../utils/emailHandler.js';
 import { transformVotingBloc, transformUser } from '../utils/mongoCompat.js';
+import { query } from '../config/db.js';
 
 // Helper function to safely extract ID from object or string
 const getId = (obj) => {
@@ -828,6 +829,109 @@ export const sendMemberInvitation = async (req, res) => {
   }
 };
 
+// Add manual member (for offline/rural members without platform accounts)
+export const addManualMember = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, state, lga, ward } = req.body;
+
+    // Validate required fields
+    if (!name || !phone || !state || !lga) {
+      return res.status(400).json({
+        message: 'Name, phone, state, and LGA are required'
+      });
+    }
+
+    const votingBloc = await VotingBloc.findById(id, true);
+    if (!votingBloc) {
+      return res.status(404).json({ message: 'Voting bloc not found' });
+    }
+
+    // Check if user is the creator or member
+    const isCreator = votingBloc.creator && votingBloc.creator.id === req.userId;
+    const isMember = votingBloc.members && votingBloc.members.includes(req.userId);
+
+    if (!isCreator && !isMember) {
+      return res.status(403).json({
+        message: 'You can only add manual members to your own voting blocs'
+      });
+    }
+
+    // Check if phone number already exists as manual member in this voting bloc
+    const existingMemberQuery = `
+      SELECT * FROM "votingBlocMembers" 
+      WHERE "votingBlocId" = $1 AND "phoneNumber" = $2 AND "memberType" = 'manual'
+    `;
+    const existingMember = await query(existingMemberQuery, [id, phone.trim()]); if (existingMember.rows.length > 0) {
+      return res.status(400).json({
+        message: 'A manual member with this phone number already exists in this voting bloc'
+      });
+    }
+
+    // Split name into first and last name (simple split on first space)
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Insert manual member into votingBlocMembers table
+    const insertMemberQuery = `
+      INSERT INTO "votingBlocMembers" (
+        "votingBlocId", 
+        "firstName",
+        "lastName", 
+        "phoneNumber", 
+        "state", 
+        "lga", 
+        "ward",
+        "memberType",
+        "joinDate"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'manual', NOW())
+      RETURNING *
+    `;
+
+    const newMember = await query(insertMemberQuery, [
+      id,
+      firstName,
+      lastName,
+      phone.trim(),
+      state,
+      lga,
+      ward || null
+    ]);
+
+    // Update voting bloc member count
+    const updateCountQuery = `
+      UPDATE "votingBlocs" 
+      SET "totalMembers" = (
+        SELECT COUNT(*) FROM "votingBlocMembers" 
+        WHERE "votingBlocId" = $1
+      )
+      WHERE id = $1
+    `;
+    await query(updateCountQuery, [id]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Manual member added successfully',
+      member: {
+        id: newMember.rows[0].id,
+        name: `${firstName} ${lastName}`.trim(),
+        phone: newMember.rows[0].phoneNumber,
+        location: {
+          state: newMember.rows[0].state,
+          lga: newMember.rows[0].lga,
+          ward: newMember.rows[0].ward
+        },
+        memberType: 'manual',
+        joinDate: newMember.rows[0].joinDate
+      }
+    });
+  } catch (error) {
+    console.error('Error adding manual member:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Send broadcast message to all members
 export const sendBroadcastMessage = async (req, res) => {
   try {
@@ -932,7 +1036,7 @@ export const removeMember = async (req, res) => {
     const { id, memberId } = req.params;
     const { reason } = req.body;
 
-    const votingBloc = await VotingBloc.findById(id);
+    const votingBloc = await VotingBloc.findById(id, true); // Get full details for manual members
     if (!votingBloc) {
       return res.status(404).json({ message: 'Voting bloc not found' });
     }
@@ -942,94 +1046,140 @@ export const removeMember = async (req, res) => {
       return res.status(403).json({ message: 'Only the creator can remove members' });
     }
 
-    // Check if member exists in the voting bloc
-    if (!votingBloc.members.includes(memberId)) {
-      return res.status(400).json({ message: 'User is not a member of this voting bloc' });
-    }
+    // Check if it's a manual member
+    if (memberId.startsWith('manual_')) {
+      // Handle manual member removal
+      const manualMemberIndex = parseInt(memberId.split('_')[1]);
+      const manualMember = votingBloc.manualMembers[manualMemberIndex];
 
-    // Cannot remove the creator
-    if (memberId === getId(votingBloc.creator)) {
-      return res.status(400).json({ message: 'Cannot remove the creator from the voting bloc' });
-    }
+      if (!manualMember) {
+        return res.status(400).json({ message: 'Manual member not found in this voting bloc' });
+      }
 
-    // Get member and creator info for notifications
-    const member = await User.findById(memberId);
-    const creator = await User.findById(req.userId);
+      // Remove manual member from the votingBlocMembers table
+      const deleteQuery = `
+        DELETE FROM "votingBlocMembers" 
+        WHERE "votingBlocId" = $1 
+          AND "firstName" = $2 
+          AND "lastName" = $3 
+          AND "phoneNumber" = $4
+          AND "memberType" = 'manual'
+      `;
 
-    if (!member || !creator) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+      await query(deleteQuery, [
+        id,
+        manualMember.firstName,
+        manualMember.lastName,
+        manualMember.phoneNumber
+      ]);
 
-    // Remove member
-    votingBloc.members = votingBloc.members.filter(
-      member => getId(member) !== memberId
-    );
+      // Update voting bloc member count
+      const updateCountQuery = `
+        UPDATE "votingBlocs" 
+        SET "totalMembers" = (
+          SELECT COUNT(*) FROM "votingBlocMembers" 
+          WHERE "votingBlocId" = $1
+        )
+        WHERE id = $1
+      `;
+      await query(updateCountQuery, [id]);
 
-    // Remove member metadata if it exists
-    if (votingBloc.memberMetadata && Array.isArray(votingBloc.memberMetadata)) {
-      votingBloc.memberMetadata = votingBloc.memberMetadata.filter(
-        metadata => getId(metadata.userId) !== memberId
-      );
-    }
-
-    await votingBloc.save();
-
-    // Create in-app notification for the removed member
-    try {
-      // Use name field if available, otherwise construct from personalInfo
-      const creatorName = creator.name ||
-        (creator.personalInfo?.first_name && creator.personalInfo?.last_name
-          ? `${creator.personalInfo.first_name} ${creator.personalInfo.last_name}`
-          : creator.email);
-
-      await Notification.create({
-        userId: memberId,
-        type: 'voting_bloc_removal',
-        title: `Removed from "${votingBloc.name}"`,
-        message: `You have been removed from the "${votingBloc.name}" voting bloc by ${creatorName}.${reason ? ` Reason: ${reason}` : ''}`,
-        metadata: {
-          votingBlocId: id,
-          votingBlocName: votingBloc.name,
-          creatorName: creatorName,
-          reason: reason || null
-        }
+      res.status(200).json({
+        success: true,
+        message: 'Manual member removed successfully',
       });
-    } catch (notificationError) {
-      console.error('Error creating removal notification:', notificationError);
-      // Don't fail the entire operation if notification fails
-    }
 
-    // Send email notification to the removed member
-    try {
-      if (member.email) {
+    } else {
+      // Handle platform member removal (existing logic)
+      // Check if member exists in the voting bloc
+      if (!votingBloc.members.includes(memberId)) {
+        return res.status(400).json({ message: 'User is not a member of this voting bloc' });
+      }
+
+      // Cannot remove the creator
+      if (memberId === getId(votingBloc.creator)) {
+        return res.status(400).json({ message: 'Cannot remove the creator from the voting bloc' });
+      }
+
+      // Get member and creator info for notifications
+      const member = await User.findById(memberId);
+      const creator = await User.findById(req.userId);
+
+      if (!member || !creator) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Remove member
+      votingBloc.members = votingBloc.members.filter(
+        member => getId(member) !== memberId
+      );
+
+      // Remove member metadata if it exists
+      if (votingBloc.memberMetadata && Array.isArray(votingBloc.memberMetadata)) {
+        votingBloc.memberMetadata = votingBloc.memberMetadata.filter(
+          metadata => getId(metadata.userId) !== memberId
+        );
+      }
+
+      await votingBloc.save();
+
+      // Create in-app notification for the removed member
+      try {
         // Use name field if available, otherwise construct from personalInfo
-        const memberName = member.name ||
-          (member.personalInfo?.first_name && member.personalInfo?.last_name
-            ? `${member.personalInfo.first_name} ${member.personalInfo.last_name}`
-            : member.email);
-
         const creatorName = creator.name ||
           (creator.personalInfo?.first_name && creator.personalInfo?.last_name
             ? `${creator.personalInfo.first_name} ${creator.personalInfo.last_name}`
             : creator.email);
 
-        await sendVotingBlocRemovalEmail(
-          memberName,
-          member.email,
-          votingBloc.name,
-          creatorName,
-          reason
-        );
+        await Notification.create({
+          userId: memberId,
+          type: 'voting_bloc_removal',
+          title: `Removed from "${votingBloc.name}"`,
+          message: `You have been removed from the "${votingBloc.name}" voting bloc by ${creatorName}.${reason ? ` Reason: ${reason}` : ''}`,
+          metadata: {
+            votingBlocId: id,
+            votingBlocName: votingBloc.name,
+            creatorName: creatorName,
+            reason: reason || null
+          }
+        });
+      } catch (notificationError) {
+        console.error('Error creating removal notification:', notificationError);
+        // Don't fail the entire operation if notification fails
       }
-    } catch (emailError) {
-      console.error('Error sending removal email:', emailError);
-      // Don't fail the entire operation if email fails
-    }
 
-    res.status(200).json({
-      success: true,
-      message: 'Member removed successfully',
-    });
+      // Send email notification to the removed member
+      try {
+        if (member.email) {
+          // Use name field if available, otherwise construct from personalInfo
+          const memberName = member.name ||
+            (member.personalInfo?.first_name && member.personalInfo?.last_name
+              ? `${member.personalInfo.first_name} ${member.personalInfo.last_name}`
+              : member.email);
+
+          const creatorName = creator.name ||
+            (creator.personalInfo?.first_name && creator.personalInfo?.last_name
+              ? `${creator.personalInfo.first_name} ${creator.personalInfo.last_name}`
+              : creator.email);
+
+          await sendVotingBlocRemovalEmail(
+            memberName,
+            member.email,
+            votingBloc.name,
+            creatorName,
+            reason
+          );
+        }
+      } catch (emailError) {
+        console.error('Error sending removal email:', emailError);
+        // Don't fail the entire operation if email fails
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Member removed successfully',
+      });
+    }
   } catch (error) {
     console.error('Error removing member:', error);
     res.status(500).json({ message: 'Server error' });
@@ -1198,7 +1348,7 @@ export const updateMemberTags = async (req, res) => {
     const { id, memberId } = req.params;
     const { decisionTag, contactTag, notes, engagementLevel, pvcStatus } = req.body;
 
-    const votingBloc = await VotingBloc.findById(id);
+    const votingBloc = await VotingBloc.findById(id, true); // Get full details
     if (!votingBloc) {
       return res.status(404).json({ message: 'Voting bloc not found' });
     }
@@ -1209,37 +1359,79 @@ export const updateMemberTags = async (req, res) => {
       return res.status(403).json({ message: 'Only the voting bloc creator can update member tags' });
     }
 
-    // Check if the member exists in the voting bloc
-    if (!votingBloc.members.includes(memberId)) {
-      return res.status(404).json({ message: 'Member not found in this voting bloc' });
-    }
+    // Check if it's a manual member (ID starts with 'manual_')
+    if (memberId.startsWith('manual_')) {
+      // Handle manual member update
+      const manualMemberIndex = parseInt(memberId.split('_')[1]);
+      const manualMember = votingBloc.manualMembers[manualMemberIndex];
 
-    // Find or create member metadata
-    let memberMeta = votingBloc.memberMetadata.find(meta => getId(meta.userId) === memberId);
-    if (!memberMeta) {
-      // Create new metadata if it doesn't exist
-      votingBloc.memberMetadata.push({
-        userId: memberId,
-        joinDate: new Date(),
-        decisionTag: decisionTag || 'Undecided',
-        contactTag: contactTag || 'No Response',
-        engagementLevel: engagementLevel || 'Medium',
-        pvcStatus: pvcStatus || 'Unregistered',
-        notes: notes || ''
-      });
-    } else {
-      // Update existing metadata
-      if (decisionTag) memberMeta.decisionTag = decisionTag;
-      if (contactTag) {
-        memberMeta.contactTag = contactTag;
-        memberMeta.lastContactDate = new Date();
+      if (!manualMember) {
+        return res.status(404).json({ message: 'Manual member not found' });
       }
-      if (notes !== undefined) memberMeta.notes = notes;
-      if (engagementLevel) memberMeta.engagementLevel = engagementLevel;
-      if (pvcStatus) memberMeta.pvcStatus = pvcStatus;
-    }
 
-    await votingBloc.save();
+      // Update manual member metadata in the votingBlocMembers table
+      const updateQuery = `
+        UPDATE "votingBlocMembers" 
+        SET 
+          "decisionTag" = COALESCE($1, "decisionTag"),
+          "contactTag" = COALESCE($2, "contactTag"),
+          "notes" = COALESCE($3, "notes"),
+          "engagementLevel" = COALESCE($4, "engagementLevel"),
+          "pvcStatus" = COALESCE($5, "pvcStatus"),
+          "lastContactDate" = CASE WHEN $2 IS NOT NULL THEN NOW() ELSE "lastContactDate" END
+        WHERE "votingBlocId" = $6 
+          AND "firstName" = $7 
+          AND "lastName" = $8 
+          AND "phoneNumber" = $9
+          AND "memberType" = 'manual'
+      `;
+
+      await query(updateQuery, [
+        decisionTag,
+        contactTag,
+        notes,
+        engagementLevel,
+        pvcStatus,
+        id,
+        manualMember.firstName,
+        manualMember.lastName,
+        manualMember.phoneNumber
+      ]);
+
+    } else {
+      // Handle platform member update (existing logic)
+      // Check if the member exists in the voting bloc
+      if (!votingBloc.members.includes(memberId)) {
+        return res.status(404).json({ message: 'Member not found in this voting bloc' });
+      }
+
+      // Find or create member metadata
+      let memberMeta = votingBloc.memberMetadata.find(meta => getId(meta.userId) === memberId);
+      if (!memberMeta) {
+        // Create new metadata if it doesn't exist
+        votingBloc.memberMetadata.push({
+          userId: memberId,
+          joinDate: new Date(),
+          decisionTag: decisionTag || 'Undecided',
+          contactTag: contactTag || 'No Response',
+          engagementLevel: engagementLevel || 'Medium',
+          pvcStatus: pvcStatus || 'Unregistered',
+          notes: notes || ''
+        });
+      } else {
+        // Update existing metadata
+        if (decisionTag) memberMeta.decisionTag = decisionTag;
+        if (contactTag) {
+          memberMeta.contactTag = contactTag;
+          memberMeta.lastContactDate = new Date();
+        }
+        if (notes !== undefined) memberMeta.notes = notes;
+        if (engagementLevel) memberMeta.engagementLevel = engagementLevel;
+        if (pvcStatus) memberMeta.pvcStatus = pvcStatus;
+      }
+
+      await votingBloc.save();
+    }
 
     res.status(200).json({
       success: true,
@@ -1270,8 +1462,8 @@ export const getMemberMetadata = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Combine member data with metadata
-    const membersWithMetadata = votingBloc.memberDetails.map(member => {
+    // Combine platform members with metadata
+    const platformMembersWithMetadata = votingBloc.memberDetails.map(member => {
       const metadata = votingBloc.memberMetadata.find(meta => meta.userId === member.userId);
       return {
         _id: member.userId,
@@ -1279,6 +1471,7 @@ export const getMemberMetadata = async (req, res) => {
         email: member.email,
         phone: member.phone,
         countryCode: member.countryCode,
+        isManualMember: false,
         metadata: metadata || {
           joinDate: member.joinDate || new Date(),
           decisionTag: 'Undecided',
@@ -1291,9 +1484,37 @@ export const getMemberMetadata = async (req, res) => {
       };
     });
 
+    // Add manual members with their own structure
+    const manualMembersWithMetadata = (votingBloc.manualMembers || []).map((manualMember, index) => ({
+      _id: `manual_${index}_${Date.parse(manualMember.addedAt)}`,
+      name: `${manualMember.firstName} ${manualMember.lastName}`.trim(),
+      email: null,
+      phone: manualMember.phoneNumber,
+      countryCode: null,
+      isManualMember: true,
+      metadata: {
+        joinDate: manualMember.addedAt || new Date(),
+        decisionTag: manualMember.decisionTag || 'Undecided',
+        contactTag: manualMember.contactTag || 'No Response',
+        engagementLevel: manualMember.engagementLevel || 'Medium',
+        pvcStatus: manualMember.pvcStatus || 'Unregistered',
+        notes: manualMember.notes || '',
+        lastContactDate: manualMember.lastContactDate,
+        location: {
+          state: manualMember.state,
+          lga: manualMember.lga,
+          ward: manualMember.ward
+        },
+        memberType: 'manual'
+      }
+    }));
+
+    // Combine both types of members
+    const allMembersWithMetadata = [...platformMembersWithMetadata, ...manualMembersWithMetadata];
+
     res.status(200).json({
       success: true,
-      members: membersWithMetadata
+      members: allMembersWithMetadata
     });
   } catch (error) {
     console.error('Error fetching member metadata:', error);

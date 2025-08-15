@@ -15,14 +15,15 @@ import {
   ArrowLeft,
   Eye,
   BarChart3,
-  UserCheck,
+  // UserCheck,
   Send,
   MessageSquare,
   UserMinus,
   Mail,
   RotateCcw,
   Search,
-  Tag
+  Tag,
+  User
 } from "lucide-react";
 import {
   getVotingBlocById,
@@ -30,6 +31,7 @@ import {
   getMemberEngagement,
   getVotingBlocInvitations,
   sendMemberInvitation,
+  addManualMember,
   sendBroadcastMessage,
   removeMember,
   sendPrivateMessage,
@@ -48,6 +50,7 @@ import PrivateMessageModal from "../../../components/modals/PrivateMessageModal"
 import FlyerModal from "../../../components/modals/FlyerModal";
 
 import { formatPhoneForWhatsApp } from "../../../utils/phoneUtils";
+import { statesLGAWardList } from "../../../utils/StateLGAWard";
 
 export default function VotingBlocManagePage() {
   const { id } = useParams<{ id: string }>();
@@ -89,6 +92,8 @@ export default function VotingBlocManagePage() {
   const [showMemberTagModal, setShowMemberTagModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showFlyerModal, setShowFlyerModal] = useState(false);
+  const [showManualMemberModal, setShowManualMemberModal] = useState(false);
+  const [manualMemberLoading, setManualMemberLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -167,6 +172,28 @@ export default function VotingBlocManagePage() {
       throw error; // Re-throw to let modal handle loading state
     } finally {
       setInviteLoading(false);
+    }
+  };
+
+  const handleAddManualMember = async (memberData: {
+    name: string;
+    phone: string;
+    state: string;
+    lga: string;
+    ward?: string;
+  }) => {
+    try {
+      setManualMemberLoading(true);
+      await addManualMember(id!, memberData);
+      setToast({ message: "Manual member added successfully!", type: "success" });
+      setShowManualMemberModal(false);
+      await fetchVotingBloc(); // Refresh voting bloc data to get updated member count
+      await fetchMemberMetadata(); // Refresh member list to include new manual member
+    } catch (error) {
+      setToast({ message: "Failed to add manual member", type: "error" });
+      throw error; // Re-throw to let modal handle loading state
+    } finally {
+      setManualMemberLoading(false);
     }
   };
 
@@ -662,7 +689,7 @@ export default function VotingBlocManagePage() {
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                  Members ({votingBloc.members.length})
+                  Members ({votingBloc.metrics.totalMembers})
                 </h3>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                   <button
@@ -682,6 +709,15 @@ export default function VotingBlocManagePage() {
                     <UserPlus size={16} />
                     <span className="hidden sm:inline">Invite Members</span>
                     <span className="sm:hidden">Invite</span>
+                  </button>
+                  <button
+                    onClick={() => setShowManualMemberModal(true)}
+                    disabled={broadcastLoading || inviteLoading || privateMessageLoading || manualMemberLoading}
+                    className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <User size={16} />
+                    <span className="hidden sm:inline">Add Manual Member</span>
+                    <span className="sm:hidden">Add Manual</span>
                   </button>
                 </div>
               </div>
@@ -883,9 +919,15 @@ export default function VotingBlocManagePage() {
                               Creator
                             </span>
                           )}
+                          {member.isManualMember && (
+                            <span className="flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full flex-shrink-0">
+                              <UserPlus size={8} className="sm:w-2.5 sm:h-2.5" />
+                              Manual
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs sm:text-sm text-gray-500 mb-2 break-all">
-                          {member.email || 'No email provided'}
+                          {member.isManualMember ? 'Offline member' : (member.email || 'No email provided')}
                         </div>
 
                         {/* Phone Number */}
@@ -946,55 +988,77 @@ export default function VotingBlocManagePage() {
                       <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 flex-shrink-0">
                         {member._id !== votingBloc?.creator._id && (
                           <>
-                            <button
-                              onClick={() => {
-                                setEditingMember(member);
-                                setShowMemberTagModal(true);
-                              }}
-                              className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg"
-                              title="Edit Member Tags"
-                            >
-                              <Tag size={14} className="sm:w-4 sm:h-4" />
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setSelectedMember(member);
-                                setShowPrivateMessageModal(true);
-                              }}
-                              disabled={broadcastLoading || inviteLoading || privateMessageLoading}
-                              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Send Private Message"
-                            >
-                              <MessageSquare size={14} className="sm:w-4 sm:h-4" />
-                            </button>
-
-                            {member.phone && (
+                            <div className="flex flex-col gap-1 items-center">
                               <button
-                                onClick={() => openWhatsAppChat(member.phone, member.countryCode)}
-                                className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg"
-                                title="Chat on WhatsApp"
+                                onClick={() => {
+                                  setEditingMember(member);
+                                  setShowMemberTagModal(true);
+                                }}
+                                className="text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg"
+                                title="Edit Member Tags"
                               >
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.886 3.488" />
-                                </svg>
+                                <Tag size={14} className="sm:w-4 sm:h-4" />
                               </button>
+                              <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                                Edit Tags
+                              </span>
+                            </div>
+
+                            {!member.isManualMember && (
+                              <div className="flex flex-col gap-1 items-center">
+                                <button
+                                  onClick={() => {
+                                    setSelectedMember(member);
+                                    setShowPrivateMessageModal(true);
+                                  }}
+                                  disabled={broadcastLoading || inviteLoading || privateMessageLoading}
+                                  className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Send Private Message"
+                                >
+                                  <MessageSquare size={14} className="sm:w-4 sm:h-4" />
+                                </button>
+                                <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                                  Send Message
+                                </span>
+                              </div>
                             )}
 
-                            <button
-                              onClick={() => {
-                                setSelectedMember(member);
-                                setShowRemoveConfirm(true);
-                              }}
-                              disabled={broadcastLoading || inviteLoading || privateMessageLoading || actionLoading}
-                              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Remove Member"
-                            >
-                              <UserMinus size={14} className="sm:w-4 sm:h-4" />
-                            </button>
+                            {member.phone && (
+                              <div className="flex flex-col gap-1 items-center">
+                                <button
+                                  onClick={() => openWhatsAppChat(member.phone, member.countryCode)}
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg"
+                                  title="Chat on WhatsApp"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.886 3.488" />
+                                  </svg>
+                                </button>
+                                <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                                  WhatsApp
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="flex flex-col gap-1 items-center">
+                              <button
+                                onClick={() => {
+                                  setSelectedMember(member);
+                                  setShowRemoveConfirm(true);
+                                }}
+                                disabled={broadcastLoading || inviteLoading || privateMessageLoading || actionLoading}
+                                className=" text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Remove Member"
+                              >
+                                <UserMinus size={14} className="sm:w-4 sm:h-4" />
+                              </button>
+                              <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                                Delete
+                              </span>
+                            </div>
                           </>
                         )}
-                        <UserCheck className="text-green-500" size={14} />
+                        {/* <UserCheck className="text-green-500" size={14} /> */}
                       </div>
                     </div>
                   ))}
@@ -1446,12 +1510,22 @@ export default function VotingBlocManagePage() {
         loading={inviteLoading}
       />
 
+      {/* Manual Member Modal */}
+      {showManualMemberModal && (
+        <ManualMemberModal
+          isOpen={showManualMemberModal}
+          onClose={() => !manualMemberLoading && setShowManualMemberModal(false)}
+          onAdd={handleAddManualMember}
+          loading={manualMemberLoading}
+        />
+      )}
+
       {/* Broadcast Message Modal */}
       <BroadcastMessageModal
         isOpen={showBroadcastModal}
         onClose={() => !broadcastLoading && setShowBroadcastModal(false)}
         onSend={handleBroadcastMessage}
-        memberCount={votingBloc?.members.length || 0}
+        memberCount={membersWithMetadata.filter(member => !member.isManualMember).length}
         loading={broadcastLoading}
       />
 
@@ -1578,8 +1652,8 @@ export default function VotingBlocManagePage() {
                   type="submit"
                   disabled={updateTagsLoading}
                   className={`px-4 py-2 text-white rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 ${updateTagsLoading
-                      ? 'bg-green-400 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700'
+                    ? 'bg-green-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
                     }`}
                 >
                   {updateTagsLoading && (
@@ -1634,6 +1708,251 @@ export default function VotingBlocManagePage() {
               Watch Tutorial
             </a>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Manual Member Modal Component
+interface ManualMemberModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (data: {
+    name: string;
+    phone: string;
+    state: string;
+    lga: string;
+    ward?: string;
+  }) => Promise<void>;
+  loading: boolean;
+}
+
+function ManualMemberModal({ isOpen, onClose, onAdd, loading }: ManualMemberModalProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    state: '',
+    lga: '',
+    ward: ''
+  });
+
+  const [availableLGAs, setAvailableLGAs] = useState<any[]>([]);
+  const [availableWards, setAvailableWards] = useState<any[]>([]);
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        name: '',
+        phone: '',
+        state: '',
+        lga: '',
+        ward: ''
+      });
+      setAvailableLGAs([]);
+      setAvailableWards([]);
+    }
+  }, [isOpen]);
+
+  // Update LGAs when state changes
+  useEffect(() => {
+    if (formData.state) {
+      const selectedState = statesLGAWardList.find(s => s.state === formData.state);
+      if (selectedState) {
+        setAvailableLGAs(selectedState.lgas);
+        setFormData(prev => ({ ...prev, lga: '', ward: '' }));
+        setAvailableWards([]);
+      }
+    }
+  }, [formData.state]);
+
+  // Update wards when LGA changes
+  useEffect(() => {
+    if (formData.lga && availableLGAs.length > 0) {
+      const selectedLGA = availableLGAs.find(l => l.lga === formData.lga);
+      if (selectedLGA) {
+        setAvailableWards(selectedLGA.wards || []);
+        setFormData(prev => ({ ...prev, ward: '' }));
+      }
+    }
+  }, [formData.lga, availableLGAs]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim() || !formData.phone.trim() || !formData.state || !formData.lga) {
+      return;
+    }
+
+    try {
+      await onAdd({
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        state: formData.state,
+        lga: formData.lga,
+        ward: formData.ward || undefined
+      });
+    } catch (error) {
+      // Error handled by parent component
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Add Manual Member</h2>
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-sm text-orange-700">
+              <strong>Manual Members:</strong> For voters without smartphones/internet access.
+              They won't receive digital messages but can be managed through member tags and notes.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              {/* Name Field */}
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  placeholder="Enter full name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Phone Field */}
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  placeholder="e.g., 08012345678"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              {/* State Field */}
+              <div>
+                <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                  State *
+                </label>
+                <select
+                  id="state"
+                  value={formData.state}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  required
+                  disabled={loading}
+                >
+                  <option value="">Select State</option>
+                  {statesLGAWardList.map((state) => (
+                    <option key={state.state} value={state.state}>
+                      {state.state}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* LGA Field */}
+              <div>
+                <label htmlFor="lga" className="block text-sm font-medium text-gray-700 mb-1">
+                  Local Government Area (LGA) *
+                </label>
+                <select
+                  id="lga"
+                  value={formData.lga}
+                  onChange={(e) => handleInputChange('lga', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  required
+                  disabled={loading || !formData.state}
+                >
+                  <option value="">Select LGA</option>
+                  {availableLGAs.map((lga) => (
+                    <option key={lga.lga} value={lga.lga}>
+                      {lga.lga.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ward Field */}
+              <div>
+                <label htmlFor="ward" className="block text-sm font-medium text-gray-700 mb-1">
+                  Ward (Optional)
+                </label>
+                <select
+                  id="ward"
+                  value={formData.ward}
+                  onChange={(e) => handleInputChange('ward', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  disabled={loading || !formData.lga}
+                >
+                  <option value="">Select Ward (Optional)</option>
+                  {availableWards.map((ward) => (
+                    <option key={ward as string} value={ward as string}>
+                      {(ward as string).replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !formData.name.trim() || !formData.phone.trim() || !formData.state || !formData.lga}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Adding...
+                  </>
+                ) : (
+                  'Add Member'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
