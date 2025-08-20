@@ -18,6 +18,7 @@ import {
   UserCheck,
   Bell,
   RefreshCw,
+  MapPin,
 } from "lucide-react";
 import TopLogo from "../../components/TopLogo";
 import Loading from "../../components/Loader";
@@ -43,6 +44,7 @@ import AdminDefaultVotingBlocPage from "./admin/AdminDefaultVotingBlocPage";
 import AdminTemplateSyncPage from "./admin/AdminTemplateSyncPage";
 import AdminUserManagement from "./admin/AdminUserManagement";
 import AllNotificationsPage from "./notifications/AllNotificationsPage";
+import StateDashboard from "./state/StateDashboard";
 // Sidebar menu items type
 interface NavItem {
   title: string;
@@ -128,6 +130,26 @@ export default function DashboardPage() {
     }
   }
 
+  // Check if user is a coordinator
+  const isCoordinator = profile?.designation && [
+    'National Coordinator',
+    'State Coordinator',
+    'LGA Coordinator',
+    'Ward Coordinator'
+  ].includes(profile.designation);
+
+  // Debug logging for coordinator check
+  // useEffect(() => {
+  //   if (profile) {
+  //     console.log('🔍 Coordinator check:', {
+  //       designation: profile.designation,
+  //       isCoordinator,
+  //       role: profile.role,
+  //       shouldShowStateDashboard: profile.role === 'admin' || isCoordinator
+  //     });
+  //   }
+  // }, [profile, isCoordinator]); 
+
   const sidebarItems: NavItem[] = [
     {
       title: "Overview",
@@ -141,6 +163,10 @@ export default function DashboardPage() {
       children: [
         { title: "Your Voting Bloc", icon: <Flag size={20} />, onClick: handleGoToAutoVotingBloc },
         { title: "Leaderboard", icon: <BarChart3 size={20} />, component: <LeaderboardPage /> },
+        // State Dashboard - only visible to admin and coordinators
+        ...(profile?.role === 'admin' || isCoordinator ? [
+          { title: "State Dashboard", icon: <MapPin size={20} />, component: <StateDashboard /> }
+        ] : []),
         { title: "Citizens Organizing School", icon: <BookOpen size={20} />, component: <CitizensOrganizingSchool /> },
       ],
     },

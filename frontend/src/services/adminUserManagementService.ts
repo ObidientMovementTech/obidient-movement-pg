@@ -34,6 +34,13 @@ interface BulkActionData {
   emailVerified?: boolean;
 }
 
+interface UserDesignationUpdate {
+  designation: string;
+  assignedState?: string | null;
+  assignedLGA?: string | null;
+  assignedWard?: string | null;
+}
+
 export const adminUserManagementService = {
   // Get all users with pagination and filters (OPTIMIZED)
   async getAllUsers(params: Record<string, any> = {}) {
@@ -158,6 +165,14 @@ export const adminUserManagementService = {
 
   async getUnverifiedUsersStats() {
     const response = await axios.get(`${API_BASE}/admin/user-management/users/unverified/stats`, {
+      withCredentials: true
+    });
+    return response.data;
+  },
+
+  // Update user designation and assignment
+  async updateUserDesignation(userId: string, updateData: UserDesignationUpdate) {
+    const response = await axios.put(`${API_BASE}/admin/user-management/users/${userId}/designation`, updateData, {
       withCredentials: true
     });
     return response.data;

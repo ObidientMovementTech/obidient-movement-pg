@@ -17,6 +17,7 @@ import evaluationRoutes from './routes/evaluation.route.js';
 import kycRoutes from './routes/kyc.route.js';
 import votingBlocRoutes from './routes/votingBloc.route.js';
 import imageProxyRoutes from './routes/imageProxy.route.js';
+import stateDashboardRoutes from './routes/stateDashboard.routes.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -67,6 +68,7 @@ app.use('/evaluation', evaluationRoutes)
 app.use('/kyc', kycRoutes);
 app.use('/voting-blocs', votingBlocRoutes);
 app.use('/api', imageProxyRoutes); // Image proxy route
+app.use('/state-dashboard', stateDashboardRoutes); // State Dashboard routes
 
 // Placeholder route
 app.get('/', (req, res) => {

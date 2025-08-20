@@ -24,6 +24,7 @@ export const registerUser = async (req, res) => {
       countryCode,
       votingState,
       votingLGA,
+      votingWard, // Add support for voting ward
       pendingVotingBlocJoin // New field for voting bloc join info
     } = req.body;
 
@@ -87,7 +88,7 @@ export const registerUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-      
+
       return res.status(409).json({
         success: false,
         message: 'An account with this email address already exists. Please use a different email or try logging in.',
@@ -106,7 +107,7 @@ export const registerUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-      
+
       return res.status(409).json({
         success: false,
         message: 'An account with this phone number already exists. Please use a different phone number.',
@@ -138,6 +139,9 @@ export const registerUser = async (req, res) => {
     }
     if (votingLGA) {
       userData.votingLGA = votingLGA;
+    }
+    if (votingWard) {
+      userData.votingWard = votingWard;
     }
 
     const newUser = await User.create(userData);
@@ -210,7 +214,7 @@ export const registerUser = async (req, res) => {
       userAgent: req.get('User-Agent'),
       timestamp: new Date().toISOString()
     });
-    
+
     console.error('Register error:', error);
 
     // Handle specific database errors
@@ -282,7 +286,7 @@ export const loginUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-      
+
       return res.status(401).json({
         success: false,
         message: "No account found with this email address. Please check your email or sign up for a new account.",
@@ -300,7 +304,7 @@ export const loginUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-      
+
       return res.status(403).json({
         success: false,
         message: "Please verify your email address before logging in. Check your inbox for a verification email.",
@@ -320,7 +324,7 @@ export const loginUser = async (req, res) => {
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
       });
-      
+
       return res.status(401).json({
         success: false,
         message: "Incorrect password. Please check your password and try again.",
@@ -395,7 +399,7 @@ export const loginUser = async (req, res) => {
       userAgent: req.get('User-Agent'),
       timestamp: new Date().toISOString()
     });
-    
+
     console.error("Login error:", error);
     return res.status(500).json({
       success: false,
@@ -526,6 +530,12 @@ export const getCurrentUser = async (req, res) => {
       votingWard: user.votingWard,
       isVoter: user.isVoter,
       willVote: user.willVote,
+
+      // Designation and assignment fields
+      designation: user.designation,
+      assignedState: user.assignedState,
+      assignedLGA: user.assignedLGA,
+      assignedWard: user.assignedWard,
 
       // Legacy nested structure (for backward compatibility)
       personalInfo: user.personalInfo || {},

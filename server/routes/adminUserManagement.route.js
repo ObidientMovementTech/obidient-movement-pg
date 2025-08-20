@@ -47,5 +47,8 @@ router.get('/users/unverified/stats', adminUserManagementController.getUnverifie
 router.post('/users/:userId/resend-verification', adminUserManagementController.resendVerificationEmail);
 router.post('/users/resend-all-verification', adminUserManagementController.resendAllVerificationEmails);
 
+// Update user designation and assignment
+router.put('/users/:userId/designation', adminUserManagementController.updateUserDesignation);
+
 
 export default router;

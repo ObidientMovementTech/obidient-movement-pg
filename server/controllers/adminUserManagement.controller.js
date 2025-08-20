@@ -72,6 +72,7 @@ export const adminUserManagementController = {
         SELECT 
           u.id, u.name, u.email, u.phone, u.role, u."emailVerified", u."kycStatus",
           u."profileImage", u."countryOfResidence", u."votingState", u."votingLGA",
+          u.designation, u."assignedState", u."assignedLGA", u."assignedWard",
           u."createdAt", u."updatedAt"
         FROM users u
         ${whereClause}
@@ -1310,6 +1311,94 @@ export const adminUserManagementController = {
       res.status(500).json({
         success: false,
         message: 'Failed to get unverified users statistics',
+        error: error.message
+      });
+    }
+  },
+
+  // Update user designation and assignment
+  async updateUserDesignation(req, res) {
+    try {
+      const { userId } = req.params;
+      const { designation, assignedState, assignedLGA, assignedWard } = req.body;
+
+      // Validate designation
+      const validDesignations = [
+        'National Coordinator',
+        'State Coordinator',
+        'LGA Coordinator',
+        'Ward Coordinator',
+        'Polling Unit Agent',
+        'Vote Defender',
+        'Community Member'
+      ];
+
+      if (!designation || !validDesignations.includes(designation)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid designation provided'
+        });
+      }
+
+      // Validate assignment requirements based on designation
+      if (designation === 'State Coordinator' && !assignedState) {
+        return res.status(400).json({
+          success: false,
+          message: 'State Coordinator requires an assigned state'
+        });
+      }
+
+      if (designation === 'LGA Coordinator' && (!assignedState || !assignedLGA)) {
+        return res.status(400).json({
+          success: false,
+          message: 'LGA Coordinator requires assigned state and LGA'
+        });
+      }
+
+      if (designation === 'Ward Coordinator' && (!assignedState || !assignedLGA || !assignedWard)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ward Coordinator requires assigned state, LGA, and ward'
+        });
+      }
+
+      // Check if user exists
+      const userResult = await query('SELECT id, name FROM users WHERE id = $1', [userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Update user designation and assignment
+      const updateResult = await query(
+        `UPDATE users 
+         SET designation = $1, 
+             "assignedState" = $2, 
+             "assignedLGA" = $3, 
+             "assignedWard" = $4,
+             "updatedAt" = NOW()
+         WHERE id = $5
+         RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard"`,
+        [designation, assignedState, assignedLGA, assignedWard, userId]
+      );
+
+      const updatedUser = updateResult.rows[0];
+
+      res.json({
+        success: true,
+        message: `Successfully updated designation for ${updatedUser.name}`,
+        data: {
+          user: updatedUser
+        }
+      });
+
+    } catch (error) {
+      console.error('Update user designation error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update user designation',
         error: error.message
       });
     }

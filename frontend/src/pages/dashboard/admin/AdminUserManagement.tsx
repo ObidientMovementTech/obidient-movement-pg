@@ -4,10 +4,12 @@ import {
   Search,
   // Plus, 
   Trash2, Shield, ShieldOff,
-  CheckCircle, XCircle, UserCheck, UserX, Eye, Loader2, X, AlertTriangle, Mail, Send
+  CheckCircle, XCircle, UserCheck, UserX, Loader2, X, AlertTriangle, Mail, Send,
+  Edit3
 } from 'lucide-react';
 import { adminUserManagementService } from '../../../services/adminUserManagementService';
 import { adminMaintenanceService } from '../../../services/adminMaintenanceService';
+import { statesLGAWardList } from '../../../utils/StateLGAWard';
 
 interface User {
   id: string;
@@ -21,6 +23,10 @@ interface User {
   countryOfResidence?: string;
   votingState?: string;
   votingLGA?: string;
+  designation?: string;
+  assignedState?: string;
+  assignedLGA?: string;
+  assignedWard?: string;
   createdAt: string;
   updatedAt: string;
   firstName?: string;
@@ -47,6 +53,28 @@ interface UserStats {
 interface UnverifiedStats {
   count: number;
   recentSignups: number; // Last 7 days
+}
+
+// Designation constants
+const DESIGNATIONS = {
+  NATIONAL_COORDINATOR: 'National Coordinator',
+  STATE_COORDINATOR: 'State Coordinator',
+  LGA_COORDINATOR: 'LGA Coordinator',
+  WARD_COORDINATOR: 'Ward Coordinator',
+  POLLING_UNIT_AGENT: 'Polling Unit Agent',
+  VOTE_DEFENDER: 'Vote Defender',
+  COMMUNITY_MEMBER: 'Community Member'
+} as const;
+
+// Edit user modal interface
+interface EditUserModal {
+  isOpen: boolean;
+  user: User | null;
+  designation: string;
+  assignedState: string;
+  assignedLGA: string;
+  assignedWard: string;
+  loading: boolean;
 }
 
 // Confirmation modal interface
@@ -113,6 +141,17 @@ export default function AdminUserManagement() {
     confirmStyle: 'primary',
     onConfirm: () => { },
     onCancel: () => { },
+    loading: false
+  });
+
+  // Edit user modal state
+  const [editModal, setEditModal] = useState<EditUserModal>({
+    isOpen: false,
+    user: null,
+    designation: '',
+    assignedState: '',
+    assignedLGA: '',
+    assignedWard: '',
     loading: false
   });
 
@@ -438,6 +477,66 @@ export default function AdminUserManagement() {
         }
       }
     });
+  };
+
+  // Edit user functions
+  const openEditModal = (user: User) => {
+    setEditModal({
+      isOpen: true,
+      user,
+      designation: user.designation || DESIGNATIONS.COMMUNITY_MEMBER,
+      assignedState: user.assignedState || '',
+      assignedLGA: user.assignedLGA || '',
+      assignedWard: user.assignedWard || '',
+      loading: false
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditModal({
+      isOpen: false,
+      user: null,
+      designation: '',
+      assignedState: '',
+      assignedLGA: '',
+      assignedWard: '',
+      loading: false
+    });
+  };
+
+  const handleSaveUserDesignation = async () => {
+    if (!editModal.user) return;
+
+    setEditModal(prev => ({ ...prev, loading: true }));
+
+    try {
+      await adminUserManagementService.updateUserDesignation(editModal.user.id, {
+        designation: editModal.designation,
+        assignedState: editModal.assignedState || null,
+        assignedLGA: editModal.assignedLGA || null,
+        assignedWard: editModal.assignedWard || null
+      });
+
+      // Update the user in the local state
+      setUsers(prev => prev.map(user =>
+        user.id === editModal.user!.id
+          ? {
+            ...user,
+            designation: editModal.designation,
+            assignedState: editModal.assignedState || undefined,
+            assignedLGA: editModal.assignedLGA || undefined,
+            assignedWard: editModal.assignedWard || undefined
+          }
+          : user
+      ));
+
+      closeEditModal();
+      setSuccess(`Successfully updated designation for ${editModal.user.name}`);
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to update user designation');
+    } finally {
+      setEditModal(prev => ({ ...prev, loading: false }));
+    }
   };
 
   const handleCleanupDuplicateAutoBlocs = async () => {
@@ -1235,11 +1334,11 @@ export default function AdminUserManagement() {
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => alert(`User details for ${user.name} - coming soon!`)}
-                            className="text-gray-400 hover:text-gray-600"
-                            title="View Details"
+                            onClick={() => openEditModal(user)}
+                            className="text-blue-600 hover:text-blue-700"
+                            title="Edit User"
                           >
-                            <Eye size={16} />
+                            <Edit3 size={16} />
                           </button>
 
                           {user.role === 'admin' ? (
@@ -1430,6 +1529,221 @@ export default function AdminUserManagement() {
           </div>
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {editModal.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={closeEditModal}
+            />
+
+            {/* Modal positioning */}
+            <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
+
+            {/* Modal content */}
+            <div className="relative inline-block transform overflow-hidden rounded-lg bg-white px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:p-6 sm:align-middle">
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                  Edit User: {editModal.user?.name}
+                </h3>
+                <button
+                  onClick={closeEditModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* User Info Display */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    {editModal.user?.profileImage ? (
+                      <img
+                        src={editModal.user.profileImage}
+                        alt={editModal.user.name}
+                        className="h-12 w-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-full bg-gray-300 flex items-center justify-center">
+                        <Users size={24} className="text-gray-600" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-gray-900">{editModal.user?.name}</p>
+                      <p className="text-sm text-gray-500">{editModal.user?.email}</p>
+                      <p className="text-sm text-gray-500">
+                        Voting Location: {editModal.user?.votingState || 'N/A'} • {editModal.user?.votingLGA || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Designation Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Designation
+                  </label>
+                  <select
+                    value={editModal.designation}
+                    onChange={(e) => {
+                      const newDesignation = e.target.value;
+                      setEditModal(prev => ({
+                        ...prev,
+                        designation: newDesignation,
+                        // Clear assignment fields when changing designation
+                        assignedState: '',
+                        assignedLGA: '',
+                        assignedWard: ''
+                      }));
+                    }}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    {Object.values(DESIGNATIONS).map(designation => (
+                      <option key={designation} value={designation}>
+                        {designation}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Assignment Fields - Show based on designation */}
+                {(editModal.designation === DESIGNATIONS.STATE_COORDINATOR ||
+                  editModal.designation === DESIGNATIONS.LGA_COORDINATOR ||
+                  editModal.designation === DESIGNATIONS.WARD_COORDINATOR) && (
+                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
+                      <h4 className="text-sm font-medium text-blue-900">Assignment Location</h4>
+
+                      {/* State Selection */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Assigned State
+                        </label>
+                        <select
+                          value={editModal.assignedState}
+                          onChange={(e) => {
+                            setEditModal(prev => ({
+                              ...prev,
+                              assignedState: e.target.value,
+                              assignedLGA: '', // Reset LGA when state changes
+                              assignedWard: '' // Reset ward when state changes
+                            }));
+                          }}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select State</option>
+                          {statesLGAWardList.map(state => (
+                            <option key={state.state} value={state.state}>
+                              {state.state}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* LGA Selection - Show for LGA and Ward coordinators */}
+                      {(editModal.designation === DESIGNATIONS.LGA_COORDINATOR ||
+                        editModal.designation === DESIGNATIONS.WARD_COORDINATOR) && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Assigned LGA
+                            </label>
+                            <select
+                              value={editModal.assignedLGA}
+                              onChange={(e) => {
+                                setEditModal(prev => ({
+                                  ...prev,
+                                  assignedLGA: e.target.value,
+                                  assignedWard: '' // Reset ward when LGA changes
+                                }));
+                              }}
+                              disabled={!editModal.assignedState}
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                            >
+                              <option value="">Select LGA</option>
+                              {editModal.assignedState &&
+                                statesLGAWardList
+                                  .find(s => s.state === editModal.assignedState)
+                                  ?.lgas.map(lga => (
+                                    <option key={lga.lga} value={lga.lga}>
+                                      {lga.lga}
+                                    </option>
+                                  ))
+                              }
+                            </select>
+                          </div>
+                        )}
+
+                      {/* Ward Selection - Show only for Ward coordinators */}
+                      {editModal.designation === DESIGNATIONS.WARD_COORDINATOR && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Assigned Ward
+                          </label>
+                          <select
+                            value={editModal.assignedWard}
+                            onChange={(e) => {
+                              setEditModal(prev => ({
+                                ...prev,
+                                assignedWard: e.target.value
+                              }));
+                            }}
+                            disabled={!editModal.assignedLGA}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                          >
+                            <option value="">Select Ward</option>
+                            {editModal.assignedState && editModal.assignedLGA &&
+                              statesLGAWardList
+                                .find(s => s.state === editModal.assignedState)
+                                ?.lgas.find(l => l.lga === editModal.assignedLGA)
+                                ?.wards.map(ward => (
+                                  <option key={ward} value={ward}>
+                                    {ward}
+                                  </option>
+                                ))
+                            }
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="text-sm text-blue-600">
+                        {editModal.designation === DESIGNATIONS.STATE_COORDINATOR &&
+                          "This coordinator will have access to all LGAs and wards in the assigned state."}
+                        {editModal.designation === DESIGNATIONS.LGA_COORDINATOR &&
+                          "This coordinator will have access to all wards in the assigned LGA."}
+                        {editModal.designation === DESIGNATIONS.WARD_COORDINATOR &&
+                          "This coordinator will have access only to the assigned ward."}
+                      </div>
+                    </div>
+                  )}
+              </div>
+
+              {/* Modal Actions */}
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  disabled={editModal.loading}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveUserDesignation}
+                  disabled={editModal.loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                >
+                  {editModal.loading && <Loader2 size={16} className="animate-spin mr-2" />}
+                  {editModal.loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       <ConfirmationModalComponent />
