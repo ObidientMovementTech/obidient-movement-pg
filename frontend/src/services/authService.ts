@@ -10,6 +10,7 @@ export const registerUser = async (data: {
   countryCode?: string;
   votingState?: string;
   votingLGA?: string;
+  votingWard?: string;
   country?: string;
   isDiaspora?: boolean;
   pendingVotingBlocJoin?: {

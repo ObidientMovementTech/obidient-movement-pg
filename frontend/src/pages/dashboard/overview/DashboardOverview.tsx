@@ -265,12 +265,12 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
                   <Vote size={24} className="text-white" />
                 </div>
                 <span className="text-white/90 text-sm font-medium uppercase tracking-wider">
-                  Take Action Now
+                  Take Action in <span className="text-[#8cc63f]">{profile?.votingState || profile?.personalInfo?.voting_engagement_state || 'Your'} State</span>
                 </span>
               </div>
 
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
-                Mobilize your <span className="text-[#8cc63f]">Polling Unit</span>
+                Mobilize your <span className="text-[#8cc63f]">Polling Unit</span> in <span className="text-[#8cc63f]">{profile?.votingLGA || profile?.personalInfo?.lga || 'Your'} LGA</span>
                 <br />
                 <span className="text-lg md:text-xl lg:text-2xl font-normal text-white/90">
                   Unite voices, drive change

@@ -18,6 +18,10 @@ class User {
       votingState = null,
       votingLGA = null,
       votingWard = null,
+      designation = 'Community Member',
+      assignedState = null,
+      assignedLGA = null,
+      assignedWard = null,
       gender = null,
       ageRange = null,
       citizenship = null,
@@ -37,13 +41,14 @@ class User {
         `INSERT INTO users (
           name, email, phone, "passwordHash", "profileImage", 
           "emailVerified", role, "votingState", "votingLGA", "votingWard",
+          designation, "assignedState", "assignedLGA", "assignedWard",
           gender, "ageRange", citizenship, "isVoter", "willVote",
           "userName", "countryCode", "stateOfOrigin"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) 
         RETURNING *`,
         [name, email, phone, passwordHash, profileImage, emailVerified, role,
-          votingState, votingLGA, votingWard, gender, ageRange, citizenship,
-          isVoter, willVote, userName, countryCode, stateOfOrigin]
+          votingState, votingLGA, votingWard, designation, assignedState, assignedLGA, assignedWard,
+          gender, ageRange, citizenship, isVoter, willVote, userName, countryCode, stateOfOrigin]
       );
 
       const user = userResult.rows[0];
@@ -134,7 +139,7 @@ class User {
                      "countryOfResidence", "createdAt", "updatedAt", "votingState", "votingLGA",
                      "votingWard", gender, "ageRange", citizenship, "isVoter", "willVote",
                      "userName", "countryCode", "stateOfOrigin", lga, ward, "votingEngagementState",
-                     "profileCompletionPercentage"`;
+                     "profileCompletionPercentage", designation, "assignedState", "assignedLGA", "assignedWard"`;
     }
 
     const result = await query(`SELECT ${selectFields} FROM users WHERE id = $1`, [id]);
@@ -207,7 +212,7 @@ class User {
       }
 
       // Handle direct user fields
-      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA'];
+      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA', 'designation', 'assignedState', 'assignedLGA', 'assignedWard'];
       directFields.forEach(field => {
         if (updateData[field] !== undefined) {
           fieldsToUpdate.push(`"${field}" = $${paramCount}`);
@@ -249,7 +254,9 @@ class User {
       'hasTakenCauseSurvey', 'countryOfResidence',
       // Add all the new profile fields
       'votingState', 'votingLGA', 'votingWard', 'gender', 'ageRange', 'citizenship',
-      'isVoter', 'willVote', 'userName', 'countryCode', 'stateOfOrigin'
+      'isVoter', 'willVote', 'userName', 'countryCode', 'stateOfOrigin',
+      // Add designation fields
+      'designation', 'assignedState', 'assignedLGA', 'assignedWard'
     ];
 
     updatableFields.forEach(field => {

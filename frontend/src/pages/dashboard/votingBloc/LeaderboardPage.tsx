@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { Trophy, Users, TrendingUp, MapPin, Filter, Medal, Crown, Award } from "lucide-react";
+import { Trophy, 
+  // Users, 
+  TrendingUp, MapPin, Filter, Medal, Crown, Award } from "lucide-react";
 import { getLeaderboard } from "../../../services/votingBlocService";
 import { LeaderboardEntry } from "../../../types/votingBloc";
 import { statesLGAWardList } from "../../../utils/StateLGAWard";
@@ -18,17 +20,17 @@ export default function LeaderboardPage() {
   const [displayCount, setDisplayCount] = useState(50); // Initially show 50 items
 
   // Memoized calculations for performance
-  const stats = useMemo(() => {
-    const totalBlocs = leaderboard.length;
-    const totalMembers = leaderboard.reduce((sum, entry) => sum + entry.metrics.totalMembers, 0);
-    const topPerformer = leaderboard[0];
+  // const stats = useMemo(() => {
+  //   const totalBlocs = leaderboard.length;
+  //   const totalMembers = leaderboard.reduce((sum, entry) => sum + entry.metrics.totalMembers, 0);
+  //   const topPerformer = leaderboard[0];
 
-    return {
-      totalBlocs,
-      totalMembers,
-      topPerformer
-    };
-  }, [leaderboard]);
+  //   return {
+  //     totalBlocs,
+  //     totalMembers,
+  //     topPerformer
+  //   };
+  // }, [leaderboard]);
 
   // Memoized displayed leaderboard for virtual scrolling
   const displayedLeaderboard = useMemo(() => {
@@ -219,7 +221,7 @@ export default function LeaderboardPage() {
       </div>
 
       {/* Stats Summary */}
-      {stats.totalBlocs > 0 && (
+      {/* {stats.totalBlocs > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <div className="flex items-center gap-3 mb-2">
@@ -272,7 +274,7 @@ export default function LeaderboardPage() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Leaderboard */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

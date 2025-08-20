@@ -80,6 +80,12 @@ export interface UserProfile {
   willVote?: string;
   countryCode?: string;
 
+  // Coordinator designation fields
+  designation?: string;
+  assignedState?: string;
+  assignedLGA?: string;
+  assignedWard?: string;
+
   // Existing fields
   selfieImageUrl?: string;
   validID: ValidID;
@@ -124,6 +130,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       const res = await axios.get(`${API_BASE}/auth/me`, {
         withCredentials: true,
+      });
+      console.log('👤 User profile loaded:', {
+        name: res.data.user.name,
+        designation: res.data.user.designation,
+        assignedState: res.data.user.assignedState,
+        role: res.data.user.role
       });
       setProfile(res.data.user);
     } catch (err) {

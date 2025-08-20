@@ -9,6 +9,7 @@ import ErrorPage from "./pages/ErrorPage.tsx";
 // Auth
 import AuthPage from "./pages/auth/page.tsx";
 import GetStartedPage from "./pages/auth/GetStartedPage.tsx";
+import AnambraSignupPage from "./pages/auth/AnambraSignupPage.tsx";
 import VerificationPage from "./pages/auth/VerificationPage.tsx";
 import LoginPage from "./pages/auth/LoginPage.tsx";
 import ResendVerification from "./pages/auth/ResendPage.tsx";
@@ -63,6 +64,16 @@ const router = createBrowserRouter([
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "change-password", element: <ChangePassword /> },
       { path: "confirm-email/:token", element: <ConfirmEmailPage /> },
+    ],
+  },
+  {
+    path: "/anambra",
+    element: (
+      <UserProvider>
+        <AuthPage />
+      </UserProvider>),
+    children: [
+      { path: "sign-up", element: <AnambraSignupPage /> },
     ],
   },
   {
