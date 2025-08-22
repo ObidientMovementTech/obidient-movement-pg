@@ -5,11 +5,12 @@ import {
   // Plus, 
   Trash2, Shield, ShieldOff,
   CheckCircle, XCircle, UserCheck, UserX, Loader2, X, AlertTriangle, Mail, Send,
-  Edit3
+  Edit3, Key
 } from 'lucide-react';
 import { adminUserManagementService } from '../../../services/adminUserManagementService';
 import { adminMaintenanceService } from '../../../services/adminMaintenanceService';
 import { statesLGAWardList } from '../../../utils/StateLGAWard';
+import MonitorKeyAssignmentModal from '../../../components/MonitorKeyAssignmentModal';
 
 interface User {
   id: string;
@@ -131,6 +132,12 @@ export default function AdminUserManagement() {
     [key: string]: boolean;
   }>({});
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
+  // Monitor key modal state
+  const [monitorKeyModal, setMonitorKeyModal] = useState<{
+    isOpen: boolean;
+    user: User | null;
+  }>({ isOpen: false, user: null });
 
   // Confirmation modal state
   const [confirmationModal, setConfirmationModal] = useState<ConfirmationModal>({
@@ -570,6 +577,20 @@ export default function AdminUserManagement() {
         }
       }
     });
+  };
+
+  // Monitor Key Assignment handlers
+  const handleOpenMonitorKeyModal = (user: User) => {
+    setMonitorKeyModal({ isOpen: true, user });
+  };
+
+  const handleCloseMonitorKeyModal = () => {
+    setMonitorKeyModal({ isOpen: false, user: null });
+  };
+
+  const handleMonitorKeySuccess = () => {
+    setSuccess('Monitor key assigned successfully');
+    loadUsers(); // Refresh the user list
   };
 
   const handleBulkAction = async () => {
@@ -1412,6 +1433,15 @@ export default function AdminUserManagement() {
                             </>
                           )}
 
+                          {/* Monitor Key Assignment Button */}
+                          <button
+                            onClick={() => handleOpenMonitorKeyModal(user)}
+                            className="text-indigo-600 hover:text-indigo-700 disabled:opacity-50 relative"
+                            title="Assign Monitor Key"
+                          >
+                            <Key size={16} />
+                          </button>
+
                           <button
                             onClick={() => handleDeleteUser(user.id, user.name)}
                             disabled={actionLoading[`delete-${user.id}`]}
@@ -1747,6 +1777,16 @@ export default function AdminUserManagement() {
 
       {/* Confirmation Modal */}
       <ConfirmationModalComponent />
+
+      {/* Monitor Key Assignment Modal */}
+      {monitorKeyModal.user && (
+        <MonitorKeyAssignmentModal
+          isOpen={monitorKeyModal.isOpen}
+          onClose={handleCloseMonitorKeyModal}
+          user={monitorKeyModal.user}
+          onSuccess={handleMonitorKeySuccess}
+        />
+      )}
     </div>
   );
 }

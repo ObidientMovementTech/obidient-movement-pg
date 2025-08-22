@@ -381,3 +381,122 @@ export function createVotingBlocRemovalEmailTemplate(memberName, votingBlocName,
   `.trim();
 }
 
+export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, designation, elections, monitoringLocation) {
+  const electionsList = elections.map(election =>
+    `<li style="margin-bottom: 8px;">
+      <strong>${election.election_name}</strong><br>
+      <span style="color: #666666; font-size: 14px;">${election.state} • ${election.election_type} • ${new Date(election.election_date).toLocaleDateString()}</span>
+    </li>`
+  ).join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vote Defender Access Granted</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="padding: 30px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="display: inline-block; background: linear-gradient(135deg, #1e7e34, #28a745); color: white; padding: 15px 25px; border-radius: 25px; font-size: 16px; font-weight: bold;">
+            🛡️ ELECTION MONITORING ACCESS GRANTED
+          </div>
+        </div>
+        
+        <h2 style="color: #333333; margin-top: 0; text-align: center;">Congratulations, ${userName}!</h2>
+        
+        <p style="color: #555555; line-height: 1.5; font-size: 16px;">
+          You have been approved as a <strong>${designation}</strong> for election monitoring activities with the Obidient Movement.
+        </p>
+        
+        <div style="background: linear-gradient(135deg, #e8f5e8, #f0f8f0); border: 2px solid #28a745; border-radius: 10px; padding: 20px; margin: 25px 0; text-align: center;">
+          <h3 style="color: #1e7e34; margin-top: 0; margin-bottom: 15px;">Your Unique Monitor Key</h3>
+          <div style="background-color: #ffffff; border: 2px dashed #28a745; border-radius: 8px; padding: 15px; margin: 10px 0;">
+            <span style="font-size: 24px; font-weight: bold; letter-spacing: 3px; color: #1e7e34; font-family: 'Courier New', monospace;">${uniqueKey}</span>
+          </div>
+          <p style="color: #666666; font-size: 14px; margin: 10px 0 0 0;">Keep this key secure and do not share it with others</p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h4 style="color: #333333; margin-top: 0;">📍 Your Monitoring Assignment</h4>
+          <div style="color: #555555; line-height: 1.6;">
+            <p style="margin: 5px 0;"><strong>Designation:</strong> ${designation}</p>
+            ${monitoringLocation?.state ? `<p style="margin: 5px 0;"><strong>State:</strong> ${monitoringLocation.state}</p>` : ''}
+            ${monitoringLocation?.lga ? `<p style="margin: 5px 0;"><strong>LGA:</strong> ${monitoringLocation.lga}</p>` : ''}
+            ${monitoringLocation?.ward ? `<p style="margin: 5px 0;"><strong>Ward:</strong> ${monitoringLocation.ward}</p>` : ''}
+          </div>
+        </div>
+        
+        ${elections.length > 0 ? `
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #333333; margin-top: 0;">🗳️ Elections You Can Monitor</h4>
+            <ul style="color: #555555; line-height: 1.6; margin: 10px 0; padding-left: 20px;">
+              ${electionsList}
+            </ul>
+          </div>
+        ` : ''}
+        
+        <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0;">
+          <h4 style="color: #1976d2; margin-top: 0;">📱 How to Access the Monitoring System</h4>
+          <ol style="color: #555555; line-height: 1.6; margin: 10px 0; padding-left: 20px;">
+            <li>Log in to your Obidient Movement account</li>
+            <li>Navigate to the Election Monitoring section</li>
+            <li>Enter your unique key: <strong>${uniqueKey}</strong></li>
+            <li>Start monitoring elections in your assigned area</li>
+          </ol>
+        </div>
+        
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+          <h4 style="color: #856404; margin-top: 0;">⚠️ Important Guidelines</h4>
+          <ul style="color: #856404; line-height: 1.6; margin: 10px 0; padding-left: 20px; font-size: 14px;">
+            <li>Keep your monitor key confidential</li>
+            <li>Report any suspicious activities immediately</li>
+            <li>Follow all election monitoring protocols</li>
+            <li>Maintain impartiality and professionalism</li>
+            <li>Document everything accurately and timely</li>
+          </ul>
+        </div>
+        
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0;">
+          <tr>
+            <td align="center">
+              <table border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" bgcolor="#28a745" style="border-radius: 6px; box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);">
+                    <a href="#" target="_blank" style="display: inline-block; padding: 15px 30px; font-size: 16px; font-weight: bold; color: #ffffff; text-decoration: none;">
+                      Access Monitoring System
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        
+        <hr style="border: none; border-top: 1px solid #eeeeee; margin: 25px 0;">
+        
+        <p style="color: #777777; font-size: 14px;">
+          This access was granted by an administrator. If you have any questions about your monitoring role, 
+          please contact your coordinator or the administrative team.
+        </p>
+        
+        <p style="color: #555555; line-height: 1.5;">
+          Thank you for your commitment to protecting the integrity of our democratic process.
+        </p>
+        
+        <p style="color: #999999; font-size: 12px;">
+          This is an automated message from Obidient Movement. Please do not reply to this email.
+        </p>
+        <p style="color: #555555; font-weight: bold;">— The Obidient Movement Team</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+

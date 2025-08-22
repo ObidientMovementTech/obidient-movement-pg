@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vote Defender Access Granted</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      text-align: center;
+      padding: 20px 0;
+      background: linear-gradient(135deg, #1e7e34, #28a745);
+      color: white;
+      border-radius: 10px 10px 0 0;
+      margin: -20px -20px 20px -20px;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .key-display {
+      background: #f8f9fa;
+      border: 2px solid #28a745;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .unique-key {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1e7e34;
+      letter-spacing: 2px;
+      background: white;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #dee2e6;
+    }
+
+    .election-list {
+      background: #e9f7ef;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+
+    .election-item {
+      background: white;
+      border-radius: 5px;
+      padding: 10px;
+      margin: 5px 0;
+      border-left: 4px solid #28a745;
+    }
+
+    .location-info {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: #28a745;
+      color: white;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+
+    .footer {
+      margin-top: 30px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      border-top: 1px solid #eee;
+      padding-top: 20px;
+    }
+
+    .designation-badge {
+      background: #1e7e34;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 15px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">🛡️ Obidient Movement</div>
+      <h1>Vote Defender Access Granted</h1>
+    </div>
+
+    <p>Dear <strong>{{userName}}</strong>,</p>
+
+    <p>Congratulations! You have been granted access to the Election Monitoring System as a <span
+        class="designation-badge">{{designation}}</span>.</p>
+
+    <div class="key-display">
+      <h3>Your Unique Access Key</h3>
+      <div class="unique-key">{{uniqueKey}}</div>
+      <p><small>Keep this key secure and confidential</small></p>
+    </div>
+
+    <div class="election-list">
+      <h3>📊 Elections You Can Monitor</h3>
+      {{#each elections}}
+      <div class="election-item">
+        <strong>{{election_name}}</strong><br>
+        <small>📅 {{election_date}} • 📍 {{state}}</small>
+      </div>
+      {{/each}}
+    </div>
+
+    {{#if monitoringLocation}}
+    <div class="location-info">
+      <h3>📍 Your Assigned Monitoring Location</h3>
+      <p>
+        {{#if monitoringLocation.state}}<strong>State:</strong> {{monitoringLocation.state}}<br>{{/if}}
+        {{#if monitoringLocation.lga}}<strong>LGA:</strong> {{monitoringLocation.lga}}<br>{{/if}}
+        {{#if monitoringLocation.ward}}<strong>Ward:</strong> {{monitoringLocation.ward}}{{/if}}
+      </p>
+    </div>
+    {{/if}}
+
+    <h3>🎯 What You Can Do</h3>
+    <ul>
+      <li><strong>Monitor Polling Units:</strong> Enter location and GPS details</li>
+      <li><strong>Track Officer Arrival:</strong> Verify INEC officer identities and timing</li>
+      <li><strong>Submit Results:</strong> Report vote tallies and agent information</li>
+      <li><strong>Report Incidents:</strong> Document irregularities and violations</li>
+    </ul>
+
+    <div style="text-align: center;">
+      <a href="{{platformUrl}}/dashboard" class="cta-button">Access Monitoring Dashboard</a>
+    </div>
+
+    <div class="warning">
+      <h3>⚠️ Important Security Guidelines</h3>
+      <ul>
+        <li>Keep your unique key confidential</li>
+        <li>Do not share your access credentials</li>
+        <li>Report any suspicious activities immediately</li>
+        <li>Only submit accurate and verifiable information</li>
+      </ul>
+    </div>
+
+    <p>Thank you for your commitment to protecting our democracy. Your role as a Vote Defender is crucial in ensuring
+      free, fair, and credible elections.</p>
+
+    <p>If you have any questions or need support, please contact our technical team.</p>
+
+    <p>Best regards,<br>
+      <strong>The Obidient Movement Team</strong>
+    </p>
+
+    <div class="footer">
+      <p>This is an automated message. Please do not reply to this email.</p>
+      <p>© 2025 Obidient Movement. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+
+</html>
