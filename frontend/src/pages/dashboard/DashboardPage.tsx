@@ -43,6 +43,7 @@ import AdminBroadcastPage from "./admin/AdminBroadcastPage";
 import AdminDefaultVotingBlocPage from "./admin/AdminDefaultVotingBlocPage";
 import AdminTemplateSyncPage from "./admin/AdminTemplateSyncPage";
 import AdminUserManagement from "./admin/AdminUserManagement";
+import ElectionManagement from "./admin/ElectionManagement";
 import AllNotificationsPage from "./notifications/AllNotificationsPage";
 import StateDashboard from "./state/StateDashboard";
 // Sidebar menu items type
@@ -192,6 +193,7 @@ export default function DashboardPage() {
       title: "Admin",
       icon: <ShieldCheck size={24} />,
       children: [
+        { title: "Election Management", icon: <Landmark size={20} />, component: <ElectionManagement /> },
         { title: "User Management", icon: <Users size={20} />, component: <AdminUserManagement /> },
         { title: "KYC Management", icon: <UserCheck size={20} />, component: <KYCManagement /> },
         { title: "Default Voting Bloc Settings", icon: <Flag size={20} />, component: <AdminDefaultVotingBlocPage /> },

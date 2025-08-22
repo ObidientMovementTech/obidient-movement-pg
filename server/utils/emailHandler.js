@@ -6,7 +6,8 @@ import {
   createVotingBlocBroadcastEmailTemplate,
   createVotingBlocPrivateMessageEmailTemplate,
   createVotingBlocInvitationEmailTemplate,
-  createVotingBlocRemovalEmailTemplate
+  createVotingBlocRemovalEmailTemplate,
+  createVoteDefenderKeyAssignedEmailTemplate
 } from './emailTemplates.js';
 
 // Send Confirmation Email
@@ -282,6 +283,58 @@ export const sendVotingBlocRemovalEmail = async (memberName, memberEmail, voting
     return response;
   } catch (error) {
     console.error(`[GMAIL][EMAIL] Error sending voting bloc removal email to ${memberEmail}:`, error.message);
+    throw error;
+  }
+};
+
+// Send Vote Defender Key Assignment Email
+export const sendVoteDefenderKeyAssignedEmail = async (userName, userEmail, uniqueKey, designation, elections, monitoringLocation) => {
+  const subject = 'Vote Defender Access Granted - Obidient Movement';
+  const html = createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, designation, elections, monitoringLocation);
+
+  const plainText = `Hi ${userName},
+
+You have been approved as a ${designation} for election monitoring activities with the Obidient Movement.
+
+Your Unique Monitor Key: ${uniqueKey}
+
+Keep this key secure and do not share it with others.
+
+Your Monitoring Assignment:
+- Designation: ${designation}
+${monitoringLocation?.state ? `- State: ${monitoringLocation.state}` : ''}
+${monitoringLocation?.lga ? `- LGA: ${monitoringLocation.lga}` : ''}
+${monitoringLocation?.ward ? `- Ward: ${monitoringLocation.ward}` : ''}
+
+${elections.length > 0 ? `Elections You Can Monitor:
+${elections.map(election => `- ${election.election_name} (${election.state}, ${election.election_type})`).join('\n')}` : ''}
+
+How to Access the Monitoring System:
+1. Log in to your Obidient Movement account
+2. Navigate to the Election Monitoring section
+3. Enter your unique key: ${uniqueKey}
+4. Start monitoring elections in your assigned area
+
+Thank you for your commitment to protecting the integrity of our democratic process.
+
+— The Obidient Movement Team`;
+
+  console.log(`[EMAIL] Preparing to send vote defender key assignment email to ${userEmail}`);
+
+  try {
+    const mailOptions = {
+      from: `"${sender.name}" <${sender.email}>`,
+      to: userEmail,
+      subject,
+      html,
+      text: plainText,
+    };
+
+    const response = await emailTransporter.sendMail(mailOptions);
+    console.log(`[EMAIL] Vote defender key assignment email sent successfully to ${userEmail}`, response.messageId);
+    return response;
+  } catch (error) {
+    console.error(`[EMAIL] Error sending vote defender key assignment email to ${userEmail}:`, error.message);
     throw error;
   }
 };
