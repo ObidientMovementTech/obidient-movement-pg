@@ -206,11 +206,26 @@ const AnambraSignupPage = () => {
       className="flex flex-col justify-between px-4 py-8 max-w-[450px] w-full gap-4"
     >
       {/* Header with Election Info */}
-      <div className="text-left mb-6">
-        <div className="bg-gradient-to-r from-green-700 to-green-900 text-white p-4 rounded-lg mb-4">
-          <h2 className="text-xl font-bold">Anambra Gubernatorial Election 2025</h2>
-          <p className="text-sm text-green-100">Register to participate in Anambra State's future</p>
+      <div className="text-left mb-6 relative">
+        {/* Candidate Image - Half in, Half out effect */}
+        <div className="flex justify-center mb-4">
+          <div className="relative">
+            <img
+              src="/george-moghalu.jpeg"
+              alt="George Moghalu - Gubernatorial Candidate"
+              className="w-24 h-24 rounded-full border-4 border-white shadow-2xl object-cover relative z-10 bg-white"
+            />
+          </div>
         </div>
+
+        <div className="bg-gradient-to-r from-green-700 to-green-900 text-white p-6 pt-8 rounded-lg mb-4 relative -mt-12">
+          <div className="text-center mt-4">
+            <h2 className="text-xl font-bold">Anambra Gubernatorial Election 2025</h2>
+            <p className="text-sm text-green-100 mt-1">Register to participate in Anambra State's future</p>
+            <p className="text-xs text-green-200 mt-2 font-medium">Supporting George Moghalu</p>
+          </div>
+        </div>
+
         <p className="get-started-text text-gray-dark dark:text-gray-100 text-2xl">
           Join the Movement
         </p>
