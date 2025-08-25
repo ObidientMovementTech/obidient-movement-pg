@@ -5,8 +5,9 @@ import {
   // Plus, 
   Trash2, Shield, ShieldOff,
   CheckCircle, XCircle, UserCheck, UserX, Loader2, X, AlertTriangle, Mail, Send,
-  Edit3, Key
+  Edit3, Key, MessageCircle
 } from 'lucide-react';
+import { SendMessageModal } from '../../../components/admin/SendMessageModal';
 import { adminUserManagementService } from '../../../services/adminUserManagementService';
 import { adminMaintenanceService } from '../../../services/adminMaintenanceService';
 import { statesLGAWardList } from '../../../utils/StateLGAWard';
@@ -160,6 +161,15 @@ export default function AdminUserManagement() {
     assignedLGA: '',
     assignedWard: '',
     loading: false
+  });
+
+  // Message modal state
+  const [messageModal, setMessageModal] = useState<{
+    isOpen: boolean;
+    user: { id: string; name: string; email: string; } | null;
+  }>({
+    isOpen: false,
+    user: null
   });
 
   // OPTIMIZED: Debounced search effect
@@ -591,6 +601,30 @@ export default function AdminUserManagement() {
   const handleMonitorKeySuccess = () => {
     setSuccess('Monitor key assigned successfully');
     loadUsers(); // Refresh the user list
+  };
+
+  // Message Modal handlers
+  const handleOpenMessageModal = (user: User) => {
+    setMessageModal({
+      isOpen: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  };
+
+  const handleCloseMessageModal = () => {
+    setMessageModal({
+      isOpen: false,
+      user: null
+    });
+  };
+
+  const handleMessageSuccess = () => {
+    setSuccess('Private message sent successfully');
+    loadUsers(); // Refresh the user list to show updated status
   };
 
   const handleBulkAction = async () => {
@@ -1443,6 +1477,16 @@ export default function AdminUserManagement() {
                           </button>
 
                           <button
+                            onClick={() => {
+                              handleOpenMessageModal(user);
+                            }}
+                            className="text-primary hover:text-primary/80"
+                            title="Send Message"
+                          >
+                            <MessageCircle size={16} />
+                          </button>
+
+                          <button
                             onClick={() => handleDeleteUser(user.id, user.name)}
                             disabled={actionLoading[`delete-${user.id}`]}
                             className="text-red-600 hover:text-red-700 disabled:opacity-50 relative"
@@ -1787,6 +1831,13 @@ export default function AdminUserManagement() {
           onSuccess={handleMonitorKeySuccess}
         />
       )}
+
+      <SendMessageModal
+        isOpen={messageModal.isOpen}
+        onClose={handleCloseMessageModal}
+        user={messageModal.user}
+        onSuccess={handleMessageSuccess}
+      />
     </div>
   );
 }

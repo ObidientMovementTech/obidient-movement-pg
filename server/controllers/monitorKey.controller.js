@@ -40,7 +40,15 @@ export const monitorKeyController = {
       await client.query('BEGIN');
 
       const { userId } = req.params;
-      const { electionIds, monitoringLocation } = req.body;
+      const {
+        electionIds,
+        monitoring_location,
+        assignedState,
+        assignedLGA,
+        assignedWard,
+        key_status,
+        election_access_level
+      } = req.body;
       const adminId = req.user.id;
 
       // Validate inputs
@@ -51,9 +59,17 @@ export const monitorKeyController = {
         });
       }
 
+      // Validate monitoring location
+      if (!monitoring_location || !monitoring_location.state) {
+        return res.status(400).json({
+          success: false,
+          message: 'Monitoring location with state is required'
+        });
+      }
+
       // Get user details
       const userResult = await client.query(
-        'SELECT id, name, email, designation, assignedstate, assignedlga, assignedward FROM users WHERE id = $1',
+        'SELECT id, name, email, designation, "assignedState", "assignedLGA", "assignedWard" FROM users WHERE id = $1',
         [userId]
       );
 
@@ -90,8 +106,8 @@ export const monitorKeyController = {
 
       // Generate unique key
       const uniqueKey = generateMonitorKey(
-        user.designation,
-        user.assignedstate || monitoringLocation?.state
+        election_access_level || user.designation,
+        monitoring_location.state
       );
 
       // Ensure key is unique
@@ -104,31 +120,34 @@ export const monitorKeyController = {
         // Regenerate if collision (very rare)
         const newKey = generateMonitorKey(
           user.designation,
-          user.assignedstate || monitoringLocation?.state
+          user.assignedState || monitoring_location?.state
         );
         uniqueKey = newKey;
       }
 
-      // Update user with monitoring key
+      // Update user with monitoring key and location information
       await client.query(`
         UPDATE users 
         SET monitor_unique_key = $1,
-            key_assigned_by = $2,
+            key_assigned_by = $2::uuid,
             key_assigned_date = CURRENT_TIMESTAMP,
-            key_status = 'active',
-            election_access_level = $3,
-            monitoring_location = $4,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = $5
+            key_status = $3,
+            election_access_level = $4,
+            monitoring_location = $5,
+            "assignedState" = $6,
+            "assignedLGA" = $7,
+            "assignedWard" = $8,
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = $9::uuid
       `, [
         uniqueKey,
         adminId,
-        JSON.stringify(electionIds),
-        JSON.stringify(monitoringLocation || {
-          state: user.assignedstate,
-          lga: user.assignedlga,
-          ward: user.assignedward
-        }),
+        key_status || 'active',
+        election_access_level || user.designation,
+        monitoring_location,
+        assignedState || monitoring_location.state,
+        assignedLGA || monitoring_location.lga,
+        assignedWard || monitoring_location.ward,
         userId
       ]);
 
@@ -148,10 +167,10 @@ export const monitorKeyController = {
           uniqueKey,
           user.designation,
           electionsResult.rows,
-          monitoringLocation || {
-            state: user.assignedstate,
-            lga: user.assignedlga,
-            ward: user.assignedward
+          monitoring_location || {
+            state: user.assignedState,
+            lga: user.assignedLGA,
+            ward: user.assignedWard
           }
         );
       } catch (emailError) {
@@ -325,7 +344,7 @@ export const monitorKeyController = {
       const result = await query(`
         UPDATE users 
         SET key_status = 'revoked',
-            updated_at = CURRENT_TIMESTAMP
+            "updatedAt" = CURRENT_TIMESTAMP
         WHERE id = $1 AND key_status = 'active'
         RETURNING name, email, monitor_unique_key
       `, [userId]);

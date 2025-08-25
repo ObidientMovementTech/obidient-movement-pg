@@ -10,7 +10,8 @@ export function createConfirmationEmailTemplate(name, link) {
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <h2 style="color: #333333; margin-top: 0;">Hi ${name || ''},</h2>
         <p style="color: #555555; line-height: 1.5;">Thank you for registering on <strong>Obidient Movement</strong>!</p>
         <p style="color: #555555; line-height: 1.5;">Please confirm your email by clicking the button below:</p>
@@ -58,7 +59,8 @@ export function createResetPasswordEmailTemplate(name, link) {
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <h2 style="color: #333333; margin-top: 0;">Hi ${name || ''},</h2>
         <p style="color: #555555; line-height: 1.5;">We received a request to update your Obidient Movement account access.</p>
         <p style="color: #555555; line-height: 1.5;">Click the button below to set a new password:</p>
@@ -115,7 +117,8 @@ export function createOTPEmailTemplate(name, otp, purpose) {
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <h2 style="color: #333333; margin-top: 0;">Hi ${name || ''},</h2>
         <p style="color: #555555; line-height: 1.5;">You requested to ${purposeText} on <strong>Obidient Movement</strong>.</p>
         <p style="color: #555555; line-height: 1.5;">Please use the verification code below:</p>
@@ -160,7 +163,8 @@ export function createVotingBlocBroadcastEmailTemplate(votingBlocName, senderNam
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <div style="background-color: #0B6739; color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
           <h2 style="margin: 0; font-size: 20px;">New ${typeLabel} from Your Voting Bloc</h2>
         </div>
@@ -196,7 +200,8 @@ export function createVotingBlocPrivateMessageEmailTemplate(votingBlocName, send
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <div style="background-color: #6366f1; color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
           <h2 style="margin: 0; font-size: 20px;">Private Message</h2>
         </div>
@@ -234,7 +239,8 @@ export function createVotingBlocInvitationEmailTemplate(inviteeName, inviterName
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <div style="text-align: center; margin-bottom: 20px;">
           <div style="display: inline-block; background-color: #0B6739; color: white; padding: 10px 20px; border-radius: 25px; font-size: 14px; font-weight: bold;">
             🗳️ VOTING BLOC INVITATION
@@ -325,7 +331,8 @@ export function createVotingBlocRemovalEmailTemplate(memberName, votingBlocName,
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <h2 style="color: #333333; margin-top: 0;">Hi ${memberName},</h2>
         
         <p style="color: #555555; line-height: 1.5;">
@@ -381,11 +388,59 @@ export function createVotingBlocRemovalEmailTemplate(memberName, votingBlocName,
   `.trim();
 }
 
+export function createAdminBroadcastEmailTemplate(recipientName, senderName, subject, message, messageType = 'announcement') {
+  const typeLabels = {
+    'announcement': 'Important Announcement',
+    'update': 'Platform Update',
+    'notice': 'Notice',
+    'alert': 'Alert'
+  };
+
+  const typeLabel = typeLabels[messageType] || 'Message';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
+        <div style="background-color: #0B6739; color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px;">${typeLabel}</h2>
+        </div>
+        
+        <h3 style="color: #333333; margin-top: 0;">Hi ${recipientName || 'there'},</h3>
+        <p style="color: #666666; margin-bottom: 20px;">From: ${senderName}</p>
+        <h4 style="color: #333333; margin-top: 0;">${subject}</h4>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 4px solid #0B6739; text-align: left;">
+          <p style="color: #333333; line-height: 1.6; margin: 0;">${message}</p>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #eeeeee; margin: 25px 0;">
+        
+        <p style="color: #777777; font-size: 14px;">This message was sent by an administrator of the Obidient Movement platform.</p>
+        <p style="color: #999999; font-size: 12px;">This is an automated message from Obidient Movement. Please do not reply to this email.</p>
+        <p style="color: #555555;">— Obidient Movement Team</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
 export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, designation, elections, monitoringLocation) {
   const electionsList = elections.map(election =>
     `<li style="margin-bottom: 8px;">
       <strong>${election.election_name}</strong><br>
-      <span style="color: #666666; font-size: 14px;">${election.state} • ${election.election_type} • ${new Date(election.election_date).toLocaleDateString()}</span>
+      <span style="color: #666666; font-size: 14px;">${election.state} • ${new Date(election.election_date).toLocaleDateString()}</span>
     </li>`
   ).join('');
 
@@ -400,7 +455,8 @@ export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, 
 <body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <tr>
-      <td style="padding: 30px;">
+      <td style="padding: 30px; text-align: center;">
+        <img src="https://i.ibb.co/tpycHjNP/obi-icon.png" alt="Obidient Movement Logo" style="width: 80px; height: auto; margin-bottom: 20px;">
         <div style="text-align: center; margin-bottom: 20px;">
           <div style="display: inline-block; background: linear-gradient(135deg, #1e7e34, #28a745); color: white; padding: 15px 25px; border-radius: 25px; font-size: 16px; font-weight: bold;">
             🛡️ ELECTION MONITORING ACCESS GRANTED
@@ -422,7 +478,7 @@ export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, 
         </div>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h4 style="color: #333333; margin-top: 0;">📍 Your Monitoring Assignment</h4>
+          <h4 style="color: #333333; margin-top: 0;">Your Monitoring Assignment</h4>
           <div style="color: #555555; line-height: 1.6;">
             <p style="margin: 5px 0;"><strong>Designation:</strong> ${designation}</p>
             ${monitoringLocation?.state ? `<p style="margin: 5px 0;"><strong>State:</strong> ${monitoringLocation.state}</p>` : ''}
@@ -433,7 +489,7 @@ export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, 
         
         ${elections.length > 0 ? `
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h4 style="color: #333333; margin-top: 0;">🗳️ Elections You Can Monitor</h4>
+            <h4 style="color: #333333; margin-top: 0;">Elections You Can Monitor</h4>
             <ul style="color: #555555; line-height: 1.6; margin: 10px 0; padding-left: 20px;">
               ${electionsList}
             </ul>
@@ -441,7 +497,7 @@ export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, 
         ` : ''}
         
         <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0;">
-          <h4 style="color: #1976d2; margin-top: 0;">📱 How to Access the Monitoring System</h4>
+          <h4 style="color: #1976d2; margin-top: 0;">How to Access the Monitoring System</h4>
           <ol style="color: #555555; line-height: 1.6; margin: 10px 0; padding-left: 20px;">
             <li>Log in to your Obidient Movement account</li>
             <li>Navigate to the Election Monitoring section</li>
@@ -467,7 +523,7 @@ export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, 
               <table border="0" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" bgcolor="#28a745" style="border-radius: 6px; box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);">
-                    <a href="#" target="_blank" style="display: inline-block; padding: 15px 30px; font-size: 16px; font-weight: bold; color: #ffffff; text-decoration: none;">
+                    <a href="https://member.obidients.com/dashboard" target="_blank" style="display: inline-block; padding: 15px 30px; font-size: 16px; font-weight: bold; color: #ffffff; text-decoration: none;">
                       Access Monitoring System
                     </a>
                   </td>
