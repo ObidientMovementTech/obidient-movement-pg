@@ -1,4 +1,4 @@
-import { emailTransporter, sender, createEmailTransporter } from '../config/email.js';
+import { emailTransporter, sender, replySender, createEmailTransporter } from '../config/email.js';
 import {
   createConfirmationEmailTemplate,
   createResetPasswordEmailTemplate,
@@ -7,7 +7,8 @@ import {
   createVotingBlocPrivateMessageEmailTemplate,
   createVotingBlocInvitationEmailTemplate,
   createVotingBlocRemovalEmailTemplate,
-  createVoteDefenderKeyAssignedEmailTemplate
+  createVoteDefenderKeyAssignedEmailTemplate,
+  createAdminBroadcastEmailTemplate
 } from './emailTemplates.js';
 
 // Send Confirmation Email
@@ -288,6 +289,76 @@ export const sendVotingBlocRemovalEmail = async (memberName, memberEmail, voting
 };
 
 // Send Vote Defender Key Assignment Email
+// Send admin broadcast email to multiple recipients
+export const sendAdminBroadcastEmail = async (senderName, subject, message, recipients, messageType = 'announcement') => {
+  console.log(`[EMAIL] Preparing to send admin broadcast email to ${recipients.length} recipients`);
+
+  try {
+    // Send to multiple recipients
+    const emailPromises = recipients.map(recipient => {
+      const html = createAdminBroadcastEmailTemplate(
+        recipient.name,
+        senderName,
+        subject,
+        message,
+        messageType
+      );
+
+      const plainText = `${subject}\n\nFrom: ${senderName}\n\n${message}\n\nThis message was sent by an administrator of the Obidient Movement platform.\n\n— Obidient Movement Team`;
+
+      return emailTransporter.sendMail({
+        from: `"${replySender.name}" <${replySender.email}>`,
+        to: recipient.email,
+        subject: `${subject} - Obidient Movement`,
+        html,
+        text: plainText,
+      });
+    });
+
+    const results = await Promise.allSettled(emailPromises);
+    const successful = results.filter(result => result.status === 'fulfilled').length;
+    const failed = results.filter(result => result.status === 'rejected').length;
+
+    console.log(`[EMAIL] Admin broadcast email sent successfully to ${successful}/${recipients.length} recipients. Failed: ${failed}`);
+    return { successful, failed, total: recipients.length };
+  } catch (error) {
+    console.error(`[EMAIL] Error sending admin broadcast email:`, error.message);
+    throw error;
+  }
+};
+
+// Send admin message to a single user
+export const sendAdminPrivateMessage = async (recipientName, recipientEmail, senderName, subject, message, messageType = 'notice') => {
+  console.log(`[EMAIL] Preparing to send admin private message to ${recipientEmail}`);
+
+  try {
+    const html = createAdminBroadcastEmailTemplate(
+      recipientName,
+      senderName,
+      subject,
+      message,
+      messageType
+    );
+
+    const plainText = `${subject}\n\nFrom: ${senderName}\n\n${message}\n\nThis is a private message from an administrator of the Obidient Movement platform.\n\n— Obidient Movement Team`;
+
+    const mailOptions = {
+      from: `"${replySender.name}" <${replySender.email}>`,
+      to: recipientEmail,
+      subject: `${subject} - Obidient Movement`,
+      html,
+      text: plainText,
+    };
+
+    const response = await emailTransporter.sendMail(mailOptions);
+    console.log(`[EMAIL] Admin private message sent successfully to ${recipientEmail}`, response.messageId);
+    return response;
+  } catch (error) {
+    console.error(`[EMAIL] Error sending admin private message to ${recipientEmail}:`, error.message);
+    throw error;
+  }
+};
+
 export const sendVoteDefenderKeyAssignedEmail = async (userName, userEmail, uniqueKey, designation, elections, monitoringLocation) => {
   const subject = 'Vote Defender Access Granted - Obidient Movement';
   const html = createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, designation, elections, monitoringLocation);

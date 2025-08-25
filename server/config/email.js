@@ -95,6 +95,11 @@ export const gmailTransporter = emailTransporter;
 export const verifyGmailConnection = verifyEmailConnection;
 
 export const sender = {
-  email: process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || process.env.GMAIL_USER,
+  email: process.env.EMAIL_FROM_ADDRESS,
+  name: process.env.EMAIL_FROM_NAME || "Obidient Movement"
+};
+
+export const replySender = {
+  email: process.env.EMAIL_FROM_REPLY_TO,
   name: process.env.EMAIL_FROM_NAME || "Obidient Movement"
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Key, Loader2, MapPin, Calendar } from 'lucide-react';
 import { monitorKeyService } from '../services/monitorKeyService.ts';
-import { statesLGAWardList } from '../utils/StateLGAWard';
+import { statesLGAWardList } from '../utils/StateLGAWard.ts';
 // import { electionService } from '../services/electionService.ts';
 
 interface Election {
@@ -156,24 +156,78 @@ const MonitorKeyAssignmentModal = ({ isOpen, onClose, user, onSuccess }: Monitor
   };
 
   const handleAssignKey = async () => {
-    if (selectedElections.length === 0) {
+    // Validate user ID
+    if (!user.id) {
+      alert('Invalid user ID');
+      console.error('Monitor key assignment failed: Invalid user ID');
+      return;
+    }
+
+    // Validate election selection
+    if (!selectedElections || selectedElections.length === 0) {
       alert('Please select at least one election');
+      console.error('Monitor key assignment failed: No elections selected');
+      return;
+    }
+
+    // Validate monitoring location based on user's designation
+    if (!monitoringLocation.state) {
+      alert('Please select a state for monitoring');
+      return;
+    }
+
+    // For LGA and Ward coordinators, ensure their respective locations are selected
+    if (user.designation === 'LGA Coordinator' && !monitoringLocation.lga) {
+      alert('LGA Coordinator must have an LGA selected');
+      return;
+    }
+    if (user.designation === 'Ward Coordinator' && !monitoringLocation.ward) {
+      alert('Ward Coordinator must have a ward selected');
       return;
     }
 
     setLoading(true);
     try {
-      const assignmentData = {
+      // Define the assignment data with proper types
+      const assignmentData: {
+        userId: string;
+        electionIds: string[];
+        monitoring_location: {
+          state: string;
+          lga: string | null;
+          ward: string | null;
+        };
+        assignedState: string;
+        assignedLGA: string | null;
+        assignedWard: string | null;
+        key_status: 'active' | 'inactive';
+        election_access_level: string;
+      } = {
+        userId: user.id,
         electionIds: selectedElections,
-        monitoringLocation
+        monitoring_location: {
+          state: monitoringLocation.state,
+          lga: monitoringLocation.lga || null,
+          ward: monitoringLocation.ward || null
+        },
+        assignedState: monitoringLocation.state,
+        assignedLGA: monitoringLocation.lga || null,
+        assignedWard: monitoringLocation.ward || null,
+        key_status: 'active' as const,
+        election_access_level: user.designation || 'undefined_role' // Provide a default value
       };
-      await (monitorKeyService as any).assignMonitorKey(user.id, assignmentData);
+
+      console.log('Assigning monitor key with data:', assignmentData);
+
+      const response = await monitorKeyService.assignMonitorKey(user.id, assignmentData);
+      console.log('Monitor key assignment response:', response);
 
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Error assigning monitor key:', error);
-      alert(error.message || 'Failed to assign monitor key');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to assign monitor key';
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
