@@ -57,29 +57,3 @@ export const deleteAdminBroadcast = async (id: string): Promise<void> => {
     withCredentials: true,
   });
 };
-
-export interface PrivateMessageResponse {
-  success: boolean;
-  message: string;
-  notification: {
-    id: string;
-    title: string;
-    message: string;
-    createdAt: string;
-  };
-  emailSent: boolean;
-}
-
-export const sendPrivateMessage = async (
-  userId: string,
-  title: string,
-  message: string,
-  messageType?: 'notice' | 'announcement' | 'alert' | 'update'
-): Promise<PrivateMessageResponse> => {
-  const res = await axios.post(
-    `${BASE_URL}/admin-broadcasts/send-private`,
-    { userId, title, message, messageType },
-    { withCredentials: true }
-  );
-  return res.data;
-};

@@ -1,6 +1,80 @@
-import { Clock, BarChart2, Users, CheckCircle, ListChecks, CalendarCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { BarChart2, Search, RefreshCw } from "lucide-react";
+import { electionResultsService, ElectionSummary, ResultsFilters } from "../../../services/electionResultsService";
+import ElectionCard from "../../../components/ElectionCard";
+import Toast from "../../../components/Toast";
 
 const Results = () => {
+  const [elections, setElections] = useState<ElectionSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [filters] = useState<ResultsFilters>({
+    status: undefined,
+    state: '',
+    search: '',
+    limit: 12
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedState, setSelectedState] = useState<string>('all');
+
+  // Load elections data
+  const loadElections = async () => {
+    try {
+      setLoading(true);
+
+      // Prepare filters
+      const queryFilters: ResultsFilters = {
+        ...filters,
+        search: searchTerm || undefined,
+        status: selectedStatus !== 'all' ? selectedStatus as any : undefined,
+        state: selectedState !== 'all' ? selectedState : undefined
+      };
+
+      const response = await electionResultsService.getElectionResults(queryFilters);
+      setElections(response.data || []);
+    } catch (error: any) {
+      console.error('Failed to load elections:', error);
+      setToast({
+        message: error.message || 'Failed to load election results',
+        type: 'error'
+      });
+
+      // Set mock data for development
+      setElections(mockElections);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadElections();
+  }, [selectedStatus, selectedState]);
+
+  const handleSearch = () => {
+    loadElections();
+  };
+
+  const handleRefresh = () => {
+    loadElections();
+  };
+
+  const handleElectionClick = (election: ElectionSummary) => {
+    // TODO: Navigate to detailed election results page
+    console.log('Selected election:', election);
+    setToast({
+      message: `Opening detailed results for ${election.election_name}`,
+      type: 'success'
+    });
+  };
+
+  const stats = {
+    total: elections.length,
+    ongoing: elections.filter(e => e.status === 'ongoing').length,
+    completed: elections.filter(e => e.status === 'completed').length,
+    upcoming: elections.filter(e => e.status === 'upcoming').length
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 font-poppins">
       {/* Hero Section */}
@@ -21,138 +95,189 @@ const Results = () => {
               <div className="bg-white/20 backdrop-blur-sm p-2 rounded-lg">
                 <BarChart2 className="w-6 h-6" />
               </div>
-              <div className="bg-yellow-500 text-white text-xs px-3 py-1 rounded-full font-semibold inline-flex items-center gap-1.5 shadow-sm">
-                <Clock className="w-3.5 h-3.5" /> Coming Soon
+              <div className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-semibold inline-flex items-center gap-1.5 shadow-sm">
+                Live Results
               </div>
             </div>
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">Results – View Elections</h1>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">Election Results</h1>
             <p className="text-lg md:text-xl opacity-90 mb-4">
-              Stay informed with real-time and historical election results. Track completed and ongoing elections across the nation.
+              View real-time and historical election results. Stay informed with certified outcomes and live updates.
             </p>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 gap-3 text-white">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
+              <div className="text-xl font-bold">{stats.ongoing}</div>
+              <div className="text-xs opacity-80">Ongoing</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
+              <div className="text-xl font-bold">{stats.completed}</div>
+              <div className="text-xs opacity-80">Completed</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Features Preview */}
-      <div className="mb-12">
-        <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-6">What to Expect</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-          {features.map(feature => (
-            <div key={feature.title} className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition">
-              <div className="flex gap-4">
-                <div className={`w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center ${feature.bgColor}`}>
-                  {feature.icon}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-gray-800">{feature.title}</h3>
-                    {feature.source && (
-                      <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{feature.source}</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">{feature.description}</p>
-                </div>
-              </div>
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 flex-1">
+            {/* Search */}
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="Search elections..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                onClick={handleSearch}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="all">All Status</option>
+              <option value="ongoing">Ongoing</option>
+              <option value="completed">Completed</option>
+              <option value="upcoming">Upcoming</option>
+            </select>
+
+            {/* State Filter */}
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="all">All States</option>
+              <option value="Lagos">Lagos</option>
+              <option value="Anambra">Anambra</option>
+              <option value="Rivers">Rivers</option>
+              <option value="Kano">Kano</option>
+              <option value="FCT">FCT</option>
+            </select>
+          </div>
+
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Elections Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
+              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded mb-4 w-3/4"></div>
+              <div className="h-3 bg-gray-200 rounded mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-1/2"></div>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* How It Works */}
-      <div className="mb-12">
-        <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-6">How It Works</h2>
-        <div className="relative">
-          {/* Steps Connector */}
-          <div className="absolute left-4 top-8 bottom-8 w-0.5 bg-green-200 hidden sm:block"></div>
-          <div className="space-y-8">
-            {steps.map((step, index) => (
-              <div key={index} className="flex gap-4 items-start relative">
-                <div className="w-8 h-8 rounded-full bg-green-600 text-white flex-shrink-0 flex items-center justify-center font-semibold shadow-md z-10">
-                  {index + 1}
-                </div>
-                <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm flex-1">
-                  <h3 className="text-lg font-semibold mb-2 text-gray-800">{step.title}</h3>
-                  <p className="text-sm text-gray-600">{step.description}</p>
-                </div>
-              </div>
-            ))}
+      ) : elections.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          {elections.map((election) => (
+            <ElectionCard
+              key={election.election_id}
+              election={election}
+              onClick={() => handleElectionClick(election)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <BarChart2 className="w-8 h-8 text-gray-400" />
           </div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">No Elections Found</h3>
+          <p className="text-gray-600 mb-4">Try adjusting your filters or search terms.</p>
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setSelectedStatus('all');
+              setSelectedState('all');
+              loadElections();
+            }}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          >
+            Clear Filters
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* Coming Soon Banner */}
-      <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between border border-green-200">
-        <div>
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-800 flex items-center gap-2 mb-2">
-            <Clock className="w-6 h-6 text-green-600" /> Launch Date
-          </h2>
-          <p className="text-gray-600 mb-4 md:mb-0">
-            We're working hard to bring you this feature by <span className="font-semibold text-green-600">October 2025</span>. Stay tuned for updates!
-          </p>
-        </div>
-        <button
-          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition shadow-sm flex items-center gap-2 self-start md:self-center"
-          onClick={() => window.alert('Thanks for your interest! We\'ll notify you when this feature is available.')}
-        >
-          Get Notified
-          <CheckCircle className="h-5 w-5" />
-        </button>
-      </div>
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };
 
-const features = [
+// Mock data for development/testing
+const mockElections: ElectionSummary[] = [
   {
-    title: "Live Results",
-    description: "Follow ongoing elections with real-time updates and visual charts.",
-    icon: <BarChart2 className="text-green-600 h-6 w-6" />,
-    bgColor: "bg-green-50",
-    source: "INEC"
+    election_id: "lagos-gov-2023",
+    election_name: "Lagos State Gubernatorial Election 2023",
+    election_type: "Gubernatorial",
+    state: "Lagos",
+    status: "completed",
+    election_date: "2023-03-18",
+    total_votes: 1347152,
+    leading_candidate: {
+      name: "Babajide Sanwo-Olu",
+      party: "APC",
+      votes: 762134,
+      percentage: 56.6
+    },
+    voter_turnout: 27.3,
+    is_certified: true
   },
   {
-    title: "Historical Data",
-    description: "Access past election results and trends for deeper insights.",
-    icon: <CalendarCheck className="text-emerald-600 h-6 w-6" />,
-    bgColor: "bg-emerald-50",
-    source: "INEC"
+    election_id: "anambra-gov-2024",
+    election_name: "Anambra State Gubernatorial Election 2024",
+    election_type: "Gubernatorial",
+    state: "Anambra",
+    status: "ongoing",
+    election_date: "2024-11-16",
+    total_votes: 234567,
+    leading_candidate: {
+      name: "Peter Obi",
+      party: "LP",
+      votes: 145234,
+      percentage: 61.9
+    },
+    is_certified: false
   },
   {
-    title: "Candidate Profiles",
-    description: "Learn about candidates, their parties, and performance in elections.",
-    icon: <Users className="text-lime-600 h-6 w-6" />,
-    bgColor: "bg-lime-50",
-    source: "New"
-  },
-  {
-    title: "Verified Outcomes",
-    description: "See certified results and official statements for transparency.",
-    icon: <ListChecks className="text-green-700 h-6 w-6" />,
-    bgColor: "bg-green-100",
-    source: "Official"
-  }
-];
-
-const steps = [
-  {
-    title: "Select an Election",
-    description: "Choose from ongoing or completed elections to view detailed results."
-  },
-  {
-    title: "View Live & Past Data",
-    description: "Access real-time updates or explore historical election outcomes."
-  },
-  {
-    title: "Explore Candidates",
-    description: "See profiles, party affiliations, and performance of all candidates."
-  },
-  {
-    title: "Verify Results",
-    description: "Check official certifications and transparency statements."
-  },
-  {
-    title: "Share Insights",
-    description: "Easily share election results and insights with your community."
+    election_id: "rivers-house-2024",
+    election_name: "Rivers State House of Assembly Election 2024",
+    election_type: "State Assembly",
+    state: "Rivers",
+    status: "upcoming",
+    election_date: "2024-12-14",
+    total_votes: 0,
+    is_certified: false
   }
 ];
 

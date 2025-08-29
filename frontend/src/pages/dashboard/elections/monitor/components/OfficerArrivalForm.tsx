@@ -3,7 +3,7 @@ import { useState } from 'react';
 import ArrivalTracking from './stages/officer-arrival/ArrivalTracking';
 import OfficerIdentity from './stages/officer-arrival/INECIdentityVerification';
 import OfficerContext from './stages/officer-arrival/ContextualNotes';
-import { submitOfficerArrivalData } from '../../../../../services/monitorService';
+import { monitoringService } from '../../../../../services/monitoringService';
 
 interface OfficerArrivalFormProps {
   formData: any;
@@ -87,20 +87,38 @@ export default function OfficerArrivalForm({ formData, setFormData, onNext }: Of
                 ...formData,
                 officerArrival: {
                   ...formData.officerArrival,
-                  ...data.officerArrival,
+                  ...data,
                 },
               };
 
               setFormData(updatedData);
 
               try {
-                const token = localStorage.getItem('token') || '';
-                const response = await submitOfficerArrivalData(updatedData, token);
+                // Create officer arrival report object for API
+                const officerArrivalData = {
+                  submissionId: formData.submissionId || monitoringService.generateSubmissionId(),
+                  firstArrivalTime: updatedData.officerArrival.firstArrivalTime,
+                  lastArrivalTime: updatedData.officerArrival.lastArrivalTime,
+                  onTimeStatus: updatedData.officerArrival.onTimeStatus,
+                  proofTypes: updatedData.officerArrival.proofTypes || [],
+                  arrivalNotes: updatedData.officerArrival.arrivalNotes,
+                  officerNames: updatedData.officerArrival.officerNames,
+                  votingStarted: updatedData.officerArrival.votingStarted,
+                  actualStartTime: updatedData.officerArrival.actualStartTime,
+                  materialsVerification: updatedData.officerArrival.materialsVerification,
+                  securityPresence: updatedData.officerArrival.securityPresence,
+                  setupCompletionTime: updatedData.officerArrival.setupCompletionTime,
+                  contextualNotes: updatedData.officerArrival.contextualNotes,
+                  arrivalPhotos: updatedData.officerArrival.arrivalPhotos || [],
+                  officerPhotos: updatedData.officerArrival.officerPhotos
+                };
+
+                const response = await monitoringService.submitOfficerArrival(officerArrivalData);
                 console.log('✅ Officer Arrival Data Saved:', response);
                 if (onNext) onNext();
               } catch (error: any) {
                 console.error('❌ Error:', error);
-                alert(error?.response?.data?.message || 'Submission failed. Try again.');
+                alert(error?.message || 'Submission failed. Try again.');
               }
             }}
             formData={formData}

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import PollingUnitInfo from './stages/result-tracking/PollingUnitInfo';
 import PUResultDetails from './stages/result-tracking/PUResultDetails';
 import ResultEvidenceUpload from './stages/result-tracking/ResultEvidenceUpload';
-import { submitResultTrackingData } from '../../../../../services/monitorService';
+import { monitoringService } from '../../../../../services/monitoringService';
 
 interface ResultTrackingFormProps {
   formData: any;
@@ -87,20 +87,41 @@ export default function ResultTrackingForm({ formData, setFormData, onNext }: Re
                 ...formData,
                 resultTracking: {
                   ...formData.resultTracking,
-                  ...data.resultTracking,
+                  ...data,
                 },
               };
 
               setFormData(updatedData);
 
               try {
-                const token = localStorage.getItem('token') || '';
-                const response = await submitResultTrackingData(updatedData, token);
+                // Create result tracking report object for API
+                const resultTrackingData = {
+                  submissionId: formData.submissionId || monitoringService.generateSubmissionId(),
+                  pollingInfo: updatedData.resultTracking.pollingInfo,
+                  registeredVoters: updatedData.resultTracking.registered,
+                  accreditedVoters: updatedData.resultTracking.accredited,
+                  validVotes: updatedData.resultTracking.valid,
+                  rejectedVotes: updatedData.resultTracking.rejected,
+                  totalVotesCast: updatedData.resultTracking.total,
+                  votesPerParty: updatedData.resultTracking.stats?.votesPerParty || [],
+                  ec8aPhotos: updatedData.resultTracking.ec8aPhotos || [],
+                  announcementVideos: updatedData.resultTracking.announcementVideos || [],
+                  resultSheetPhotos: updatedData.resultTracking.resultSheetPhotos || [],
+                  wallPostingPhotos: updatedData.resultTracking.wallPostingPhotos || [],
+                  resultAnnouncedBy: updatedData.resultTracking.resultAnnouncedBy,
+                  announcementTime: updatedData.resultTracking.announcementTime,
+                  partyAgentsPresent: updatedData.resultTracking.partyAgentsPresent,
+                  discrepanciesNoted: updatedData.resultTracking.discrepanciesNoted,
+                  resultUploadStatus: updatedData.resultTracking.resultUploadStatus,
+                  additionalNotes: updatedData.resultTracking.additionalNotes
+                };
+
+                const response = await monitoringService.submitResultTracking(resultTrackingData);
                 console.log('✅ Result Tracking Data Saved:', response);
                 if (onNext) onNext();
               } catch (error: any) {
                 console.error('❌ Error:', error);
-                alert(error?.response?.data?.message || 'Submission failed. Try again.');
+                alert(error?.message || 'Submission failed. Try again.');
               }
             }}
             formData={formData}

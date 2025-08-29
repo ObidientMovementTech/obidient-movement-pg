@@ -39,6 +39,11 @@ import VotingBlocDetail from "./pages/dashboard/votingBloc/VotingBlocDetail.tsx"
 import NewVotingBlocPage from "./pages/dashboard/votingBloc/NewVotingBlocPage.tsx";
 import EditVotingBlocPage from "./pages/dashboard/votingBloc/EditVotingBlocPage.tsx";
 import VotingBlocManagePage from "./pages/dashboard/votingBloc/VotingBlocManagePage.tsx";
+import MonitorDashboard from "./pages/dashboard/elections/monitor/index.tsx";
+import PUInfoPage from "./pages/dashboard/elections/monitor/pages/PUInfoPage.tsx";
+import OfficerVerificationPage from "./pages/dashboard/elections/monitor/pages/OfficerVerificationPage.tsx";
+import ResultTrackingPage from "./pages/dashboard/elections/monitor/pages/ResultTrackingPage.tsx";
+import IncidentReportingPage from "./pages/dashboard/elections/monitor/pages/IncidentReportingPage.tsx";
 
 const router = createBrowserRouter([
   {
@@ -106,7 +111,74 @@ const router = createBrowserRouter([
     ),
   },
 
+  // Election Monitoring Dashboard - Protected Route
+  {
+    path: "/dashboard/elections/monitor",
+    element: (
+      <UserProvider>
+        <ProtectedRoute>
+          <MonitorDashboard />
+        </ProtectedRoute>
+      </UserProvider>
+    ),
+  },
 
+  // Legacy route for backwards compatibility
+  {
+    path: "/dashboard/elections/monitoring",
+    element: (
+      <UserProvider>
+        <ProtectedRoute>
+          <MonitorDashboard />
+        </ProtectedRoute>
+      </UserProvider>
+    ),
+  },
+
+  // Monitoring Form Pages
+  {
+    path: "/dashboard/elections/monitor/polling-unit",
+    element: (
+      <UserProvider>
+        <ProtectedRoute>
+          <PUInfoPage />
+        </ProtectedRoute>
+      </UserProvider>
+    ),
+  },
+
+  {
+    path: "/dashboard/elections/monitor/officer-verification",
+    element: (
+      <UserProvider>
+        <ProtectedRoute>
+          <OfficerVerificationPage />
+        </ProtectedRoute>
+      </UserProvider>
+    ),
+  },
+
+  {
+    path: "/dashboard/elections/monitor/result-tracking",
+    element: (
+      <UserProvider>
+        <ProtectedRoute>
+          <ResultTrackingPage />
+        </ProtectedRoute>
+      </UserProvider>
+    ),
+  },
+
+  {
+    path: "/dashboard/elections/monitor/incident-reporting",
+    element: (
+      <UserProvider>
+        <ProtectedRoute>
+          <IncidentReportingPage />
+        </ProtectedRoute>
+      </UserProvider>
+    ),
+  },
 
   // Voting Bloc Links
   {

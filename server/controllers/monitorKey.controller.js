@@ -69,7 +69,7 @@ export const monitorKeyController = {
 
       // Get user details
       const userResult = await client.query(
-        'SELECT id, name, email, designation, "assignedState", "assignedLGA", "assignedWard" FROM users WHERE id = $1',
+        'SELECT id, name, email, designation, assignedState, assignedLGA, assignedWard FROM users WHERE id = $1',
         [userId]
       );
 
@@ -129,16 +129,16 @@ export const monitorKeyController = {
       await client.query(`
         UPDATE users 
         SET monitor_unique_key = $1,
-            key_assigned_by = $2::uuid,
+            key_assigned_by = $2,
             key_assigned_date = CURRENT_TIMESTAMP,
             key_status = $3,
             election_access_level = $4,
             monitoring_location = $5,
-            "assignedState" = $6,
-            "assignedLGA" = $7,
-            "assignedWard" = $8,
-            "updatedAt" = CURRENT_TIMESTAMP
-        WHERE id = $9::uuid
+            assignedState = $6,
+            assignedLGA = $7,
+            assignedWard = $8,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $9
       `, [
         uniqueKey,
         adminId,
@@ -204,63 +204,136 @@ export const monitorKeyController = {
   // Verify monitoring key
   async verifyMonitorKey(req, res) {
     try {
+      console.log('🔥 VERIFY MONITOR KEY - REQUEST RECEIVED');
+      console.log('🔍 Request method:', req.method);
+      console.log('🔍 Request URL:', req.url);
+      console.log('🔍 Request headers:', {
+        authorization: req.headers.authorization,
+        cookie: req.headers.cookie,
+        'content-type': req.headers['content-type']
+      });
+      console.log('🔍 Request body:', req.body);
+      console.log('🔍 Request user:', req.user);
+      console.log('🔍 Session:', req.session);
+
       const { uniqueKey } = req.body;
-      const userId = req.user.id;
+      const userId = req.user?.id;
+
+      console.log('🔍 Extracted data:', { uniqueKey, userId });
 
       if (!uniqueKey) {
+        console.log('❌ No unique key provided');
         return res.status(400).json({
           success: false,
           message: 'Unique key is required'
         });
       }
 
-      // Verify key belongs to user and is active
-      const result = await query(`
+      if (!userId) {
+        console.log('❌ No user ID found in request (user not authenticated)');
+        console.log('❌ req.user:', req.user);
+        console.log('❌ req.session:', req.session);
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      // First, let's check what's in the user's record
+      console.log('🔍 Checking user record first...');
+      const userCheck = await query(`
         SELECT 
-          u.id, u.name, u.designation, u.election_access_level, 
-          u.monitoring_location, u.key_assigned_date,
-          ARRAY_AGG(
-            JSON_BUILD_OBJECT(
-              'election_id', e.election_id,
-              'election_name', e.election_name,
-              'election_type', e.election_type,
-              'state', e.state,
-              'election_date', e.election_date,
-              'status', e.status
-            )
-          ) as elections
-        FROM users u
-        LEFT JOIN elections e ON e.election_id = ANY(
-          SELECT json_array_elements_text(u.election_access_level::json)
-        )
-        WHERE u.monitor_unique_key = $1 
-          AND u.id = $2 
-          AND u.key_status = 'active'
-        GROUP BY u.id, u.name, u.designation, u.election_access_level, 
-                 u.monitoring_location, u.key_assigned_date
+          id, name, designation, election_access_level, 
+          monitoring_location, key_assigned_date, monitor_unique_key, key_status
+        FROM users 
+        WHERE monitor_unique_key = $1 AND id = $2
       `, [uniqueKey, userId]);
 
-      if (result.rows.length === 0) {
+      console.log('🔍 User check result:', {
+        found: userCheck.rows.length > 0,
+        userData: userCheck.rows[0]
+      });
+
+      if (userCheck.rows.length === 0) {
+        console.log('❌ User not found with this key and user ID combination');
         return res.status(404).json({
           success: false,
           message: 'Invalid key or key not assigned to this user'
         });
       }
 
-      const userData = result.rows[0];
+      const user = userCheck.rows[0];
+      console.log('🔍 User election_access_level value:', user.election_access_level);
+      console.log('🔍 User designation:', user.designation);
+
+      // Check if user has active key
+      if (user.key_status !== 'active') {
+        console.log('❌ Key is not active, status:', user.key_status);
+        return res.status(400).json({
+          success: false,
+          message: 'Monitoring key is not active'
+        });
+      }
+
+      // Get elections based on user's access level and location
+      let elections = [];
+      try {
+        console.log('🔍 Fetching elections based on access level and location...');
+
+        // Build query based on access level
+        let electionQuery = `
+          SELECT 
+            election_id, election_name, election_type, state, election_date, status
+          FROM elections 
+          WHERE status = 'active'
+        `;
+        let queryParams = [];
+
+        // Filter elections based on user's access level and location
+        const accessLevel = user.election_access_level || user.designation;
+        const monitoringLocation = user.monitoring_location ? JSON.parse(user.monitoring_location) : null;
+
+        if (accessLevel === 'State Coordinator' && monitoringLocation?.state) {
+          electionQuery += ` AND state = $1`;
+          queryParams.push(monitoringLocation.state);
+        } else if (accessLevel === 'LGA Coordinator' && monitoringLocation?.state) {
+          electionQuery += ` AND state = $1`;
+          queryParams.push(monitoringLocation.state);
+          // Could add LGA filtering if that field exists in elections table
+        } else if (accessLevel === 'National Coordinator') {
+          // National coordinators can see all elections
+        }
+
+        electionQuery += ` ORDER BY election_date DESC`;
+
+        console.log('🔍 Election query:', electionQuery);
+        console.log('🔍 Query params:', queryParams);
+
+        const electionsResult = await query(electionQuery, queryParams);
+        elections = electionsResult.rows;
+        console.log('🔍 Found elections:', elections.length);
+
+      } catch (error) {
+        console.log('❌ Error fetching elections:', error.message);
+        // Continue without elections - key verification can still succeed
+      }
+
+      console.log('✅ Key verification successful for user:', user.name);
 
       res.status(200).json({
         success: true,
         message: 'Key verified successfully',
         data: {
           userInfo: {
-            name: userData.name,
-            designation: userData.designation,
-            assignedDate: userData.key_assigned_date,
-            monitoringLocation: userData.monitoring_location
+            name: user.name,
+            designation: user.designation,
+            accessLevel: user.election_access_level,
+            assignedDate: user.key_assigned_date,
+            monitoringLocation: user.monitoring_location
           },
-          elections: userData.elections.filter(e => e.election_id !== null),
-          accessGranted: true
+          elections: elections,
+          accessGranted: true,
+          totalElections: elections.length
         }
       });
 
@@ -294,8 +367,17 @@ export const monitorKeyController = {
             )
           ) as elections
         FROM users u
-        LEFT JOIN elections e ON e.election_id = ANY(
-          SELECT json_array_elements_text(u.election_access_level::json)
+        LEFT JOIN elections e ON (
+          u.election_access_level IS NOT NULL 
+          AND u.election_access_level != '' 
+          AND e.election_id = ANY(
+            CASE 
+              WHEN u.election_access_level ~ '^\\[.*\\]$' THEN
+                ARRAY(SELECT json_array_elements_text(u.election_access_level::json))
+              ELSE 
+                ARRAY[u.election_access_level]
+            END
+          )
         )
         WHERE u.id = $1
         GROUP BY u.id, u.monitor_unique_key, u.key_status, u.key_assigned_date,
@@ -344,7 +426,7 @@ export const monitorKeyController = {
       const result = await query(`
         UPDATE users 
         SET key_status = 'revoked',
-            "updatedAt" = CURRENT_TIMESTAMP
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND key_status = 'active'
         RETURNING name, email, monitor_unique_key
       `, [userId]);
