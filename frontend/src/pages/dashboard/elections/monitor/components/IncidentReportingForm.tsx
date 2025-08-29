@@ -3,7 +3,7 @@ import IncidentBasics from './stages/incident-reporting/IncidentBasics';
 import IncidentDetails from './stages/incident-reporting/IncidentDetails';
 import WitnessInfo from './stages/incident-reporting/WitnessInfo';
 import EscalationReport from './stages/incident-reporting/EscalationReport';
-import { submitIncidentReportData } from '../../../../../services/monitorService';
+import { monitoringService } from '../../../../../services/monitoringService';
 
 interface IncidentReportingFormProps {
   formData: any;
@@ -86,20 +86,43 @@ export default function IncidentReportingForm({ formData, setFormData, onNext }:
                 ...formData,
                 incidentReport: {
                   ...formData.incidentReport,
-                  ...data.incidentReport,
+                  ...data,
                 },
               };
 
               setFormData(updatedData);
 
               try {
-                const token = localStorage.getItem('token') || '';
-                const response = await submitIncidentReportData(updatedData, token);
+                // Create incident report object for API
+                const incidentReportData = {
+                  submissionId: formData.submissionId || monitoringService.generateSubmissionId(),
+                  incidentType: updatedData.incidentReport.incidentType || 'General Incident',
+                  severity: updatedData.incidentReport.severity || 'medium',
+                  description: updatedData.incidentReport.incident_narrative || 'No description provided',
+                  timeReported: new Date().toISOString(),
+                  resolved: false,
+                  // Map all form fields to API fields
+                  officerNameOrId: updatedData.incidentReport.officerNameOrId,
+                  incidentDate: updatedData.incidentReport.incidentDate,
+                  incidentStartTime: updatedData.incidentReport.incidentStart,
+                  incidentEndTime: updatedData.incidentReport.incidentEnd,
+                  captureMethod: updatedData.incidentReport.captureMethod || [],
+                  weatherConditions: updatedData.incidentReport.conditions,
+                  irregularities: updatedData.incidentReport.irregularities || [],
+                  perpetrators: updatedData.incidentReport.perpetrators,
+                  victims: updatedData.incidentReport.victims,
+                  officialsPresent: updatedData.incidentReport.officialsPresent,
+                  witnesses: updatedData.incidentWitnesses || [],
+                  reportedToAuthorities: updatedData.reportedToAuthorities,
+                  additionalNotes: updatedData.additionalNotes
+                };
+
+                const response = await monitoringService.submitIncidentReport(incidentReportData);
                 console.log('✅ Incident Report Submitted:', response);
                 if (onNext) onNext();
               } catch (error: any) {
                 console.error('❌ Error submitting incident report:', error);
-                alert(error?.response?.data?.message || 'Submission failed. Please try again.');
+                alert(error?.message || 'Submission failed. Please try again.');
               }
             }}
           />

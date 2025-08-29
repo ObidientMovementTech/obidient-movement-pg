@@ -4,8 +4,7 @@ import {
   getAdminBroadcasts,
   getAdminBroadcastById,
   updateAdminBroadcast,
-  deleteAdminBroadcast,
-  sendPrivateMessage
+  deleteAdminBroadcast
 } from '../controllers/adminBroadcast.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
 
@@ -17,6 +16,5 @@ router.get('/', protect, getAdminBroadcasts);
 router.get('/:id', protect, getAdminBroadcastById);
 router.put('/:id', protect, updateAdminBroadcast);
 router.delete('/:id', protect, deleteAdminBroadcast);
-router.post('/send-private', protect, sendPrivateMessage);
 
 export default router;

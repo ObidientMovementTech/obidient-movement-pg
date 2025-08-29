@@ -2,7 +2,6 @@ import AdminBroadcast from "../models/adminBroadcast.model.js";
 import User from "../models/user.model.js";
 import Notification from "../models/notification.model.js";
 import { transformUser, transformBroadcast } from '../utils/mongoCompat.js';
-import { sendAdminBroadcastEmail, sendAdminPrivateMessage } from '../utils/emailHandler.js';
 
 /**
  * Send a general broadcast message to all users
@@ -32,28 +31,16 @@ export const sendAdminBroadcast = async (req, res) => {
       // For now, send to all users since notification preferences might not be implemented yet
     });
 
-    // Create notifications for each user and prepare email recipients
+    // Create notifications for each user
     const notifications = await Promise.all(
       users.map((user) =>
         Notification.create({
-          recipient: user.id,
-          type: "adminBroadcast",
+          recipient: user.id, // Use correct field name for PostgreSQL
+          type: "adminBroadcast", // New type for admin broadcasts
           title,
           message
         })
       )
-    );
-
-    // Send emails to all users
-    const emailResult = await sendAdminBroadcastEmail(
-      admin.name,
-      title,
-      message,
-      users.map(user => ({
-        name: user.name,
-        email: user.email
-      })),
-      'announcement'
     );
 
     return res.status(201).json({
@@ -65,9 +52,7 @@ export const sendAdminBroadcast = async (req, res) => {
         sentBy: newBroadcast.sentBy,
         createdAt: newBroadcast.createdAt
       },
-      notificationsSent: notifications.length,
-      emailsSent: emailResult.successful,
-      emailsFailed: emailResult.failed
+      notificationsSent: notifications.length
     });
   } catch (error) {
     console.error("Admin broadcast error:", error);
@@ -115,62 +100,6 @@ export const getAdminBroadcasts = async (req, res) => {
     res.status(200).json(transformedBroadcasts);
   } catch (error) {
     console.error("Error getting admin broadcasts:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-export const sendPrivateMessage = async (req, res) => {
-  const { userId, title, message, messageType = 'notice' } = req.body;
-  const sentBy = req.userId; // extracted from token via middleware
-
-  if (!userId || !title || !message) {
-    return res.status(400).json({ message: "User ID, title, and message are required" });
-  }
-
-  try {
-    // Verify the sender is an admin
-    const admin = await User.findById(sentBy);
-    if (!admin || admin.role !== 'admin') {
-      return res.status(403).json({ message: "Unauthorized - admin privileges required" });
-    }
-
-    // Get the recipient user
-    const recipient = await User.findById(userId);
-    if (!recipient) {
-      return res.status(404).json({ message: "Recipient user not found" });
-    }
-
-    // Create a notification for the user
-    const notification = await Notification.create({
-      recipient: userId,
-      type: "adminBroadcast", // Using adminBroadcast type since it's supported by the DB
-      title,
-      message
-    });
-
-    // Send the email
-    const emailResult = await sendAdminPrivateMessage(
-      recipient.name,
-      recipient.email,
-      admin.name,
-      title,
-      message,
-      messageType
-    );
-
-    return res.status(201).json({
-      success: true,
-      message: "Private message sent successfully",
-      notification: {
-        id: notification.id,
-        title: notification.title,
-        message: notification.message,
-        createdAt: notification.createdAt
-      },
-      emailSent: true
-    });
-  } catch (error) {
-    console.error("Error sending private message:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

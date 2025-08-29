@@ -60,15 +60,27 @@ export const monitorKeyService = {
 
   // User functions
   async verifyMonitorKey(uniqueKey: string) {
+    console.log('🔥 verifyMonitorKey called with key:', uniqueKey);
+
     try {
       const response = await axios.post(`${API_BASE}/monitor-key/verify`, {
         uniqueKey
       }, {
-        withCredentials: true
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
+
+      console.log('🎉 API response:', response.data);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to verify monitoring key');
+      console.log('❌ API error:', error);
+
+      if (error.response?.data) {
+        throw new Error(error.response.data.message || 'Key verification failed');
+      }
+      throw new Error('Network error occurred');
     }
   },
 
