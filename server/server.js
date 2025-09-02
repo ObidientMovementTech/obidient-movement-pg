@@ -21,6 +21,7 @@ import stateDashboardRoutes from './routes/stateDashboard.routes.js';
 import monitorKeyRoutes from './routes/monitorKey.route.js';
 import electionRoutes from './routes/election.routes.js';
 import monitoringRoutes from './routes/monitoring.route.js';
+import mobileRoutes from './routes/mobile.route.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -75,6 +76,7 @@ app.use('/state-dashboard', stateDashboardRoutes); // State Dashboard routes
 app.use('/monitor-key', monitorKeyRoutes); // Monitor Key routes
 app.use('/elections', electionRoutes); // Election Management routes
 app.use('/monitoring', monitoringRoutes); // Vote Protection monitoring routes
+app.use('/mobile', mobileRoutes); // Mobile App API routes
 
 // Placeholder route
 app.get('/', (req, res) => {
