@@ -7,7 +7,8 @@ import {
   createVotingBlocPrivateMessageEmailTemplate,
   createVotingBlocInvitationEmailTemplate,
   createVotingBlocRemovalEmailTemplate,
-  createVoteDefenderKeyAssignedEmailTemplate
+  createVoteDefenderKeyAssignedEmailTemplate,
+  createAdminBroadcastEmailTemplate
 } from './emailTemplates.js';
 
 // Send Confirmation Email
@@ -335,6 +336,88 @@ Thank you for your commitment to protecting the integrity of our democratic proc
     return response;
   } catch (error) {
     console.error(`[EMAIL] Error sending vote defender key assignment email to ${userEmail}:`, error.message);
+    throw error;
+  }
+};
+
+// Send Admin Broadcast Email
+export const sendAdminBroadcastEmail = async (title, message, senderName, recipients) => {
+  const subject = `Important Message: ${title} - Obidient Movement`;
+  const html = createAdminBroadcastEmailTemplate(title, message, senderName);
+
+  // Create plain text version
+  const plainText = `IMPORTANT MESSAGE FROM OBIDIENT MOVEMENT
+
+${title}
+
+${message}
+
+This message was sent by ${senderName || 'Obidient Movement Administration'} to all members of the Obidient Movement platform.
+
+For updates and more information, visit your dashboard at: https://member.obidients.com/dashboard
+
+— The Obidient Movement Team`;
+
+  console.log(`[EMAIL] Preparing to send admin broadcast email to ${recipients.length} recipients`);
+
+  try {
+    // Send to multiple recipients in batches to avoid overwhelming the email service
+    const batchSize = 50; // Send emails in batches of 50
+    const batches = [];
+    
+    for (let i = 0; i < recipients.length; i += batchSize) {
+      batches.push(recipients.slice(i, i + batchSize));
+    }
+
+    let totalSent = 0;
+    let totalFailed = 0;
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      console.log(`[EMAIL] Sending batch ${batchIndex + 1}/${batches.length} (${batch.length} emails)`);
+
+      // Send emails in this batch
+      const emailPromises = batch.map(recipient =>
+        emailTransporter.sendMail({
+          from: `"${sender.name}" <${sender.email}>`,
+          to: recipient.email,
+          subject,
+          html,
+          text: plainText,
+        }).catch(error => {
+          console.error(`[EMAIL] Failed to send to ${recipient.email}:`, error.message);
+          return { error: true, email: recipient.email };
+        })
+      );
+
+      const results = await Promise.allSettled(emailPromises);
+      
+      // Count successes and failures for this batch
+      const batchSent = results.filter(result => 
+        result.status === 'fulfilled' && !result.value?.error
+      ).length;
+      const batchFailed = results.length - batchSent;
+
+      totalSent += batchSent;
+      totalFailed += batchFailed;
+
+      console.log(`[EMAIL] Batch ${batchIndex + 1} completed: ${batchSent} sent, ${batchFailed} failed`);
+
+      // Add small delay between batches to avoid rate limiting
+      if (batchIndex < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    console.log(`[EMAIL] Admin broadcast email completed: ${totalSent}/${recipients.length} sent successfully, ${totalFailed} failed`);
+    
+    return { 
+      successful: totalSent, 
+      failed: totalFailed, 
+      total: recipients.length 
+    };
+  } catch (error) {
+    console.error(`[EMAIL] Error sending admin broadcast email:`, error.message);
     throw error;
   }
 };

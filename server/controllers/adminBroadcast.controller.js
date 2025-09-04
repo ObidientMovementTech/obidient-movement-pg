@@ -2,6 +2,7 @@ import AdminBroadcast from "../models/adminBroadcast.model.js";
 import User from "../models/user.model.js";
 import Notification from "../models/notification.model.js";
 import { transformUser, transformBroadcast } from '../utils/mongoCompat.js';
+import { sendAdminBroadcastEmail } from '../utils/emailHandler.js';
 
 /**
  * Send a general broadcast message to all users
@@ -31,6 +32,8 @@ export const sendAdminBroadcast = async (req, res) => {
       // For now, send to all users since notification preferences might not be implemented yet
     });
 
+    console.log(`[ADMIN_BROADCAST] Found ${users.length} users to notify`);
+
     // Create notifications for each user
     const notifications = await Promise.all(
       users.map((user) =>
@@ -43,6 +46,34 @@ export const sendAdminBroadcast = async (req, res) => {
       )
     );
 
+    console.log(`[ADMIN_BROADCAST] Created ${notifications.length} dashboard notifications`);
+
+    // Prepare email recipients - filter out users without email
+    const emailRecipients = users.filter(user => user.email && user.email.trim() !== '');
+    
+    console.log(`[ADMIN_BROADCAST] Sending emails to ${emailRecipients.length} users with valid email addresses`);
+
+    // Send broadcast emails
+    let emailResults = { successful: 0, failed: 0, total: 0 };
+    
+    if (emailRecipients.length > 0) {
+      try {
+        emailResults = await sendAdminBroadcastEmail(
+          title,
+          message,
+          admin.firstName && admin.lastName 
+            ? `${admin.firstName} ${admin.lastName}` 
+            : admin.username || 'Obidient Movement Administration',
+          emailRecipients
+        );
+        
+        console.log(`[ADMIN_BROADCAST] Email results: ${emailResults.successful}/${emailResults.total} sent successfully`);
+      } catch (emailError) {
+        console.error(`[ADMIN_BROADCAST] Email sending failed:`, emailError.message);
+        // Don't fail the entire request if emails fail
+      }
+    }
+
     return res.status(201).json({
       success: true,
       broadcast: {
@@ -52,7 +83,13 @@ export const sendAdminBroadcast = async (req, res) => {
         sentBy: newBroadcast.sentBy,
         createdAt: newBroadcast.createdAt
       },
-      notificationsSent: notifications.length
+      notificationsSent: notifications.length,
+      emailResults: {
+        totalUsers: users.length,
+        usersWithEmail: emailRecipients.length,
+        emailsSent: emailResults.successful,
+        emailsFailed: emailResults.failed
+      }
     });
   } catch (error) {
     console.error("Admin broadcast error:", error);

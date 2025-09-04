@@ -500,3 +500,68 @@ export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, 
   `.trim();
 }
 
+export function createAdminBroadcastEmailTemplate(title, message, senderName) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Important Message from Obidient Movement</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="padding: 30px;">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <div style="display: inline-block; background: linear-gradient(135deg, #0B6739, #077b32); color: white; padding: 15px 25px; border-radius: 25px; font-size: 16px; font-weight: bold;">
+            📢 OFFICIAL ANNOUNCEMENT
+          </div>
+        </div>
+        
+        <h2 style="color: #0B6739; margin-top: 0; text-align: center; font-size: 24px; line-height: 1.3;">
+          ${title}
+        </h2>
+        
+        <div style="background-color: #f8f9fa; border-left: 4px solid #0B6739; padding: 20px; margin: 25px 0; border-radius: 6px;">
+          <div style="color: #333333; line-height: 1.6; font-size: 16px;">
+            ${message.split('\n').map(paragraph => 
+              paragraph.trim() ? `<p style="margin: 0 0 15px 0;">${paragraph.trim()}</p>` : ''
+            ).join('')}
+          </div>
+        </div>
+        
+        <div style="background-color: #e8f5e8; border-radius: 8px; padding: 20px; margin: 25px 0; text-align: center;">
+          <h4 style="color: #0B6739; margin-top: 0; margin-bottom: 15px;">Stay Connected</h4>
+          <p style="color: #555555; line-height: 1.5; margin: 10px 0;">
+            For updates and more information, visit your dashboard or check our official communications.
+          </p>
+          <table border="0" cellpadding="0" cellspacing="0" style="margin: 15px auto;">
+            <tr>
+              <td align="center" bgcolor="#0B6739" style="border-radius: 6px; box-shadow: 0 2px 4px rgba(11, 103, 57, 0.3);">
+                <a href="https://member.obidients.com/dashboard" target="_blank" style="display: inline-block; padding: 12px 24px; font-size: 16px; font-weight: bold; color: #ffffff; text-decoration: none;">
+                  View Dashboard
+                </a>
+              </td>
+            </tr>
+          </table>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #eeeeee; margin: 25px 0;">
+        
+        <p style="color: #777777; font-size: 14px; text-align: center;">
+          This message was sent by ${senderName || 'Obidient Movement Administration'} to all members of the Obidient Movement platform.
+        </p>
+        
+        <p style="color: #999999; font-size: 12px; text-align: center;">
+          This is an automated message from Obidient Movement. Please do not reply to this email.
+        </p>
+        <p style="color: #0B6739; font-weight: bold; text-align: center;">— The Obidient Movement Team</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+

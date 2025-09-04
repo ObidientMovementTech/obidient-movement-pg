@@ -7,9 +7,14 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authAPI, storage } from '../services/api';
+import { colors, typography, globalStyles } from '../styles/globalStyles';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -72,111 +77,135 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Obidient Movement</Text>
-        <Text style={styles.subtitle}>Mobile App</Text>
+    <SafeAreaView style={[globalStyles.safeArea, styles.container]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <View style={styles.iconContainer}>
+              <Image
+                source={require('../assets/images/obi-logo-icon.png')}
+                style={styles.iconImage}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.title}>Obidient Movement</Text>
+            <Text style={styles.subtitle}>Mobile App</Text>
+          </View>
 
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <View style={styles.form}>
+            <TextInput
+              style={[globalStyles.input, styles.input]}
+              placeholder="Email"
+              placeholderTextColor={colors.textLight}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-          />
+            <TextInput
+              style={[globalStyles.input, styles.input]}
+              placeholder="Password"
+              placeholderTextColor={colors.textLight}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.buttonText}>Login</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[globalStyles.button, styles.loginButton, loading && styles.buttonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={[globalStyles.buttonText, styles.buttonText]}>Login</Text>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.testButton} onPress={testConnection}>
-            <Text style={styles.testButtonText}>Test Connection</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <TouchableOpacity
+              style={[globalStyles.secondaryButton, styles.testButton]}
+              onPress={testConnection}
+            >
+              <Text style={[globalStyles.secondaryButtonText, styles.testButtonText]}>
+                Test Connection
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  iconContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 60,
+    padding: 16,
+    marginBottom: 20,
+    ...globalStyles.shadow,
+  },
+  iconImage: {
+    width: 80,
+    height: 80,
+  },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    ...typography.h1,
+    color: colors.primary,
     textAlign: 'center',
     marginBottom: 8,
-    color: '#2e7d32',
   },
   subtitle: {
-    fontSize: 16,
+    ...typography.body1,
+    color: colors.textLight,
     textAlign: 'center',
-    marginBottom: 40,
-    color: '#666',
   },
   form: {
     width: '100%',
   },
   input: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    marginBottom: 16,
   },
-  button: {
-    backgroundColor: '#2e7d32',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  buttonDisabled: {
-    backgroundColor: '#a5d6a7',
+  loginButton: {
+    marginBottom: 16,
   },
   buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    // Using global button text style
   },
   testButton: {
-    backgroundColor: '#1976d2',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
+    marginTop: 8,
   },
   testButtonText: {
-    color: 'white',
-    fontSize: 14,
+    // Using global secondary button text style
+  },
+  buttonDisabled: {
+    backgroundColor: colors.primaryLight,
+    opacity: 0.6,
   },
 });
 

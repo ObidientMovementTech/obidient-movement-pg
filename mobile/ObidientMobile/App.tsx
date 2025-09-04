@@ -1,15 +1,13 @@
-// import React from 'react';
-// import { NavigationContainer } from '@react-navigation/native';
-// import { SafeAreaProvider } from 'react-native-safe-area-context';
-// import AppNavigator from './src/navigation/AppNavigator';
-
-import React from 'react';
+import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
+import SplashScreen from './src/components/SplashScreen';
 // import PushNotificationService from './src/services/pushNotificationService';
 
 const App = () => {
+  const [showSplash, setShowSplash] = useState(true);
+
   // Temporarily disabled Firebase until google-services.json is added
   // useEffect(() => {
   //   // Initialize push notifications
@@ -25,6 +23,12 @@ const App = () => {
   //   initializePushNotifications();
   // }, []);
 
+  if (showSplash) {
+    return (
+      <SplashScreen onFinish={() => setShowSplash(false)} />
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
@@ -36,4 +40,3 @@ const App = () => {
 
 export default App;
 
-// export default App;
