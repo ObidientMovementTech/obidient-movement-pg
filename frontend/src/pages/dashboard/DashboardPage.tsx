@@ -185,7 +185,7 @@ export default function DashboardPage() {
       children: [
         { title: "Vote", icon: <ScanLine size={20} />, component: <Vote /> },
         { title: "Monitor", icon: <Eye size={20} />, component: <Monitor /> },
-        { title: "Results", icon: <BarChart3 size={20} />, component: <Results /> },
+        // { title: "Results", icon: <BarChart3 size={20} />, component: <Results /> },
       ]
     },
     // Admin section - only visible for admin users
