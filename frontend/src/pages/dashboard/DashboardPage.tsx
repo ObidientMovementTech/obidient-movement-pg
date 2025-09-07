@@ -36,7 +36,7 @@ import DashboardHeader from "./components/DashboardHeader";
 import { useNavigate } from "react-router";
 import Vote from "./elections/Vote";
 import CitizensOrganizingSchool from "./organise/CitizensOrganizingSchool";
-import Results from "./elections/Results";
+// import Results from "./elections/Results";
 import Monitor from "./elections/Monitor";
 import KYCManagement from "./admin/KYCManagement";
 import AdminBroadcastPage from "./admin/AdminBroadcastPage";
