@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, isAdmin } from '../middlewares/auth.middleware.js';
+import { parseFileUpload } from '../utils/s3Upload.js';
 import {
   mobileLogin,
   getMobileFeeds,
@@ -7,7 +8,8 @@ import {
   getMyMessages,
   registerPushToken,
   createMobileFeed,
-  updatePushSettings
+  updatePushSettings,
+  uploadMobileFeedImage
 } from '../controllers/mobile.controller.js';
 
 const router = express.Router();
@@ -27,6 +29,7 @@ router.post('/auth/login', mobileLogin);
 // Feeds/Alerts
 router.get('/feeds', protect, getMobileFeeds);
 router.post('/feeds', protect, isAdmin, createMobileFeed); // For admin users
+router.post('/feeds/upload-image', protect, isAdmin, parseFileUpload('file'), uploadMobileFeedImage);
 
 // Leadership Messaging
 router.post('/messages/leadership', protect, sendLeadershipMessage);

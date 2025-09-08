@@ -130,6 +130,7 @@ export const globalStyles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-Regular',
     backgroundColor: colors.white,
+    color: colors.text, // Explicitly set text color to dark
   },
   card: {
     backgroundColor: colors.white,

@@ -53,7 +53,12 @@ app.set('trust proxy', 1);
 
 // Basic middlewares
 app.use(cors({
-  origin: CLIENT_URL,
+  origin: [
+    CLIENT_URL,
+    'http://192.168.0.111:8081', // Metro bundler for mobile development
+    'http://localhost:8081',      // Metro bundler localhost
+    'http://10.0.2.2:8081'        // Metro bundler for emulator
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']

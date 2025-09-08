@@ -2,6 +2,7 @@ import { query } from '../config/db.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { sendPushNotification, sendBroadcastPush } from '../services/pushNotificationService.js';
+import { uploadBufferToS3 } from '../utils/s3Upload.js';
 
 // Mobile Authentication
 const mobileLogin = async (req, res) => {
@@ -321,6 +322,42 @@ const updatePushSettings = async (req, res) => {
   }
 };
 
+// Upload image for mobile feed (Admin only)
+const uploadMobileFeedImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    if (!req.file.buffer) {
+      return res.status(400).json({ error: 'File buffer is required' });
+    }
+
+    // Upload to S3
+    const imageUrl = await uploadBufferToS3(
+      req.file.buffer,
+      req.file.originalname,
+      {
+        folder: 'mobile_feed_images',
+        contentType: req.file.mimetype
+      }
+    );
+
+    res.json({
+      success: true,
+      url: imageUrl,
+      message: 'Mobile feed image uploaded successfully'
+    });
+
+  } catch (error) {
+    console.error('Error uploading mobile feed image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload image'
+    });
+  }
+};
+
 export {
   mobileLogin,
   getMobileFeeds,
@@ -328,5 +365,6 @@ export {
   getMyMessages,
   registerPushToken,
   createMobileFeed,
-  updatePushSettings
+  updatePushSettings,
+  uploadMobileFeedImage
 };

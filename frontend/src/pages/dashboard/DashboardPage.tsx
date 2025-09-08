@@ -19,6 +19,7 @@ import {
   Bell,
   RefreshCw,
   MapPin,
+  Smartphone,
 } from "lucide-react";
 import TopLogo from "../../components/TopLogo";
 import Loading from "../../components/Loader";
@@ -43,6 +44,7 @@ import AdminBroadcastPage from "./admin/AdminBroadcastPage";
 import AdminDefaultVotingBlocPage from "./admin/AdminDefaultVotingBlocPage";
 import AdminTemplateSyncPage from "./admin/AdminTemplateSyncPage";
 import AdminUserManagement from "./admin/AdminUserManagement";
+import AdminMobileFeedsPage from "./admin/AdminMobileFeedsPage";
 import ElectionManagement from "./admin/ElectionManagement";
 import AllNotificationsPage from "./notifications/AllNotificationsPage";
 import StateDashboard from "./state/StateDashboard";
@@ -199,6 +201,7 @@ export default function DashboardPage() {
         { title: "Default Voting Bloc Settings", icon: <Flag size={20} />, component: <AdminDefaultVotingBlocPage /> },
         { title: "Template Synchronization", icon: <RefreshCw size={20} />, component: <AdminTemplateSyncPage /> },
         { title: "Broadcast Messages", icon: <Megaphone size={20} />, component: <AdminBroadcastPage /> },
+        { title: "Mobile Feeds Management", icon: <Smartphone size={20} />, component: <AdminMobileFeedsPage /> },
       ],
     }] : []),
 
