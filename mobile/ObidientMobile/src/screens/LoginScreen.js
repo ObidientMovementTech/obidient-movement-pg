@@ -28,6 +28,8 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
 
+    if (loading) return; // Prevent double-tap
+
     setLoading(true);
     try {
       // Attempt login
@@ -39,9 +41,8 @@ const LoginScreen = ({ navigation }) => {
         await storage.setAuthToken(response.data.token);
         await storage.setUser(response.data.user);
 
-        Alert.alert('Success', 'Login successful!', [
-          { text: 'OK', onPress: () => navigation.replace('Main') }
-        ]);
+        // Navigate directly to main screen without alert
+        navigation.replace('Main');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -220,11 +221,11 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   iconContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 60,
+    // backgroundColor: colors.white,
+    // borderRadius: 60,
     padding: 16,
-    marginBottom: 20,
-    ...globalStyles.shadow,
+    // marginBottom: 20,
+    // ...globalStyles.shadow,
   },
   iconImage: {
     width: 80,

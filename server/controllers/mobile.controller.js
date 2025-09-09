@@ -281,10 +281,34 @@ const createMobileFeed = async (req, res) => {
       RETURNING id, created_at
     `, [title, message, feedType, priority, imageUrl, createdBy]);
 
+    const feedId = result.rows[0].id;
+
+    // Send push notification to all users with enabled notifications
+    try {
+      const notificationTitle = `🔔 ${feedType === 'urgent' ? '🚨 URGENT' : 'New Update'}`;
+      const notificationBody = title.length > 100 ? title.substring(0, 100) + '...' : title;
+
+      const pushResult = await sendBroadcastPush(
+        notificationTitle,
+        notificationBody,
+        {
+          type: 'feed',
+          feedId: feedId.toString(),
+          feedType,
+          priority
+        }
+      );
+
+      console.log(`📱 Push notification sent for feed ${feedId}:`, pushResult);
+    } catch (pushError) {
+      console.error('Error sending push notification for new feed:', pushError);
+      // Don't fail the feed creation if push notification fails
+    }
+
     res.json({
       success: true,
-      feedId: result.rows[0].id,
-      message: 'Feed created successfully'
+      feedId: feedId,
+      message: 'Feed created successfully and notifications sent'
     });
 
   } catch (error) {

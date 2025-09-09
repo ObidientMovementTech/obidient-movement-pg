@@ -17,9 +17,11 @@
         <!-- Allow your development machine IP (Metro bundler) -->
         <domain includeSubdomains="true">192.168.1.1</domain>
         <domain includeSubdomains="true">192.168.0.111</domain>
+        <domain includeSubdomains="true">172.20.10.2</domain>
         <!-- Allow entire local network range -->
         <domain includeSubdomains="true">192.168.0.0</domain>
         <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">172.20.10.0</domain>
     </domain-config>
     
     <!-- Allow HTTPS for S3 images with permissive settings -->

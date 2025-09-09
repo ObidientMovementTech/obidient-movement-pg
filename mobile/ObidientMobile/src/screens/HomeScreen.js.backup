@@ -1,0 +1,496 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  SafeAreaView,
+  StatusBar,
+  FlatList,
+  Dimensions,
+  RefreshControl,
+} from 'react-native';
+import { colors, typography } from '../styles/globalStyles';
+import { 
+  User, 
+  Settings, 
+  Bell, 
+  MessageCircle, 
+  Users, 
+  Calendar, 
+  Search, 
+  MoreHorizontal, 
+  Clock,
+  Newspaper,
+  ChevronRight,
+  CheckCircle,
+  ArrowRight
+} from 'lucide-react-native';
+import { mobileAPI, storage } from '../services/api';
+
+const { width } = Dimensions.get('window');
+
+const HomeScreen = ({ navigation }) => {
+  const [user, setUser] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [recentFeeds, setRecentFeeds] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadUserData();
+    loadRecentFeeds();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const userData = await storage.getUser();
+      setUser(userData);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const loadRecentFeeds = async () => {
+    try {
+      setLoading(true);
+      const response = await mobileAPI.getFeeds();
+      if (response.data.success) {
+        // Get only the first 3 feeds for home screen
+        setRecentFeeds(response.data.feeds.slice(0, 3));
+      }
+    } catch (error) {
+      console.error('Error loading recent feeds:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadUserData();
+    await loadRecentFeeds();
+    setRefreshing(false);
+  };
+
+  const getIcon = (iconName, size, color) => {
+    const iconProps = { size, color, strokeWidth: 1.5 };
+
+    switch (iconName) {
+      case 'people':
+      case 'users':
+        return <Users {...iconProps} />;
+      case 'newspaper':
+      case 'newspaper-outline':
+        return <Newspaper {...iconProps} />;
+      case 'calendar':
+      case 'calendar-outline':
+        return <Calendar {...iconProps} />;
+      case 'chatbubbles':
+      case 'chatbubbles-outline':
+      case 'message-circle':
+        return <MessageCircle {...iconProps} />;
+      case 'person':
+      case 'person-outline':
+        return <User {...iconProps} />;
+      case 'chevron-forward':
+        return <ChevronRight {...iconProps} />;
+      case 'checkmark-circle':
+        return <CheckCircle {...iconProps} />;
+      default:
+        return <Users {...iconProps} />;
+    }
+  };
+
+  const QuickActionCard = ({ icon, title, subtitle, onPress, color = colors.primary }) => (
+    <TouchableOpacity style={styles.quickActionCard} onPress={onPress}>
+      <View style={[styles.quickActionIcon, { backgroundColor: color + '20' }]}>
+        {getIcon(icon, 24, color)}
+      </View>
+      <View style={styles.quickActionText}>
+        <Text style={styles.quickActionTitle}>{title}</Text>
+        <Text style={styles.quickActionSubtitle}>{subtitle}</Text>
+      </View>
+      {getIcon('chevron-forward', 20, colors.textLight)}
+    </TouchableOpacity>
+  );
+
+  const StatCard = ({ title, value, icon, color = colors.primary }) => (
+    <View style={styles.statCard}>
+      <View style={[styles.statIcon, { backgroundColor: color + '20' }]}>
+        {getIcon(icon, 20, color)}
+      </View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statTitle}>{title}</Text>
+    </View>
+  );
+
+  const FeedCard = ({ feed, isLast = false }) => (
+    <TouchableOpacity 
+      style={[styles.feedCard, isLast && styles.feedCardLast]} 
+      onPress={() => navigation.navigate('Feeds')}
+    >
+      {feed.image_url && (
+        <Image source={{ uri: feed.image_url }} style={styles.feedImage} />
+      )}
+      <View style={styles.feedContent}>
+        <View style={styles.feedHeader}>
+          <View style={[styles.feedTypeBadge, { backgroundColor: getFeedTypeColor(feed.type) }]}>
+            <Text style={styles.feedTypeText}>{feed.type?.toUpperCase()}</Text>
+          </View>
+          <Text style={styles.feedTime}>{getTimeAgo(feed.created_at)}</Text>
+        </View>
+        <Text style={styles.feedTitle} numberOfLines={2}>
+          {feed.title}
+        </Text>
+        <Text style={styles.feedContent} numberOfLines={3}>
+          {feed.content}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const getFeedTypeColor = (type) => {
+    switch (type?.toLowerCase()) {
+      case 'announcement': return '#FF6B35';
+      case 'event': return '#4ECDC4';
+      case 'news': return '#45B7D1';
+      default: return colors.primary;
+    }
+  };
+
+  const getTimeAgo = (dateString) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="white" />
+      
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>Good morning,</Text>
+            <Text style={styles.userName}>{user?.first_name || 'Obidient'} 👋</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.profileContainer}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Image
+              source={
+                user?.profile_picture
+                  ? { uri: user.profile_picture }
+                  : require('../assets/images/default-avatar.png')
+              }
+              style={styles.profileImage}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Recent Feeds Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Feeds</Text>
+            <TouchableOpacity 
+              style={styles.viewAllButton}
+              onPress={() => navigation.navigate('Feeds')}
+            >
+              <Text style={styles.viewAllText}>View all</Text>
+              <ArrowRight size={16} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={recentFeeds}
+            renderItem={({ item, index }) => (
+              <FeedCard 
+                feed={item} 
+                isLast={index === recentFeeds.length - 1}
+              />
+            )}
+            keyExtractor={(item) => item.id.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.feedsList}
+            snapToInterval={width * 0.85}
+            decelerationRate="fast"
+            ListEmptyComponent={
+              <View style={styles.emptyFeeds}>
+                <Newspaper size={48} color={colors.textLight} />
+                <Text style={styles.emptyFeedsText}>No recent feeds</Text>
+              </View>
+            }
+          />
+        </View>
+
+        {/* Quick Actions Grid */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          
+          <View style={styles.quickActionsGrid}>
+            <TouchableOpacity 
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Feeds')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: colors.primary + '15' }]}>
+                <Newspaper size={24} color={colors.primary} strokeWidth={1.5} />
+              </View>
+              <Text style={styles.quickActionTitle}>Latest Feeds</Text>
+              <Text style={styles.quickActionSubtitle}>Stay updated</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Messages')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FF6B35' + '15' }]}>
+                <MessageCircle size={24} color="#FF6B35" strokeWidth={1.5} />
+              </View>
+              <Text style={styles.quickActionTitle}>Messages</Text>
+              <Text style={styles.quickActionSubtitle}>Connect</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#4ECDC4' + '15' }]}>
+                <User size={24} color="#4ECDC4" strokeWidth={1.5} />
+              </View>
+              <Text style={styles.quickActionTitle}>Profile</Text>
+              <Text style={styles.quickActionSubtitle}>Manage</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickActionCard}
+              onPress={() => {/* Navigate to events */}}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#9B59B6' + '15' }]}>
+                <Calendar size={24} color="#9B59B6" strokeWidth={1.5} />
+              </View>
+              <Text style={styles.quickActionTitle}>Events</Text>
+              <Text style={styles.quickActionSubtitle}>Join us</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Movement Stats */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Movement Impact</Text>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>10K+</Text>
+              <Text style={styles.statLabel}>Active Members</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>150+</Text>
+              <Text style={styles.statLabel}>States Covered</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>500+</Text>
+              <Text style={styles.statLabel}>Events Held</Text>
+            </View>
+          </View>
+        </View>
+
+        <QuickActionCard
+          icon="person-outline"
+          title="Your Profile"
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    typography: 'Poppins-Regular',
+  },
+  header: {
+    backgroundColor: colors.primary,
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  greeting: {
+    color: 'white',
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+  },
+  userName: {
+    color: 'white',
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    marginTop: 4,
+  },
+  profileImage: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  welcomeBanner: {
+    backgroundColor: 'white',
+    margin: 20,
+    padding: 20,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  bannerContent: {
+    flex: 1,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: colors.textLight,
+    lineHeight: 20,
+  },
+  bannerLogo: {
+    width: 60,
+    height: 60,
+    marginLeft: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  statTitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  quickActionCard: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  quickActionText: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  quickActionSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: colors.textLight,
+  },
+  activityCard: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  activityText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text,
+    marginLeft: 12,
+  },
+});
+
+export default HomeScreen;

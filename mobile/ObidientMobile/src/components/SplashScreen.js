@@ -1,13 +1,14 @@
 import React, { useEffect } from 'react';
 import {
   View,
-  Text,
+  // Text,
   StyleSheet,
   Animated,
   Dimensions,
   Image,
 } from 'react-native';
 import { colors, typography } from '../styles/globalStyles';
+import { storage } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,14 +32,29 @@ const SplashScreen = ({ onFinish }) => {
       }),
     ]).start();
 
-    // Auto-dismiss after 2.5 seconds
-    const timer = setTimeout(() => {
-      if (onFinish) {
-        onFinish();
-      }
-    }, 2500);
+    // Check authentication and auto-dismiss after animations
+    const checkAuthAndFinish = async () => {
+      try {
+        const token = await storage.getAuthToken();
+        const user = await storage.getUser();
 
-    return () => clearTimeout(timer);
+        // Wait for animations to complete
+        setTimeout(() => {
+          if (onFinish) {
+            onFinish(token && user ? 'Main' : 'Login');
+          }
+        }, 2500);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setTimeout(() => {
+          if (onFinish) {
+            onFinish('Login');
+          }
+        }, 2500);
+      }
+    };
+
+    checkAuthAndFinish();
   }, [fadeAnim, scaleAnim, onFinish]);
 
   return (
@@ -60,8 +76,8 @@ const SplashScreen = ({ onFinish }) => {
           />
         </View>
 
-        <Text style={styles.title}>Obidient Movement</Text>
-        <Text style={styles.subtitle}>Mobile App</Text>
+        {/* <Text style={styles.title}>Obidient Movement</Text> */}
+        {/* <Text style={styles.subtitle}>Mobile App</Text> */}
 
         <View style={styles.loadingContainer}>
           <View style={styles.loadingBar}>
@@ -83,7 +99,7 @@ const SplashScreen = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -92,18 +108,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 80,
+    // backgroundColor: colors.white,
+    // borderRadius: 80,
     padding: 20,
-    marginBottom: 30,
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    // marginBottom: 30,
+    // shadowColor: colors.black,
+    // shadowOffset: {
+    //   width: 0,
+    //   height: 4,
+    // },
+    // shadowOpacity: 0.3,
+    // shadowRadius: 8,
+    // elevation: 8,
   },
   iconImage: {
     width: 120,

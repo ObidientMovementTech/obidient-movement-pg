@@ -1,41 +1,58 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text, View } from 'react-native';
+import { Home, Newspaper, MessageCircle, User } from 'lucide-react-native';
 
+import HomeScreen from '../screens/HomeScreen';
 import FeedsScreen from '../screens/FeedsScreen';
 import MessagingScreen from '../screens/MessagingScreen';
 import LoginScreen from '../screens/LoginScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import { colors } from '../styles/globalStyles';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
-
-// Simple icon component (we'll use text for now, can replace with proper icons later)
-const TabIcon = ({ name, focused }) => (
-  <Text style={{ color: focused ? '#2e7d32' : '#666', fontSize: 20 }}>
-    {name === 'Feeds' ? '📰' : name === 'Messages' ? '💬' : '👤'}
-  </Text>
-);
-
-// Profile screen placeholder
-const ProfileScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Profile Screen - Coming Soon</Text>
-  </View>
-);
 
 const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused }) => (
-          <TabIcon name={route.name} focused={focused} />
-        ),
-        tabBarActiveTintColor: '#2e7d32',
-        tabBarInactiveTintColor: '#666',
+        tabBarIcon: ({ focused, color, size }) => {
+          const iconProps = {
+            size: size,
+            color: color,
+            strokeWidth: focused ? 2 : 1.5,
+          };
+
+          if (route.name === 'Home') {
+            return <Home {...iconProps} />;
+          } else if (route.name === 'Feeds') {
+            return <Newspaper {...iconProps} />;
+          } else if (route.name === 'Messages') {
+            return <MessageCircle {...iconProps} />;
+          } else if (route.name === 'Profile') {
+            return <User {...iconProps} />;
+          }
+        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: '#8E8E93',
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E5EA',
+          paddingTop: 5,
+          paddingBottom: 5,
+          height: 65,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginTop: 2,
+        },
         headerShown: false,
       })}
     >
+      <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Feeds" component={FeedsScreen} />
       <Tab.Screen name="Messages" component={MessagingScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
@@ -43,9 +60,12 @@ const MainTabs = () => {
   );
 };
 
-const AppNavigator = () => {
+const AppNavigator = ({ initialRoute = 'Login' }) => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName={initialRoute}
+    >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Main" component={MainTabs} />
     </Stack.Navigator>
