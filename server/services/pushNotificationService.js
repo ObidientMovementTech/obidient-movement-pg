@@ -44,17 +44,41 @@ export const sendPushNotification = async (userIds, title, body, data = {}) => {
       return { success: true, sent: 0, message: 'No active tokens found' };
     }
 
-    const message = {
+    // Create individual messages for each token
+    const messages = tokens.rows.map(row => ({
       notification: { title, body },
       data: {
         ...data,
         timestamp: Date.now().toString(),
         click_action: 'FLUTTER_NOTIFICATION_CLICK' // For React Native
       },
-      tokens: tokens.rows.map(row => row.token)
-    };
+      token: row.token
+    }));
 
-    const response = await admin.messaging().sendMulticast(message);
+    // Send using sendAll (available in newer versions) or sendEach (fallback)
+    let response;
+    try {
+      response = await admin.messaging().sendAll(messages);
+    } catch (error) {
+      if (error.message.includes('sendAll')) {
+        // Fallback to individual sends
+        console.log('Using individual send method...');
+        const results = await Promise.allSettled(
+          messages.map(message => admin.messaging().send(message))
+        );
+
+        response = {
+          responses: results.map(result => ({
+            success: result.status === 'fulfilled',
+            error: result.status === 'rejected' ? result.reason : null
+          })),
+          successCount: results.filter(r => r.status === 'fulfilled').length,
+          failureCount: results.filter(r => r.status === 'rejected').length
+        };
+      } else {
+        throw error;
+      }
+    }
 
     // Handle failed tokens (remove invalid ones)
     if (response.failureCount > 0) {
@@ -62,7 +86,7 @@ export const sendPushNotification = async (userIds, title, body, data = {}) => {
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           failedTokens.push(tokens.rows[idx].token);
-          console.warn('Failed to send to token:', resp.error?.message);
+          console.warn('Failed to send to token:', resp.error?.message || resp.error);
         }
       });
 

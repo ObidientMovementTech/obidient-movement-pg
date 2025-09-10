@@ -8,6 +8,7 @@ import FeedsScreen from '../screens/FeedsScreen';
 import MessagingScreen from '../screens/MessagingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import { colors } from '../styles/globalStyles';
 
 const Tab = createBottomTabNavigator();
@@ -68,6 +69,7 @@ const AppNavigator = ({ initialRoute = 'Login' }) => {
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Main" component={MainTabs} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 };

@@ -69,14 +69,7 @@ class PushNotificationService {
 
   async registerToken(token) {
     try {
-      await mobileAPI.post('/push/register-token', {
-        token,
-        platform: Platform.OS,
-        deviceInfo: {
-          platform: Platform.OS,
-          version: Platform.Version,
-        }
-      });
+      await mobileAPI.registerPushToken(token, Platform.OS);
       console.log('Token registered successfully');
     } catch (error) {
       console.error('Error registering token:', error);

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { sendPushNotification, sendBroadcastPush } from '../services/pushNotificationService.js';
 import { uploadBufferToS3 } from '../utils/s3Upload.js';
+import Notification from '../models/notification.model.js';
 
 // Mobile Authentication
 const mobileLogin = async (req, res) => {
@@ -283,14 +284,37 @@ const createMobileFeed = async (req, res) => {
 
     const feedId = result.rows[0].id;
 
-    // Send push notification to all users with enabled notifications
+    // Create unified notifications for all users (web + mobile)
     try {
       const notificationTitle = `🔔 ${feedType === 'urgent' ? '🚨 URGENT' : 'New Update'}`;
-      const notificationBody = title.length > 100 ? title.substring(0, 100) + '...' : title;
+      const notificationMessage = title.length > 100 ? title.substring(0, 100) + '...' : title;
 
+      // Get all users to create notifications for
+      const usersResult = await query(`
+        SELECT id FROM users 
+        WHERE "emailVerified" = 'true'
+      `);
+
+      console.log(`[MOBILE_FEED] Found ${usersResult.rows.length} users to notify`);
+
+      // Create notification records for all users (simple approach like admin broadcast)
+      // const notifications = await Promise.all(
+      //   usersResult.rows.map((user) =>
+      //     Notification.create({
+      //       recipient: user.id,
+      //       type: 'feed',
+      //       title: notificationTitle,
+      //       message: notificationMessage
+      //     })
+      //   )
+      // );
+
+      // console.log(`[MOBILE_FEED] Created ${notifications.length} dashboard notifications`);
+
+      // Send push notifications to mobile users with enabled notifications
       const pushResult = await sendBroadcastPush(
         notificationTitle,
-        notificationBody,
+        notificationMessage,
         {
           type: 'feed',
           feedId: feedId.toString(),
@@ -300,9 +324,9 @@ const createMobileFeed = async (req, res) => {
       );
 
       console.log(`📱 Push notification sent for feed ${feedId}:`, pushResult);
-    } catch (pushError) {
-      console.error('Error sending push notification for new feed:', pushError);
-      // Don't fail the feed creation if push notification fails
+    } catch (error) {
+      console.error('Error creating notifications for new feed:', error);
+      // Don't fail the feed creation if notification creation fails
     }
 
     res.json({
@@ -382,6 +406,236 @@ const uploadMobileFeedImage = async (req, res) => {
   }
 };
 
+// Get Mobile Notifications (reuse web notification system)
+const getMobileNotifications = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const notifications = await Notification.findByRecipient(req.user.id, {
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      orderBy: 'createdAt',
+      orderDirection: 'DESC'
+    });
+
+    // Transform for mobile response (simple approach - no need for feedId)
+    const mobileNotifications = notifications.map(notification => ({
+      id: notification.id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      read: notification.read,
+      createdAt: notification.createdAt,
+      timestamp: notification.createdAt
+    }));
+
+    res.json({
+      success: true,
+      notifications: mobileNotifications,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: mobileNotifications.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching mobile notifications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notifications'
+    });
+  }
+};
+
+// Mark Mobile Notification as Read
+const markMobileNotificationRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const updated = await Notification.findAndUpdate(
+      { id: id, recipient: req.user.id },
+      { read: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read'
+    });
+  }
+};
+
+// Update Mobile Feed (Admin function)
+const updateMobileFeed = async (req, res) => {
+  try {
+    const { id: feedId } = req.params;
+    const { title, message, feedType, priority, imageUrl } = req.body;
+
+    // Check if user has admin permissions
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions'
+      });
+    }
+
+    // Check if feed exists
+    const existingFeed = await query(
+      'SELECT id, title, message FROM mobile_feeds WHERE id = $1',
+      [feedId]
+    );
+
+    if (existingFeed.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Feed not found'
+      });
+    }
+
+    // Build dynamic update query
+    const updateFields = [];
+    const updateValues = [];
+    let paramCount = 1;
+
+    if (title !== undefined) {
+      updateFields.push(`title = $${paramCount}`);
+      updateValues.push(title);
+      paramCount++;
+    }
+
+    if (message !== undefined) {
+      updateFields.push(`message = $${paramCount}`);
+      updateValues.push(message);
+      paramCount++;
+    }
+
+    if (feedType !== undefined) {
+      updateFields.push(`feed_type = $${paramCount}`);
+      updateValues.push(feedType);
+      paramCount++;
+    }
+
+    if (priority !== undefined) {
+      updateFields.push(`priority = $${paramCount}`);
+      updateValues.push(priority);
+      paramCount++;
+    }
+
+    if (imageUrl !== undefined) {
+      updateFields.push(`image_url = $${paramCount}`);
+      updateValues.push(imageUrl);
+      paramCount++;
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No fields to update'
+      });
+    }
+
+    // Add updated_at timestamp
+    updateFields.push(`updated_at = NOW()`);
+
+    // Add feed ID as last parameter
+    updateValues.push(feedId);
+
+    const updateQuery = `
+      UPDATE mobile_feeds 
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING id, title, message, feed_type, priority, image_url, updated_at
+    `;
+
+    const result = await query(updateQuery, updateValues);
+
+    res.json({
+      success: true,
+      feed: result.rows[0],
+      message: 'Feed updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error updating mobile feed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update feed'
+    });
+  }
+};
+
+// Delete Mobile Feed (Admin function)
+const deleteMobileFeed = async (req, res) => {
+  try {
+    const { id: feedId } = req.params;
+
+    // Check if user has admin permissions
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions'
+      });
+    }
+
+    // Check if feed exists
+    const existingFeed = await query(
+      'SELECT id, title FROM mobile_feeds WHERE id = $1',
+      [feedId]
+    );
+
+    if (existingFeed.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Feed not found'
+      });
+    }
+
+    // Delete the feed
+    await query('DELETE FROM mobile_feeds WHERE id = $1', [feedId]);
+
+    // Optional: Clean up related notifications
+    try {
+      await query(`
+        DELETE FROM notifications 
+        WHERE type = 'feed' 
+        AND message LIKE '%' || $1 || '%'
+      `, [existingFeed.rows[0].title]);
+
+      console.log(`🗑️ Cleaned up notifications for deleted feed: ${existingFeed.rows[0].title}`);
+    } catch (notificationError) {
+      console.warn('Error cleaning up notifications for deleted feed:', notificationError);
+      // Don't fail the deletion if notification cleanup fails
+    }
+
+    res.json({
+      success: true,
+      message: 'Feed deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting mobile feed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete feed'
+    });
+  }
+};
+
 export {
   mobileLogin,
   getMobileFeeds,
@@ -389,6 +643,10 @@ export {
   getMyMessages,
   registerPushToken,
   createMobileFeed,
+  updateMobileFeed,
+  deleteMobileFeed,
   updatePushSettings,
-  uploadMobileFeedImage
+  uploadMobileFeedImage,
+  getMobileNotifications,
+  markMobileNotificationRead
 };

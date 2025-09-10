@@ -111,6 +111,9 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation platform('com.google.firebase:firebase-bom:33.3.0')
+    implementation 'com.google.firebase:firebase-messaging'
+
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
@@ -126,3 +129,5 @@ dependencies {
         exclude group: 'com.android.support', module: 'support-compat'
     }
 }
+
+apply plugin: 'com.google.gms.google-services'

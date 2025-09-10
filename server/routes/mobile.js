@@ -7,6 +7,8 @@ import {
   getMyMessages,
   registerPushToken,
   createMobileFeed,
+  updateMobileFeed,
+  deleteMobileFeed,
   updatePushSettings
 } from '../controllers/mobile.controller.js';
 

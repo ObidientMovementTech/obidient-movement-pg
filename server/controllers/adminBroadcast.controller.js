@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import Notification from "../models/notification.model.js";
 import { transformUser, transformBroadcast } from '../utils/mongoCompat.js';
 import { sendAdminBroadcastEmail } from '../utils/emailHandler.js';
+import { sendBroadcastPush } from '../services/pushNotificationService.js';
 
 /**
  * Send a general broadcast message to all users
@@ -48,25 +49,41 @@ export const sendAdminBroadcast = async (req, res) => {
 
     console.log(`[ADMIN_BROADCAST] Created ${notifications.length} dashboard notifications`);
 
+    // Send push notifications to mobile users
+    try {
+      const pushResult = await sendBroadcastPush(
+        `📢 ${title}`,
+        message.length > 100 ? message.substring(0, 100) + '...' : message,
+        {
+          type: 'adminBroadcast',
+          title: title
+        }
+      );
+      console.log(`📱 Push notification sent for admin broadcast:`, pushResult);
+    } catch (pushError) {
+      console.error('Error sending push notification for admin broadcast:', pushError);
+      // Don't fail the broadcast if push notification fails
+    }
+
     // Prepare email recipients - filter out users without email
     const emailRecipients = users.filter(user => user.email && user.email.trim() !== '');
-    
+
     console.log(`[ADMIN_BROADCAST] Sending emails to ${emailRecipients.length} users with valid email addresses`);
 
     // Send broadcast emails
     let emailResults = { successful: 0, failed: 0, total: 0 };
-    
+
     if (emailRecipients.length > 0) {
       try {
         emailResults = await sendAdminBroadcastEmail(
           title,
           message,
-          admin.firstName && admin.lastName 
-            ? `${admin.firstName} ${admin.lastName}` 
+          admin.firstName && admin.lastName
+            ? `${admin.firstName} ${admin.lastName}`
             : admin.username || 'Obidient Movement Administration',
           emailRecipients
         );
-        
+
         console.log(`[ADMIN_BROADCAST] Email results: ${emailResults.successful}/${emailResults.total} sent successfully`);
       } catch (emailError) {
         console.error(`[ADMIN_BROADCAST] Email sending failed:`, emailError.message);

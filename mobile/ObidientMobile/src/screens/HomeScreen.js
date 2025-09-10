@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 import { mobileAPI, storage } from '../services/api';
 import { colors, typography } from '../styles/globalStyles';
+import NotificationPermissionManager from '../services/notificationPermissionManager';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.85;
@@ -35,7 +36,34 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     loadUserData();
     loadRecentFeeds();
+    handleNotificationPermissions();
   }, []);
+
+  const handleNotificationPermissions = async () => {
+    try {
+      console.log('🏠 HomeScreen: Checking notification permissions...');
+
+      // First check current status for debugging
+      const currentStatus = await NotificationPermissionManager.getCurrentPermissionStatus();
+      console.log('🔍 Current permission status:', currentStatus);
+
+      const result = await NotificationPermissionManager.handleNotificationPermissionFlow();
+
+      if (result.success) {
+        if (result.alreadyHandled) {
+          console.log('🔔 Notification permissions already handled');
+        } else if (result.granted) {
+          console.log('✅ Notification permissions granted!');
+        } else if (result.userDeclined) {
+          console.log('❌ User declined notification permissions');
+        }
+      } else {
+        console.error('❌ Error handling notification permissions:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Unexpected error in notification permission flow:', error);
+    }
+  };
 
   const loadUserData = async () => {
     try {
@@ -153,7 +181,10 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.greeting}>{getGreeting()}</Text>
               <Text style={styles.userName}>{user?.name || 'Obidient'} 👋</Text>
             </View>
-            <TouchableOpacity style={styles.notificationButton}>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications')}
+            >
               <Bell size={24} color="#FFFFFF" strokeWidth={2} />
               <View style={styles.notificationDot} />
             </TouchableOpacity>

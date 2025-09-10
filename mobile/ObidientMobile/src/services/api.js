@@ -74,6 +74,13 @@ export const mobileAPI = {
 
   updatePushSettings: (settings) =>
     api.put('/mobile/push/settings', settings),
+
+  // Notifications (unified system)
+  getNotifications: (page = 1, limit = 20) =>
+    api.get(`/mobile/notifications?page=${page}&limit=${limit}`),
+
+  markNotificationRead: (id) =>
+    api.put(`/mobile/notifications/${id}/read`),
 };
 
 // Storage helpers
