@@ -1,14 +1,17 @@
 import './src/config/fontSetup'; // Apply global Poppins font setup
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
 import SplashScreen from './src/components/SplashScreen';
 import PushNotificationService from './src/services/pushNotificationService';
+import { colors } from './src/styles/globalStyles';
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Login');
+  const navigationRef = useRef(null);
 
   useEffect(() => {
     // Initialize push notifications
@@ -27,6 +30,12 @@ const App = () => {
     initializePushNotifications();
   }, []);
 
+  // Set navigation reference when navigation container is ready
+  const onNavigationReady = () => {
+    PushNotificationService.setNavigationRef(navigationRef.current);
+    console.log('📱 Navigation reference set for push notifications');
+  };
+
   const handleSplashFinish = (route: string) => {
     setInitialRoute(route);
     setShowSplash(false);
@@ -40,7 +49,12 @@ const App = () => {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={colors.background}
+        translucent={false}
+      />
+      <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
         <AppNavigator initialRoute={initialRoute} />
       </NavigationContainer>
     </SafeAreaProvider>

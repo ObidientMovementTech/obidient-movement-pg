@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import {
   View,
-  // Text,
+  Text,
   StyleSheet,
   Animated,
   Dimensions,
@@ -76,10 +76,10 @@ const SplashScreen = ({ onFinish }) => {
           />
         </View>
 
-        {/* <Text style={styles.title}>Obidient Movement</Text> */}
+        <Text style={styles.title}>Obidient Movement</Text>
         {/* <Text style={styles.subtitle}>Mobile App</Text> */}
 
-        <View style={styles.loadingContainer}>
+        {/* <View style={styles.loadingContainer}>
           <View style={styles.loadingBar}>
             <Animated.View
               style={[
@@ -90,7 +90,7 @@ const SplashScreen = ({ onFinish }) => {
               ]}
             />
           </View>
-        </View>
+        </View> */}
       </Animated.View>
     </View>
   );
@@ -99,7 +99,7 @@ const SplashScreen = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -126,8 +126,8 @@ const styles = StyleSheet.create({
     height: 120,
   },
   title: {
-    ...typography.h1,
-    color: colors.white,
+    ...typography.h3,
+    // color: colors.white,
     marginBottom: 8,
     textAlign: 'center',
   },

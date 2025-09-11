@@ -1,10 +1,17 @@
 import messaging from '@react-native-firebase/messaging';
 import { Alert, Platform } from 'react-native';
 import { mobileAPI } from './api';
+import { CommonActions } from '@react-navigation/native';
 
 class PushNotificationService {
   constructor() {
     this.isInitialized = false;
+    this.navigationRef = null;
+  }
+
+  // Set navigation reference from App.js
+  setNavigationRef(navigationRef) {
+    this.navigationRef = navigationRef;
   }
 
   async initialize() {
@@ -95,25 +102,80 @@ class PushNotificationService {
   handleNotificationAction(remoteMessage) {
     const { data } = remoteMessage;
 
-    // Handle different notification types
-    if (data?.type) {
-      switch (data.type) {
-        case 'feed':
-          // Navigate to feeds screen
-          console.log('Navigate to feeds');
-          break;
-        case 'message':
-          // Navigate to messages screen
-          console.log('Navigate to messages');
-          break;
-        case 'election_alert':
-          // Show election alert
-          console.log('Show election alert');
-          break;
-        default:
-          console.log('Unknown notification type:', data.type);
+    console.log('🔔 Handling notification action:', remoteMessage);
+    console.log('🔔 Navigation ref available:', !!this.navigationRef);
+
+    // Wait a bit to ensure navigation is ready
+    setTimeout(() => {
+      if (!this.navigationRef) {
+        console.warn('⚠️  Navigation reference not available');
+        return;
       }
-    }
+
+      // Handle different notification types
+      if (data?.type) {
+        switch (data.type) {
+          case 'feed':
+          case 'test':
+          case 'test_broadcast':
+          case 'test_filtered':
+            console.log('📱 Navigating to Feeds screen');
+            this.navigationRef.dispatch(
+              CommonActions.navigate({
+                name: 'MainTabs',
+                state: {
+                  routes: [{ name: 'Feeds' }],
+                  index: 1, // Feeds tab is at index 1
+                },
+              })
+            );
+            break;
+          case 'message':
+            console.log('📱 Navigating to Messages screen');
+            this.navigationRef.dispatch(
+              CommonActions.navigate({
+                name: 'MainTabs',
+                state: {
+                  routes: [{ name: 'Messages' }],
+                  index: 2, // Messages tab is at index 2
+                },
+              })
+            );
+            break;
+          case 'notification':
+            console.log('📱 Navigating to Notifications screen');
+            this.navigationRef.dispatch(
+              CommonActions.navigate({
+                name: 'Notifications',
+              })
+            );
+            break;
+          default:
+            console.log('📱 Default: Navigating to Feeds screen for type:', data.type);
+            this.navigationRef.dispatch(
+              CommonActions.navigate({
+                name: 'MainTabs',
+                state: {
+                  routes: [{ name: 'Feeds' }],
+                  index: 1, // Feeds tab is at index 1
+                },
+              })
+            );
+        }
+      } else {
+        // Default action - go to Feeds
+        console.log('📱 No type specified, navigating to Feeds');
+        this.navigationRef.dispatch(
+          CommonActions.navigate({
+            name: 'MainTabs',
+            state: {
+              routes: [{ name: 'Feeds' }],
+              index: 1,
+            },
+          })
+        );
+      }
+    }, 1000); // Wait 1 second for navigation to be ready
   }
 
   async updatePushSettings(settings) {

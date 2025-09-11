@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   profileSection: {
     alignItems: 'center',
     paddingVertical: 30,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     marginVertical: 10,
   },
   avatarContainer: {
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   detailsSection: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     marginHorizontal: 10,
     borderRadius: 10,
     padding: 20,

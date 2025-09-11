@@ -30,15 +30,16 @@ async function quickPushTest() {
     console.log('📱 Found user with push token:');
     console.log(`   ID: ${user.id}`);
     console.log(`   Email: ${user.email}`);
-    console.log(`   Name: ${user.full_name || 'N/A'}`);
+    console.log(`   Name: ${user.name || 'N/A'}`);
     console.log(`   Platform: ${user.platform}`);
     console.log(`   Token: ${user.token.substring(0, 20)}...`);
 
     // Send test notification
     const testTitle = '🧪 Quick Test Notification';
-    const testBody = `Hello ${user.full_name || 'User'}! This is a quick test push notification sent at ${new Date().toLocaleTimeString()}.`;
+    const testBody = `Hello ${user.name || 'User'}! This is a quick test push notification sent at ${new Date().toLocaleTimeString()}.`;
     const testData = {
-      type: 'quick_test',
+      type: 'feed', // This will navigate to Feeds screen
+      action: 'open_feeds',
       timestamp: Date.now().toString(),
       user_id: user.id.toString()
     };

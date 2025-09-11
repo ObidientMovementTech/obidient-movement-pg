@@ -35,12 +35,12 @@ const MainTabs = () => {
             return <User {...iconProps} />;
           }
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: colors.tabActive,
+        tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: 'white',
+          backgroundColor: colors.tabBackground,
           borderTopWidth: 1,
-          borderTopColor: '#E5E5EA',
+          borderTopColor: colors.border,
           paddingTop: 5,
           paddingBottom: 5,
           height: 65,

@@ -17,7 +17,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, Heart, MessageCircle, Share2, Eye, Bookmark, ChevronRight, Calendar, User, MapPin } from 'lucide-react-native';
 import { mobileAPI } from '../services/api';
-import { colors, typography, priorityColors } from '../styles/globalStyles';
 
 const { width } = Dimensions.get('window');
 
@@ -135,8 +134,12 @@ const FeedsScreen = ({ navigation }) => {
   };
 
   const getPriorityColor = (priority) => {
-    const priorityKey = priority?.toLowerCase();
-    return priorityColors[priorityKey] || priorityColors.info;
+    switch (priority) {
+      case 'high': return '#FF4444';
+      case 'normal': return '#4CAF50';
+      case 'low': return '#2196F3';
+      default: return '#666666';
+    }
   };
 
   const getFeedTypeIcon = (feedType) => {
@@ -293,6 +296,12 @@ const FeedsScreen = ({ navigation }) => {
               <Text style={styles.actionText}>Share</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity onPress={() => openFeedDetail(item)} style={styles.viewMoreButton}>
+            <Eye size={16} color="#00A86B" />
+            <Text style={styles.viewMoreText}>View Full</Text>
+            <ChevronRight size={16} color="#00A86B" />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -332,7 +341,7 @@ const FeedsScreen = ({ navigation }) => {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <SafeAreaView style={styles.container}>
         {/* Modern Header */}
         <View style={styles.modernHeader}>
@@ -378,9 +387,9 @@ const FeedsScreen = ({ navigation }) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
-              progressBackgroundColor={colors.surface}
+              colors={['#00A86B']}
+              tintColor={'#00A86B'}
+              progressBackgroundColor="#FFFFFF"
             />
           }
           contentContainerStyle={styles.feedsList}
@@ -453,7 +462,7 @@ const FeedsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F7FAFC',
   },
 
   // Modern Header Styles
@@ -464,9 +473,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#E2E8F0',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -476,7 +485,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primary,
+    backgroundColor: '#00A86B',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -487,12 +496,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.text,
+    color: '#1A202C',
     fontFamily: 'Poppins-Bold',
   },
   headerSubtitle: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: '#718096',
     fontFamily: 'Poppins-Regular',
     marginTop: -2,
   },
@@ -504,9 +513,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surfaceVariant,
+    backgroundColor: '#F7FAFC',
     justifyContent: 'center',
-    alignItems: 'center',
     alignItems: 'center',
     marginLeft: 8,
   },
@@ -524,9 +532,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#E2E8F0',
   },
   onlineIndicator: {
     flexDirection: 'row',
@@ -536,18 +544,18 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: '#00A86B',
     marginRight: 6,
   },
   onlineText: {
     fontSize: 12,
-    color: colors.primaryDark,
+    color: '#00A86B',
     fontWeight: '600',
     fontFamily: 'Poppins-SemiBold',
   },
   feedCount: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: '#718096',
     fontFamily: 'Poppins-Regular',
   },
 
@@ -562,7 +570,7 @@ const styles = StyleSheet.create({
 
   // Feed Card - Social Media Style
   feedCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     borderRadius: 16,
     shadowColor: '#000',
@@ -597,7 +605,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.surfaceVariant,
+    backgroundColor: '#E2E8F0',
   },
   priorityIndicator: {
     position: 'absolute',
@@ -607,7 +615,7 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: colors.surface,
+    borderColor: '#FFFFFF',
   },
   authorInfo: {
     flex: 1,
@@ -618,7 +626,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   authorName: {
-    ...typography.body1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A202C',
+    fontFamily: 'Poppins-SemiBold',
   },
   verifiedBadge: {
     marginLeft: 4,
@@ -639,7 +650,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   feedTypeText: {
-    ...typography.caption,
+    fontSize: 12,
+    color: '#718096',
+    fontFamily: 'Poppins-Regular',
   },
   separator: {
     fontSize: 12,
@@ -647,7 +660,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   timeText: {
-    ...typography.caption,
+    fontSize: 12,
+    color: '#A0AEC0',
+    fontFamily: 'Poppins-Regular',
   },
   bookmarkButton: {
     padding: 8,
@@ -659,15 +674,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   feedTitle: {
-    ...typography.h5,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A202C',
+    lineHeight: 22,
     marginBottom: 8,
+    fontFamily: 'Poppins-Bold',
   },
   feedMessage: {
-    ...typography.body2,
+    fontSize: 15,
+    color: '#4A5568',
+    lineHeight: 22,
+    fontFamily: 'Poppins-Regular',
   },
   readMoreText: {
     fontSize: 14,
-    color: colors.primaryLight,
+    color: '#00A86B',
     fontWeight: '600',
     marginTop: 8,
     fontFamily: 'Poppins-SemiBold',
@@ -741,7 +763,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#F1F5F9',
   },
   leftActions: {
     flexDirection: 'row',
@@ -757,12 +779,27 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: '#666666',
     marginLeft: 6,
     fontFamily: 'Poppins-Medium',
   },
   likedText: {
     color: '#FF4444',
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 20,
+  },
+  viewMoreText: {
+    fontSize: 12,
+    color: '#00A86B',
+    fontWeight: '600',
+    marginHorizontal: 4,
+    fontFamily: 'Poppins-SemiBold',
   },
 
   // Loading & Empty States
@@ -780,7 +817,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
   },
   retryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#00A86B',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -800,7 +837,7 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'white',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -808,16 +845,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#E2E8F0',
   },
   backButton: {
     paddingVertical: 8,
   },
   backButtonText: {
     fontSize: 16,
-    color: colors.primaryDark,
+    color: '#00A86B',
     fontWeight: '600',
     fontFamily: 'Poppins-SemiBold',
   },
@@ -846,9 +883,11 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalTitle: {
-    ...typography.h2,
+    fontSize: 24,
     fontWeight: '700',
+    color: '#1A202C',
     marginBottom: 16,
+    lineHeight: 32,
     fontFamily: 'Poppins-Bold',
   },
   modalMeta: {
@@ -858,26 +897,29 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#E2E8F0',
   },
   modalMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   modalMetaText: {
-    ...typography.caption,
+    fontSize: 14,
+    color: '#718096',
     fontWeight: '500',
     fontFamily: 'Poppins-Medium',
   },
   modalDate: {
-    ...typography.caption,
+    fontSize: 14,
+    color: '#A0AEC0',
     fontWeight: '500',
     fontFamily: 'Poppins-Medium',
   },
   modalMessage: {
-    ...typography.body1,
     fontSize: 16,
-    // color: '#4A5568',
+    color: '#4A5568',
+    lineHeight: 24,
+    fontFamily: 'Poppins-Regular',
   },
   priorityDot: {
     width: 8,

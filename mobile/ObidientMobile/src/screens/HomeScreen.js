@@ -3,11 +3,13 @@ import {
   View,
   Text,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   Image,
   Dimensions,
   StyleSheet,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -32,6 +34,7 @@ const HomeScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
   const [recentFeeds, setRecentFeeds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -74,9 +77,12 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const loadRecentFeeds = async () => {
+  const loadRecentFeeds = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (!isRefresh) {
+        setLoading(true);
+      }
+
       const response = await mobileAPI.getFeeds();
 
       if (response.data.success) {
@@ -93,7 +99,18 @@ const HomeScreen = ({ navigation }) => {
       setRecentFeeds([]); // Set empty array on error
     } finally {
       setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      }
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      loadUserData(),
+      loadRecentFeeds(true)
+    ]);
   };
 
   const formatDate = (dateString) => {
@@ -115,6 +132,51 @@ const HomeScreen = ({ navigation }) => {
       default: return '#757575';
     }
   };
+
+  const FeedSkeleton = () => (
+    <View style={[styles.feedCard, styles.skeletonCard, { marginLeft: 20 }]}>
+      <View style={[styles.skeletonImage, styles.skeleton]} />
+      <View style={styles.feedContent}>
+        <View style={styles.feedHeader}>
+          <View style={[styles.skeletonBadge, styles.skeleton]} />
+          <View style={[styles.skeletonDate, styles.skeleton]} />
+        </View>
+        <View style={[styles.skeletonTitle, styles.skeleton]} />
+        <View style={[styles.skeletonText, styles.skeleton]} />
+        <View style={[styles.skeletonText, { width: '60%' }, styles.skeleton]} />
+      </View>
+    </View>
+  );
+
+  const FeedSkeletonSet = () => (
+    <>
+      <FeedSkeleton />
+      <View style={[styles.feedCard, styles.skeletonCard, { marginLeft: 10 }]}>
+        <View style={[styles.skeletonImage, styles.skeleton]} />
+        <View style={styles.feedContent}>
+          <View style={styles.feedHeader}>
+            <View style={[styles.skeletonBadge, styles.skeleton]} />
+            <View style={[styles.skeletonDate, styles.skeleton]} />
+          </View>
+          <View style={[styles.skeletonTitle, styles.skeleton]} />
+          <View style={[styles.skeletonText, styles.skeleton]} />
+          <View style={[styles.skeletonText, { width: '70%' }, styles.skeleton]} />
+        </View>
+      </View>
+      <View style={[styles.feedCard, styles.skeletonCard, { marginLeft: 10 }]}>
+        <View style={[styles.skeletonImage, styles.skeleton]} />
+        <View style={styles.feedContent}>
+          <View style={styles.feedHeader}>
+            <View style={[styles.skeletonBadge, styles.skeleton]} />
+            <View style={[styles.skeletonDate, styles.skeleton]} />
+          </View>
+          <View style={[styles.skeletonTitle, styles.skeleton]} />
+          <View style={[styles.skeletonText, styles.skeleton]} />
+          <View style={[styles.skeletonText, { width: '80%' }, styles.skeleton]} />
+        </View>
+      </View>
+    </>
+  );
 
   const FeedCard = ({ feed, index }) => (
     <TouchableOpacity
@@ -173,7 +235,19 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
 
-      <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            title="Pull to refresh"
+            titleColor={colors.primary}
+          />
+        }
+      >
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
@@ -211,14 +285,20 @@ const HomeScreen = ({ navigation }) => {
             snapToInterval={CARD_WIDTH + 10}
             decelerationRate="fast"
           >
-            {(recentFeeds || []).map((feed, index) => (
-              <FeedCard key={feed.id} feed={feed} index={index} />
-            ))}
-            {recentFeeds.length === 0 && !loading && (
-              <View style={styles.emptyFeeds}>
-                <Newspaper size={48} color="#E0E0E0" strokeWidth={1.5} />
-                <Text style={styles.emptyFeedsText}>No feeds available</Text>
-              </View>
+            {loading ? (
+              <FeedSkeletonSet />
+            ) : (
+              <>
+                {(recentFeeds || []).map((feed, index) => (
+                  <FeedCard key={feed.id} feed={feed} index={index} />
+                ))}
+                {recentFeeds.length === 0 && !loading && (
+                  <View style={styles.emptyFeeds}>
+                    <Newspaper size={48} color="#E0E0E0" strokeWidth={1.5} />
+                    <Text style={styles.emptyFeedsText}>No feeds available</Text>
+                  </View>
+                )}
+              </>
             )}
           </ScrollView>
         </View>
@@ -266,7 +346,7 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
   },
   header: {
     backgroundColor: colors.primary,
@@ -321,7 +401,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.h3,
-    color: '#1C1C1E',
   },
   seeAllButton: {
     flexDirection: 'row',
@@ -338,7 +417,7 @@ const styles = StyleSheet.create({
   },
   feedCard: {
     width: CARD_WIDTH,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     marginRight: 10,
     shadowColor: '#000',
@@ -376,19 +455,16 @@ const styles = StyleSheet.create({
   },
   feedDate: {
     fontSize: 12,
-    color: '#8E8E93',
     fontWeight: '500',
   },
   feedTitle: {
     ...typography.body1,
     fontWeight: 'bold',
-    color: '#1C1C1E',
     marginBottom: 8,
     lineHeight: 22,
   },
   feedText: {
     ...typography.body2,
-    color: '#48484A',
     lineHeight: 20,
     marginTop: 4,
   },
@@ -401,7 +477,6 @@ const styles = StyleSheet.create({
   },
   emptyFeedsText: {
     fontSize: 16,
-    color: '#8E8E93',
     marginTop: 12,
   },
   quickActions: {
@@ -410,7 +485,7 @@ const styles = StyleSheet.create({
   quickActionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -434,15 +509,46 @@ const styles = StyleSheet.create({
   quickActionTitle: {
     ...typography.body1,
     fontWeight: '600',
-    color: '#1C1C1E',
     marginBottom: 2,
   },
   quickActionSubtitle: {
     ...typography.caption,
-    color: '#8E8E93',
   },
   bottomSpacing: {
     height: 20,
+  },
+  // Skeleton loading styles
+  skeleton: {
+    backgroundColor: colors.surfaceVariant,
+    borderRadius: 4,
+  },
+  skeletonCard: {
+    opacity: 0.7,
+  },
+  skeletonImage: {
+    width: '100%',
+    height: 160,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  skeletonBadge: {
+    width: 60,
+    height: 16,
+    borderRadius: 6,
+  },
+  skeletonDate: {
+    width: 80,
+    height: 12,
+  },
+  skeletonTitle: {
+    width: '90%',
+    height: 18,
+    marginBottom: 8,
+  },
+  skeletonText: {
+    width: '100%',
+    height: 14,
+    marginBottom: 4,
   },
 });
 
