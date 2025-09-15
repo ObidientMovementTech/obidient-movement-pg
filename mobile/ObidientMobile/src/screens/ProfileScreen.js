@@ -8,27 +8,38 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography } from '../styles/globalStyles';
+import { colors, typography, globalStyles } from '../styles/globalStyles';
 import { storage } from '../services/api';
+import { useUser } from '../context';
 
 const ProfileScreen = ({ navigation }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    user,
+    loading,
+    error,
+    refreshUserProfile,
+    clearUser,
+    isProfileComplete,
+    profileCompletionPercentage,
+    hasRole,
+    isMonitor,
+    hasElectionAccess,
+    getUserLocation
+  } = useUser();
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadUserData = async () => {
+  const handleRefresh = async () => {
+    setRefreshing(true);
     try {
-      const userData = await storage.getUser();
-      setUser(userData);
+      await refreshUserProfile();
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('Error refreshing profile:', error);
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -45,6 +56,7 @@ const ProfileScreen = ({ navigation }) => {
             try {
               // Clear stored data
               await storage.clearAuth();
+              await clearUser();
 
               // Navigate to login screen
               navigation.reset({
@@ -61,6 +73,44 @@ const ProfileScreen = ({ navigation }) => {
     );
   };
 
+  // Render profile detail row
+  const renderDetailRow = (label, value, isImportant = false) => {
+    if (!value) return null;
+
+    // Handle object values by converting to string or specific formatting
+    let displayValue = value;
+    if (typeof value === 'object' && value !== null) {
+      // If it's an object with location properties
+      if (value.state || value.lga || value.ward) {
+        const locationParts = [value.ward, value.lga, value.state].filter(Boolean);
+        displayValue = locationParts.length > 0 ? locationParts.join(', ') : 'Not specified';
+      } else {
+        // For other objects, check if it's empty or try to stringify safely
+        const keys = Object.keys(value);
+        if (keys.length === 0) {
+          return null; // Don't render empty objects
+        }
+        displayValue = JSON.stringify(value);
+      }
+    }
+
+    return (
+      <View style={styles.detailRow}>
+        <Text style={[styles.detailLabel, isImportant && styles.importantLabel]}>
+          {label}:
+        </Text>
+        <Text style={[styles.detailValue, isImportant && styles.importantValue]}>
+          {displayValue}
+        </Text>
+      </View>
+    );
+  };
+
+  // Render section header
+  const renderSectionHeader = (title) => (
+    <Text style={styles.sectionTitle}>{title}</Text>
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -72,88 +122,163 @@ const ProfileScreen = ({ navigation }) => {
     );
   }
 
+  if (error && !user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load profile</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
+          {!isProfileComplete && (
+            <View style={styles.completionBadge}>
+              <Text style={styles.completionText}>
+                {profileCompletionPercentage}% Complete
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Profile Picture and Basic Info */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            {user?.profile_picture ? (
+            {user?.profileImage ? (
               <Image
-                source={{ uri: user.profile_picture }}
+                source={{ uri: user.profileImage }}
                 style={styles.avatar}
                 defaultSource={require('../assets/images/default-avatar.png')}
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarText}>
-                  {user?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                  {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
                 </Text>
+              </View>
+            )}
+            {user?.emailVerified && (
+              <View style={styles.verifiedBadge}>
+                <Text style={styles.verifiedText}>✓</Text>
               </View>
             )}
           </View>
 
-          <Text style={styles.userName}>
-            {user?.first_name && user?.last_name
-              ? `${user.first_name} ${user.last_name}`
-              : user?.email || 'User'
-            }
-          </Text>
+          <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          {user?.userName && <Text style={styles.userHandle}>@{user.userName}</Text>}
+          {user?.email && <Text style={styles.userEmail}>{user.email}</Text>}
 
-          {user?.email && (
-            <Text style={styles.userEmail}>{user.email}</Text>
-          )}
+          {/* Role & Status Badges */}
+          <View style={styles.badgesContainer}>
+            {user?.role && (
+              <View style={[styles.badge, styles.roleBadge]}>
+                <Text style={styles.badgeText}>{user.role.toUpperCase()}</Text>
+              </View>
+            )}
+            {isMonitor && (
+              <View style={[styles.badge, styles.monitorBadge]}>
+                <Text style={styles.badgeText}>MONITOR</Text>
+              </View>
+            )}
+            {hasElectionAccess && (
+              <View style={[styles.badge, styles.electionBadge]}>
+                <Text style={styles.badgeText}>ELECTION ACCESS</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* User Details */}
+        {/* Personal Information */}
         <View style={styles.detailsSection}>
-          <Text style={styles.sectionTitle}>Account Information</Text>
+          {renderSectionHeader('Personal Information')}
+          {renderDetailRow('Full Name', user?.name)}
+          {renderDetailRow('Phone', user?.phone)}
+          {renderDetailRow('Gender', user?.gender)}
+          {renderDetailRow('Age Range', user?.ageRange)}
+          {renderDetailRow('Citizenship', user?.citizenship)}
+          {renderDetailRow('Country Code', user?.countryCode)}
+          {renderDetailRow('Country of Residence', user?.countryOfResidence)}
+        </View>
 
-          {user?.phone && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Phone:</Text>
-              <Text style={styles.detailValue}>{user.phone}</Text>
-            </View>
-          )}
+        {/* Location Information */}
+        <View style={styles.detailsSection}>
+          {renderSectionHeader('Location Information')}
+          {renderDetailRow('State of Origin', user?.stateOfOrigin)}
+          {renderDetailRow('LGA', user?.lga)}
+          {renderDetailRow('Ward', user?.ward)}
+        </View>
 
-          {user?.state && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>State:</Text>
-              <Text style={styles.detailValue}>{user.state}</Text>
-            </View>
-          )}
+        {/* Voting Information */}
+        <View style={styles.detailsSection}>
+          {renderSectionHeader('Voting Information')}
+          {renderDetailRow('Voting State', user?.votingState, true)}
+          {renderDetailRow('Voting LGA', user?.votingLGA, true)}
+          {renderDetailRow('Voting Ward', user?.votingWard, true)}
+          {renderDetailRow('Is Voter', user?.isVoter ? 'Yes' : 'No')}
+          {renderDetailRow('Will Vote', user?.willVote ? 'Yes' : 'No')}
+          {renderDetailRow('Voting Engagement State', user?.votingEngagementState)}
+        </View>
 
-          {user?.lga && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>LGA:</Text>
-              <Text style={styles.detailValue}>{user.lga}</Text>
-            </View>
-          )}
-
-          {user?.polling_unit && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Polling Unit:</Text>
-              <Text style={styles.detailValue}>{user.polling_unit}</Text>
-            </View>
-          )}
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Member Since:</Text>
-            <Text style={styles.detailValue}>
-              {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
-            </Text>
+        {/* Assignment Information */}
+        {(user?.designation || user?.assignedState) && (
+          <View style={styles.detailsSection}>
+            {renderSectionHeader('Assignment Information')}
+            {renderDetailRow('Designation', user?.designation, true)}
+            {renderDetailRow('Assigned State', user?.assignedState)}
+            {renderDetailRow('Assigned LGA', user?.assignedLGA)}
+            {renderDetailRow('Assigned Ward', user?.assignedWard)}
           </View>
+        )}
+
+        {/* Election & Monitoring */}
+        {(user?.monitorUniqueKey || user?.electionAccessLevel) && (
+          <View style={styles.detailsSection}>
+            {renderSectionHeader('Election & Monitoring')}
+            {renderDetailRow('Monitor Key', user?.monitorUniqueKey)}
+            {renderDetailRow('Key Status', user?.keyStatus)}
+            {renderDetailRow('Key Assigned Date', user?.keyAssignedDate ?
+              new Date(user.keyAssignedDate).toLocaleDateString() : null)}
+            {renderDetailRow('Election Access Level', user?.electionAccessLevel)}
+            {renderDetailRow('Monitoring Location', user?.monitoringLocation)}
+          </View>
+        )}
+
+        {/* Account Status */}
+        <View style={styles.detailsSection}>
+          {renderSectionHeader('Account Status')}
+          {renderDetailRow('KYC Status', user?.kycStatus)}
+          {renderDetailRow('Email Verified', user?.emailVerified ? 'Yes' : 'No')}
+          {renderDetailRow('2FA Enabled', user?.twoFactorEnabled ? 'Yes' : 'No')}
+          {renderDetailRow('Push Notifications', user?.pushNotificationsEnabled ? 'Enabled' : 'Disabled')}
+          {renderDetailRow('Has Taken Survey', user?.hasTakenCauseSurvey ? 'Yes' : 'No')}
+          {renderDetailRow('Member Since', user?.createdAt ?
+            new Date(user.createdAt).toLocaleDateString() : 'N/A')}
+          {renderDetailRow('Last Seen (Mobile)', user?.mobileLastSeen ?
+            new Date(user.mobileLastSeen).toLocaleString() : 'Never')}
         </View>
 
         {/* Actions */}
         <View style={styles.actionsSection}>
           <TouchableOpacity style={styles.editButton}>
             <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+            <Text style={styles.refreshButtonText}>Refresh Profile</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -167,31 +292,61 @@ const ProfileScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: colors.background,
+    ...globalStyles.container,
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...globalStyles.loadingContainer,
   },
   loadingText: {
     ...typography.body1,
     color: colors.textSecondary,
     marginTop: 10,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    ...globalStyles.errorText,
+    ...typography.body1,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    ...globalStyles.button,
+  },
+  retryButtonText: {
+    ...globalStyles.buttonText,
+  },
   header: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.surface,
     paddingVertical: 20,
     paddingHorizontal: 20,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   headerTitle: {
     ...typography.h2,
+    color: colors.text,
+    fontWeight: 'bold',
+  },
+  completionBadge: {
+    backgroundColor: colors.warning,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  completionText: {
+    ...typography.caption,
     color: colors.white,
     fontWeight: 'bold',
   },
@@ -199,9 +354,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 30,
     backgroundColor: colors.surface,
-    marginVertical: 10,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   avatarContainer: {
+    position: 'relative',
     marginBottom: 15,
   },
   avatar: {
@@ -226,22 +384,72 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: 'bold',
   },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.success,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  verifiedText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   userName: {
     ...typography.h3,
     color: colors.text,
     fontWeight: 'bold',
-    marginBottom: 5,
+    textAlign: 'center',
+  },
+  userHandle: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
   },
   userEmail: {
-    ...typography.body1,
+    ...typography.body2,
     color: colors.textSecondary,
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 10,
+    gap: 8,
+  },
+  badge: {
+    ...globalStyles.badge,
+    marginHorizontal: 4,
+  },
+  roleBadge: {
+    backgroundColor: colors.primary,
+  },
+  monitorBadge: {
+    backgroundColor: colors.info,
+  },
+  electionBadge: {
+    backgroundColor: colors.success,
+  },
+  badgeText: {
+    ...globalStyles.badgeText,
   },
   detailsSection: {
     backgroundColor: colors.surface,
-    marginHorizontal: 10,
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   sectionTitle: {
     ...typography.h4,
@@ -249,54 +457,66 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: 10,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: 8,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
+    alignItems: 'flex-start',
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.divider,
   },
   detailLabel: {
-    ...typography.body1,
+    ...typography.body2,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
+    flex: 1,
   },
   detailValue: {
-    ...typography.body1,
+    ...typography.body2,
     color: colors.text,
-    fontWeight: '400',
-    flex: 1,
+    flex: 2,
     textAlign: 'right',
+  },
+  importantLabel: {
+    color: colors.primary,
+    fontWeight: 'bold',
+  },
+  importantValue: {
+    color: colors.primary,
+    fontWeight: 'bold',
   },
   actionsSection: {
     paddingHorizontal: 20,
+    paddingVertical: 20,
     gap: 15,
   },
   editButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: 'center',
+    ...globalStyles.button,
+    borderRadius: 12,
   },
   editButtonText: {
-    ...typography.button,
+    ...globalStyles.buttonText,
+  },
+  refreshButton: {
+    ...globalStyles.secondaryButton,
+    backgroundColor: colors.info,
+    borderColor: colors.info,
+    borderRadius: 12,
+  },
+  refreshButtonText: {
+    ...globalStyles.buttonText,
     color: colors.white,
-    fontWeight: 'bold',
   },
   logoutButton: {
+    ...globalStyles.button,
     backgroundColor: colors.error,
-    borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: 'center',
+    borderRadius: 12,
   },
   logoutButtonText: {
-    ...typography.button,
-    color: colors.white,
-    fontWeight: 'bold',
+    ...globalStyles.buttonText,
   },
 });
 

@@ -126,7 +126,7 @@ const getMobileFeeds = async (req, res) => {
 // Send Message to Leadership
 const sendLeadershipMessage = async (req, res) => {
   try {
-    const { recipientLevel, subject, message } = req.body;
+    const { recipientLevel, subject, message, priority = 'normal' } = req.body;
     const senderId = req.user.id;
 
     // Validate recipient level
@@ -138,43 +138,208 @@ const sendLeadershipMessage = async (req, res) => {
       });
     }
 
-    // Get sender's location for routing
+    // Get sender's information including location and designation
     const senderResult = await query(`
-      SELECT "assignedState", "assignedLGA", "assignedWard"
+      SELECT 
+        name, 
+        designation,
+        "assignedState", 
+        "assignedLGA", 
+        "assignedWard",
+        "votingState",
+        "votingLGA", 
+        "votingWard"
       FROM users WHERE id = $1
     `, [senderId]);
 
-    const senderLocation = senderResult.rows[0];
+    if (senderResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sender not found'
+      });
+    }
+
+    const sender = senderResult.rows[0];
+
+    // Determine recipient location based on sender's voting location (prioritized over assigned location)
     const recipientLocation = {
-      state: senderLocation.assignedState,
-      lga: senderLocation.assignedLGA,
-      ward: senderLocation.assignedWard
+      state: sender.votingState || sender.assignedState,
+      lga: sender.votingLGA || sender.assignedLGA,
+      ward: sender.votingWard || sender.assignedWard
     };
 
-    // Insert message (trigger will auto-assign if coordinator found)
+    // Find appropriate recipient based on level and location with hierarchical fallback
+    let assignedTo = null;
+    let actualRecipientLevel = recipientLevel;
+    let fallbackMessage = '';
+
+    // Define hierarchy for fallback routing
+    const hierarchyFallback = {
+      'ward': ['ward', 'lga', 'state', 'national'],
+      'lga': ['lga', 'state', 'national'],
+      'state': ['state', 'national'],
+      'national': ['national'],
+      'peter_obi': ['peter_obi']
+    };
+
+    const levelsToTry = hierarchyFallback[recipientLevel] || [recipientLevel];
+
+    // Try each level in the hierarchy until we find an available coordinator
+    for (const levelToTry of levelsToTry) {
+      let recipientQuery = '';
+      let queryParams = [];
+
+      switch (levelToTry) {
+        case 'peter_obi':
+          recipientQuery = `
+            SELECT id FROM users 
+            WHERE designation = 'Peter Obi' 
+            LIMIT 1
+          `;
+          break;
+
+        case 'national':
+          recipientQuery = `
+            SELECT id FROM users 
+            WHERE designation = 'National Coordinator' 
+            LIMIT 1
+          `;
+          break;
+
+        case 'state':
+          recipientQuery = `
+            SELECT id FROM users 
+            WHERE designation = 'State Coordinator' 
+            AND ("votingState" = $1 OR "assignedState" = $1)
+            LIMIT 1
+          `;
+          queryParams = [recipientLocation.state];
+          break;
+
+        case 'lga':
+          recipientQuery = `
+            SELECT id FROM users 
+            WHERE designation = 'LGA Coordinator' 
+            AND ("votingState" = $1 OR "assignedState" = $1)
+            AND ("votingLGA" = $2 OR "assignedLGA" = $2)
+            LIMIT 1
+          `;
+          queryParams = [recipientLocation.state, recipientLocation.lga];
+          break;
+
+        case 'ward':
+          recipientQuery = `
+            SELECT id FROM users 
+            WHERE designation = 'Ward Coordinator' 
+            AND ("votingState" = $1 OR "assignedState" = $1)
+            AND ("votingLGA" = $2 OR "assignedLGA" = $2)
+            AND ("votingWard" = $3 OR "assignedWard" = $3)
+            LIMIT 1
+          `;
+          queryParams = [recipientLocation.state, recipientLocation.lga, recipientLocation.ward];
+          break;
+      }
+
+      // Try to find recipient at this level
+      if (recipientQuery) {
+        const recipientResult = await query(recipientQuery, queryParams);
+        if (recipientResult.rows.length > 0) {
+          assignedTo = recipientResult.rows[0].id;
+          actualRecipientLevel = levelToTry;
+
+          // Set fallback message if we had to route up the hierarchy
+          if (levelToTry !== recipientLevel) {
+            const levelNames = {
+              'ward': 'Ward Coordinator',
+              'lga': 'LGA Coordinator',
+              'state': 'State Coordinator',
+              'national': 'National Coordinator',
+              'peter_obi': 'Peter Obi'
+            };
+            fallbackMessage = `Note: ${levelNames[recipientLevel]} not available for your location. Message routed to ${levelNames[levelToTry]}.`;
+          }
+          break;
+        }
+      }
+    }
+
+    // Insert message with actual recipient level (may be different from requested if fallback occurred)
     const result = await query(`
       INSERT INTO leadership_messages (
         sender_id, 
         recipient_level, 
         recipient_location, 
         subject, 
-        message
+        message,
+        assigned_to,
+        status,
+        created_at
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
       RETURNING id, status, assigned_to, created_at
     `, [
       senderId,
-      recipientLevel,
+      actualRecipientLevel, // Use the actual level where message was routed
       JSON.stringify(recipientLocation),
       subject,
-      message
+      message,
+      assignedTo,
+      assignedTo ? 'delivered' : 'pending'
     ]);
+
+    const messageData = result.rows[0];
+
+    // Send push notification if recipient found
+    if (assignedTo) {
+      try {
+        // Get recipient's push tokens
+        const pushTokenResult = await query(`
+          SELECT expo_push_token, fcm_token 
+          FROM user_push_tokens 
+          WHERE user_id = $1 AND is_active = true
+        `, [assignedTo]);
+
+        if (pushTokenResult.rows.length > 0) {
+          for (const tokenData of pushTokenResult.rows) {
+            if (tokenData.expo_push_token) {
+              await sendPushNotification(
+                tokenData.expo_push_token,
+                'New Leadership Message',
+                `${subject} - from ${sender.name}`,
+                {
+                  type: 'leadership_message',
+                  messageId: messageData.id,
+                  senderId: senderId
+                }
+              );
+            }
+          }
+        }
+      } catch (pushError) {
+        console.error('Error sending push notification:', pushError);
+        // Don't fail the message if push notification fails
+      }
+    }
+
+    // Determine response message
+    let responseMessage = '';
+    if (assignedTo) {
+      responseMessage = fallbackMessage
+        ? `Message sent successfully. ${fallbackMessage}`
+        : 'Message sent successfully';
+    } else {
+      responseMessage = 'Message could not be delivered - no coordinators available in the hierarchy for your location. Please contact support.';
+    }
 
     res.json({
       success: true,
-      messageId: result.rows[0].id,
-      status: result.rows[0].status,
-      message: 'Message sent successfully'
+      messageId: messageData.id,
+      status: messageData.status,
+      assignedTo: messageData.assigned_to,
+      originalLevel: recipientLevel,
+      actualLevel: actualRecipientLevel,
+      fallbackApplied: recipientLevel !== actualRecipientLevel,
+      message: responseMessage
     });
 
   } catch (error) {
@@ -182,6 +347,191 @@ const sendLeadershipMessage = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to send message'
+    });
+  }
+};
+
+// Get messages for leadership (received messages)
+const getLeadershipMessages = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20, status = 'all' } = req.query;
+    const offset = (page - 1) * limit;
+
+    let statusFilter = '';
+    let queryParams = [userId, limit, offset];
+
+    if (status !== 'all') {
+      statusFilter = 'AND lm.status = $4';
+      queryParams.push(status);
+    }
+
+    // Get messages assigned to this user (as recipient)
+    const messagesResult = await query(`
+      SELECT 
+        lm.id,
+        lm.subject,
+        lm.message,
+        lm.status,
+        lm.recipient_level,
+        lm.recipient_location,
+        lm.response,
+        lm.responded_at,
+        lm.created_at,
+        u.name as sender_name,
+        u.email as sender_email,
+        u.designation as sender_designation
+      FROM leadership_messages lm
+      JOIN users u ON u.id = lm.sender_id
+      WHERE lm.assigned_to = $1 ${statusFilter}
+      ORDER BY lm.created_at DESC
+      LIMIT $2 OFFSET $3
+    `, queryParams);
+
+    // Get total count
+    let countParams = [userId];
+    if (status !== 'all') {
+      countParams.push(status);
+    }
+
+    const countResult = await query(`
+      SELECT COUNT(*) as total
+      FROM leadership_messages lm
+      WHERE assigned_to = $1 ${status !== 'all' ? 'AND status = $2' : ''}
+    `, countParams);
+
+    res.json({
+      success: true,
+      messages: messagesResult.rows,
+      pagination: {
+        currentPage: parseInt(page),
+        totalItems: parseInt(countResult.rows[0].total),
+        totalPages: Math.ceil(countResult.rows[0].total / limit),
+        itemsPerPage: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching leadership messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch messages'
+    });
+  }
+};
+
+// Respond to a leadership message
+const respondToLeadershipMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { response } = req.body;
+    const userId = req.user.id;
+
+    if (!response || response.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Response cannot be empty'
+      });
+    }
+
+    // Verify message belongs to this user and update
+    const result = await query(`
+      UPDATE leadership_messages 
+      SET 
+        response = $1,
+        responded_at = NOW(),
+        status = 'responded'
+      WHERE id = $2 AND assigned_to = $3
+      RETURNING id, sender_id, subject
+    `, [response, messageId, userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found or not authorized'
+      });
+    }
+
+    const messageData = result.rows[0];
+
+    // Send push notification to original sender
+    try {
+      const senderTokenResult = await query(`
+        SELECT expo_push_token, fcm_token 
+        FROM user_push_tokens 
+        WHERE user_id = $1 AND is_active = true
+      `, [messageData.sender_id]);
+
+      const responderResult = await query(`
+        SELECT name, designation FROM users WHERE id = $1
+      `, [userId]);
+
+      if (senderTokenResult.rows.length > 0 && responderResult.rows.length > 0) {
+        const responder = responderResult.rows[0];
+
+        for (const tokenData of senderTokenResult.rows) {
+          if (tokenData.expo_push_token) {
+            await sendPushNotification(
+              tokenData.expo_push_token,
+              'Message Response Received',
+              `${responder.name} (${responder.designation}) responded to: ${messageData.subject}`,
+              {
+                type: 'message_response',
+                messageId: messageData.id,
+                responderId: userId
+              }
+            );
+          }
+        }
+      }
+    } catch (pushError) {
+      console.error('Error sending response notification:', pushError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Response sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Error responding to message:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send response'
+    });
+  }
+};
+
+// Mark message as read
+const markMessageAsRead = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.id;
+
+    const result = await query(`
+      UPDATE leadership_messages 
+      SET status = 'read'
+      WHERE id = $1 AND assigned_to = $2 AND status = 'delivered'
+      RETURNING id
+    `, [messageId, userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found or already read'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Message marked as read'
+    });
+
+  } catch (error) {
+    console.error('Error marking message as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark message as read'
     });
   }
 };
@@ -221,6 +571,35 @@ const getMyMessages = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch messages'
+    });
+  }
+};
+
+// Get Unread Message Count
+const getUnreadMessageCount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Count unread messages assigned to this user
+    const result = await query(`
+      SELECT COUNT(*) as unread_count
+      FROM leadership_messages 
+      WHERE assigned_to = $1 AND status = 'delivered'
+    `, [userId]);
+
+    const unreadCount = parseInt(result.rows[0].unread_count) || 0;
+
+    res.json({
+      success: true,
+      unreadCount
+    });
+
+  } catch (error) {
+    console.error('Error getting unread message count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unread count',
+      unreadCount: 0
     });
   }
 };
@@ -636,11 +1015,167 @@ const deleteMobileFeed = async (req, res) => {
   }
 };
 
+// Get comprehensive current user profile for mobile app
+const getCurrentUserProfile = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Get complete user data with all fields from users table
+    const userResult = await query(`
+      SELECT 
+        id,
+        name,
+        email,
+        phone,
+        "profileImage",
+        "emailVerified",
+        role,
+        "kycStatus",
+        "twoFactorEnabled",
+        otp,
+        "otpExpiry",
+        "otpPurpose",
+        "pendingEmail",
+        "kycRejectionReason",
+        "hasTakenCauseSurvey",
+        "countryOfResidence",
+        "createdAt",
+        "updatedAt",
+        "votingState",
+        "votingLGA",
+        "votingWard",
+        gender,
+        "ageRange",
+        citizenship,
+        "isVoter",
+        "willVote",
+        "userName",
+        "countryCode",
+        "stateOfOrigin",
+        lga,
+        ward,
+        "votingEngagementState",
+        "profileCompletionPercentage",
+        designation,
+        "assignedState",
+        "assignedLGA",
+        "assignedWard",
+        monitor_unique_key,
+        key_assigned_by,
+        key_assigned_date,
+        key_status,
+        election_access_level,
+        monitoring_location,
+        mobile_last_seen,
+        push_notifications_enabled
+      FROM users 
+      WHERE id = $1
+    `, [userId]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    // Update mobile last seen
+    await query(
+      'UPDATE users SET mobile_last_seen = NOW() WHERE id = $1',
+      [userId]
+    );
+
+    // Format response with proper data structure and naming
+    const userProfile = {
+      // Basic Identity
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      userName: user.userName,
+      profileImage: user.profileImage,
+
+      // Authentication & Security
+      emailVerified: user.emailVerified,
+      twoFactorEnabled: user.twoFactorEnabled || false,
+      role: user.role,
+
+      // Personal Information
+      gender: user.gender,
+      ageRange: user.ageRange,
+      citizenship: user.citizenship,
+      countryCode: user.countryCode,
+      stateOfOrigin: user.stateOfOrigin,
+      countryOfResidence: user.countryOfResidence,
+
+      // Location Information
+      lga: user.lga,
+      ward: user.ward,
+
+      // Voting Information
+      votingState: user.votingState,
+      votingLGA: user.votingLGA,
+      votingWard: user.votingWard,
+      isVoter: user.isVoter,
+      willVote: user.willVote,
+      votingEngagementState: user.votingEngagementState,
+
+      // Role & Assignment
+      designation: user.designation,
+      assignedState: user.assignedState,
+      assignedLGA: user.assignedLGA,
+      assignedWard: user.assignedWard,
+
+      // Election & Monitoring
+      monitorUniqueKey: user.monitor_unique_key,
+      keyAssignedBy: user.key_assigned_by,
+      keyAssignedDate: user.key_assigned_date,
+      keyStatus: user.key_status,
+      electionAccessLevel: user.election_access_level,
+      monitoringLocation: user.monitoring_location,
+
+      // KYC & Verification
+      kycStatus: user.kycStatus,
+      kycRejectionReason: user.kycRejectionReason,
+
+      // Profile & Surveys
+      profileCompletionPercentage: user.profileCompletionPercentage || 0,
+      hasTakenCauseSurvey: user.hasTakenCauseSurvey,
+
+      // Mobile Specific
+      mobileLastSeen: user.mobile_last_seen,
+      pushNotificationsEnabled: user.push_notifications_enabled || true,
+
+      // Timestamps
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
+
+    res.status(200).json({
+      success: true,
+      user: userProfile
+    });
+
+  } catch (error) {
+    console.error('Error fetching user profile for mobile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user profile'
+    });
+  }
+};
+
 export {
   mobileLogin,
   getMobileFeeds,
   sendLeadershipMessage,
+  getLeadershipMessages,
+  respondToLeadershipMessage,
+  markMessageAsRead,
   getMyMessages,
+  getUnreadMessageCount,
   registerPushToken,
   createMobileFeed,
   updateMobileFeed,
@@ -648,5 +1183,6 @@ export {
   updatePushSettings,
   uploadMobileFeedImage,
   getMobileNotifications,
-  markMobileNotificationRead
+  markMobileNotificationRead,
+  getCurrentUserProfile
 };

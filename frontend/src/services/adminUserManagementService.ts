@@ -176,5 +176,14 @@ export const adminUserManagementService = {
       withCredentials: true
     });
     return response.data;
+  },
+
+  // Export verified users to CSV
+  async exportVerifiedUsersCSV() {
+    const response = await axios.get(`${API_BASE}/admin/user-management/users/export/verified-csv`, {
+      withCredentials: true,
+      responseType: 'text' // Important for CSV data
+    });
+    return response;
   }
 };

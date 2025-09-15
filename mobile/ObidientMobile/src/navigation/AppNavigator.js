@@ -9,55 +9,28 @@ import MessagingScreen from '../screens/MessagingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import CustomTabBar from '../components/CustomTabBar';
 import { colors } from '../styles/globalStyles';
+import { MessageProvider } from '../context';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
 const MainTabs = () => {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          const iconProps = {
-            size: size,
-            color: color,
-            strokeWidth: focused ? 2 : 1.5,
-          };
-
-          if (route.name === 'Home') {
-            return <Home {...iconProps} />;
-          } else if (route.name === 'Feeds') {
-            return <Newspaper {...iconProps} />;
-          } else if (route.name === 'Messages') {
-            return <MessageCircle {...iconProps} />;
-          } else if (route.name === 'Profile') {
-            return <User {...iconProps} />;
-          }
-        },
-        tabBarActiveTintColor: colors.tabActive,
-        tabBarInactiveTintColor: colors.tabInactive,
-        tabBarStyle: {
-          backgroundColor: colors.tabBackground,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          paddingTop: 5,
-          paddingBottom: 5,
-          height: 65,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-          marginTop: 2,
-        },
-        headerShown: false,
-      })}
-    >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Feeds" component={FeedsScreen} />
-      <Tab.Screen name="Messages" component={MessagingScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+    <MessageProvider>
+      <Tab.Navigator
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen name="Feeds" component={FeedsScreen} />
+        <Tab.Screen name="Messages" component={MessagingScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </Tab.Navigator>
+    </MessageProvider>
   );
 };
 

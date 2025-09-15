@@ -1,11 +1,16 @@
 import express from 'express';
 import { protect, isAdmin } from '../middlewares/auth.middleware.js';
+import { mobileRateLimit } from '../middlewares/security.middleware.js';
 import { parseFileUpload } from '../utils/s3Upload.js';
 import {
   mobileLogin,
   getMobileFeeds,
   sendLeadershipMessage,
+  getLeadershipMessages,
+  respondToLeadershipMessage,
+  markMessageAsRead,
   getMyMessages,
+  getUnreadMessageCount,
   registerPushToken,
   createMobileFeed,
   updateMobileFeed,
@@ -13,10 +18,14 @@ import {
   updatePushSettings,
   uploadMobileFeedImage,
   getMobileNotifications,
-  markMobileNotificationRead
+  markMobileNotificationRead,
+  getCurrentUserProfile
 } from '../controllers/mobile.controller.js';
 
 const router = express.Router();
+
+// Apply mobile-specific rate limiting to all routes
+router.use(mobileRateLimit);
 
 // Health check
 router.get('/test', (req, res) => {
@@ -30,6 +39,9 @@ router.get('/test', (req, res) => {
 // Authentication
 router.post('/auth/login', mobileLogin);
 
+// User Profile
+router.get('/user/profile', protect, getCurrentUserProfile);
+
 // Feeds/Alerts
 router.get('/feeds', protect, getMobileFeeds);
 router.post('/feeds', protect, isAdmin, createMobileFeed); // For admin users
@@ -39,7 +51,11 @@ router.post('/feeds/upload-image', protect, isAdmin, parseFileUpload('file'), up
 
 // Leadership Messaging
 router.post('/messages/leadership', protect, sendLeadershipMessage);
+router.get('/messages/leadership', protect, getLeadershipMessages);
+router.post('/messages/:messageId/respond', protect, respondToLeadershipMessage);
+router.put('/messages/:messageId/read', protect, markMessageAsRead);
 router.get('/messages/my-messages', protect, getMyMessages);
+router.get('/messages/unread-count', protect, getUnreadMessageCount);
 
 // Push Notifications
 router.post('/push/register-token', protect, registerPushToken);

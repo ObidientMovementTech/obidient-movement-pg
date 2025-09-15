@@ -50,5 +50,7 @@ router.post('/users/resend-all-verification', adminUserManagementController.rese
 // Update user designation and assignment
 router.put('/users/:userId/designation', adminUserManagementController.updateUserDesignation);
 
+// Export verified users to CSV
+router.get('/users/export/verified-csv', adminUserManagementController.exportVerifiedUsersCSV);
 
 export default router;

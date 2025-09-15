@@ -25,7 +25,7 @@ import mobileRoutes from './routes/mobile.route.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
-  generalRateLimit,
+  // generalRateLimit,
   sanitizeInput,
   requestLogger,
   detectSuspiciousActivity,
@@ -43,7 +43,7 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 app.use(helmetConfig);
 app.use(compression());
 app.use(requestLogger);
-app.use(generalRateLimit);
+// app.use(generalRateLimit);
 app.use(detectSuspiciousActivity);
 app.use(sanitizeInput);
 app.use(hpp());

@@ -76,7 +76,7 @@ export const loginRateLimit = rateLimit({
 // General API rate limiting
 export const generalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 500, // increased limit each IP to 500 requests per windowMs
   message: {
     error: 'Too many requests from this IP, please try again later.'
   },
@@ -101,6 +101,17 @@ export const emailResendRateLimit = rateLimit({
   max: 3, // limit each IP to 3 resend attempts per 5 minutes
   message: {
     error: 'Too many email resend attempts from this IP, please try again after 5 minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Mobile API rate limiting (more lenient for mobile apps)
+export const mobileRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per windowMs for mobile
+  message: {
+    error: 'Too many requests from this mobile app, please try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,

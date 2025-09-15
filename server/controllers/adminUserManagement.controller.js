@@ -1402,5 +1402,55 @@ export const adminUserManagementController = {
         error: error.message
       });
     }
+  },
+
+  // Export verified users to CSV
+  async exportVerifiedUsersCSV(req, res) {
+    try {
+      console.log('Starting CSV export for verified users');
+
+      // Fetch verified users with only the required fields
+      const result = await query(`
+        SELECT 
+          name,
+          email,
+          phone
+        FROM users 
+        WHERE "emailVerified" = true
+        ORDER BY name ASC
+      `);
+
+      const users = result.rows;
+      console.log(`Found ${users.length} verified users for export`);
+
+      // Generate CSV content
+      const headers = ['Name', 'Email', 'Phone'];
+      const csvRows = [headers.join(',')];
+
+      users.forEach(user => {
+        const row = [
+          user.name ? `"${user.name.replace(/"/g, '""')}"` : '""', // Escape quotes in names
+          user.email ? `"${user.email}"` : '""',
+          user.phone ? `"${user.phone}"` : '""'
+        ];
+        csvRows.push(row.join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+
+      // Set headers for CSV download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="verified-users-${new Date().toISOString().split('T')[0]}.csv"`);
+
+      res.status(200).send(csvContent);
+
+    } catch (error) {
+      console.error('CSV export error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to export user data',
+        error: error.message
+      });
+    }
   }
 };

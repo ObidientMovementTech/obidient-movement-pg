@@ -57,6 +57,10 @@ export const authAPI = {
 
 // Mobile app endpoints
 export const mobileAPI = {
+  // User Profile
+  getCurrentUserProfile: () =>
+    api.get('/mobile/user/profile'),
+
   // Feeds
   getFeeds: (page = 1, limit = 20) =>
     api.get(`/mobile/feeds?page=${page}&limit=${limit}`),
@@ -65,8 +69,21 @@ export const mobileAPI = {
   sendMessage: (data) =>
     api.post('/mobile/messages/leadership', data),
 
+  getLeadershipMessages: (page = 1, limit = 20, status = 'all') =>
+    api.get(`/mobile/messages/leadership?page=${page}&limit=${limit}&status=${status}`),
+
+  respondToMessage: (messageId, response) =>
+    api.post(`/mobile/messages/${messageId}/respond`, { response }),
+
+  markMessageAsRead: (messageId) =>
+    api.put(`/mobile/messages/${messageId}/read`),
+
   getMyMessages: () =>
     api.get('/mobile/messages/my-messages'),
+
+  // Get unread message count
+  getUnreadMessageCount: () =>
+    api.get('/mobile/messages/unread-count'),
 
   // Push notifications
   registerPushToken: (token, platform) =>

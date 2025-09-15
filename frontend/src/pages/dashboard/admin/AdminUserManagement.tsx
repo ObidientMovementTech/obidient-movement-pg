@@ -5,7 +5,7 @@ import {
   // Plus, 
   Trash2, Shield, ShieldOff,
   CheckCircle, XCircle, UserCheck, UserX, Loader2, X, AlertTriangle, Mail, Send,
-  Edit3, Key
+  Edit3, Key, Download
 } from 'lucide-react';
 import { adminUserManagementService } from '../../../services/adminUserManagementService';
 import { adminMaintenanceService } from '../../../services/adminMaintenanceService';
@@ -132,6 +132,7 @@ export default function AdminUserManagement() {
     [key: string]: boolean;
   }>({});
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Monitor key modal state
   const [monitorKeyModal, setMonitorKeyModal] = useState<{
@@ -593,6 +594,32 @@ export default function AdminUserManagement() {
     loadUsers(); // Refresh the user list
   };
 
+  // Export verified users to CSV
+  const handleExportCSV = async () => {
+    setExportLoading(true);
+    try {
+      const response = await adminUserManagementService.exportVerifiedUsersCSV();
+
+      // Create and download the CSV file
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `verified-users-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setSuccess('User data exported successfully');
+    } catch (err) {
+      setError('Failed to export user data');
+      console.error('Export error:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const handleBulkAction = async () => {
     if (selectedUsers.length === 0 || !bulkAction) return;
 
@@ -885,6 +912,26 @@ export default function AdminUserManagement() {
               )}
             </button>
           )}
+
+          {/* Export CSV Button */}
+          <button
+            onClick={handleExportCSV}
+            disabled={exportLoading}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+            title="Export verified users (Name, Email, Phone) to CSV"
+          >
+            {exportLoading ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download size={20} />
+                Export Verified Users CSV
+              </>
+            )}
+          </button>
 
           {/* <button
             onClick={() => alert('Create user form - coming soon!')}

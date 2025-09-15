@@ -6,6 +6,7 @@ import { StatusBar } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
 import SplashScreen from './src/components/SplashScreen';
 import PushNotificationService from './src/services/pushNotificationService';
+import { UserProvider } from './src/context';
 import { colors } from './src/styles/globalStyles';
 
 const App = () => {
@@ -49,14 +50,16 @@ const App = () => {
 
   return (
     <SafeAreaProvider>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={colors.background}
-        translucent={false}
-      />
-      <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
-        <AppNavigator initialRoute={initialRoute} />
-      </NavigationContainer>
+      <UserProvider>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={colors.background}
+          translucent={false}
+        />
+        <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
+          <AppNavigator initialRoute={initialRoute} />
+        </NavigationContainer>
+      </UserProvider>
     </SafeAreaProvider>
   );
 };

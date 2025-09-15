@@ -13,15 +13,12 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { X } from 'lucide-react-native';
 import { mobileAPI } from '../services/api';
 import { colors, typography, globalStyles } from '../styles/globalStyles';
-import { useUser, useMessage } from '../context';
+import { useUser } from '../context';
 
 const MessagingScreen = ({ navigation }) => {
   const { user } = useUser();
-  const { markAsRead: decrementUnreadCount, refreshUnreadCount, resetUnreadCount } = useMessage();
   const [activeTab, setActiveTab] = useState('inbox'); // 'send', 'inbox', 'sent'
   const [selectedLevel, setSelectedLevel] = useState('');
   const [subject, setSubject] = useState('');
@@ -33,8 +30,6 @@ const MessagingScreen = ({ navigation }) => {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [responseText, setResponseText] = useState('');
   const [showResponseModal, setShowResponseModal] = useState(false);
-  const [viewResponseModal, setViewResponseModal] = useState(false);
-  const [responseToView, setResponseToView] = useState('');
 
   // Dynamic recipient levels based on user's designation and voting location
   const getAvailableRecipientLevels = () => {
@@ -73,48 +68,6 @@ const MessagingScreen = ({ navigation }) => {
     return allLevels;
   };
 
-  // Helper function to get readable recipient level label
-  const getRecipientLevelLabel = (recipientLevel) => {
-    const levels = {
-      'peter_obi': 'Peter Obi',
-      'national': 'National Coordinator',
-      'state': 'State Coordinator',
-      'lga': 'LGA Coordinator',
-      'ward': 'Ward Coordinator'
-    };
-    return levels[recipientLevel] || recipientLevel;
-  };
-
-  // Helper function to format date safely
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown Date';
-
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
-      return date.toLocaleDateString();
-    } catch (error) {
-      return 'Invalid Date';
-    }
-  };
-
-  // Helper function to format date and time safely
-  const formatDateTime = (dateString) => {
-    if (!dateString) return 'Unknown Date';
-
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
-      return date.toLocaleString();
-    } catch (error) {
-      return 'Invalid Date';
-    }
-  };
-
   const loadMessages = async () => {
     try {
       const [sentResponse, inboxResponse] = await Promise.all([
@@ -129,7 +82,6 @@ const MessagingScreen = ({ navigation }) => {
       if (inboxResponse.data.success) {
         setInboxMessages(inboxResponse.data.messages || []);
       }
-
     } catch (error) {
       console.error('Error loading messages:', error);
       Alert.alert('Error', 'Failed to load messages');
@@ -139,7 +91,6 @@ const MessagingScreen = ({ navigation }) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadMessages();
-    await refreshUnreadCount(); // Only refresh count when user manually pulls to refresh
     setRefreshing(false);
   };
 
@@ -215,7 +166,6 @@ const MessagingScreen = ({ navigation }) => {
   const markAsRead = async (messageId) => {
     try {
       await mobileAPI.markMessageAsRead(messageId);
-      decrementUnreadCount(); // Update badge count
       loadMessages(); // Refresh to show updated status
     } catch (error) {
       console.error('Error marking message as read:', error);
@@ -251,7 +201,7 @@ const MessagingScreen = ({ navigation }) => {
           <View style={styles.statusContainer}>
             {isUnread && <View style={styles.unreadDot} />}
             <Text style={styles.messageDate}>
-              {formatDate(item.created_at || item.createdAt || item.sentAt || item.sent_at)}
+              {new Date(item.created_at).toLocaleDateString()}
             </Text>
           </View>
         </View>
@@ -278,9 +228,9 @@ const MessagingScreen = ({ navigation }) => {
   const renderSentMessage = ({ item }) => (
     <View style={styles.messageCard}>
       <View style={styles.messageHeader}>
-        <Text style={styles.recipientLevel}>To: {getRecipientLevelLabel(item.recipientLevel || item.recipient_level)}</Text>
+        <Text style={styles.recipientLevel}>To: {item.recipientLevel}</Text>
         <Text style={styles.messageDate}>
-          {formatDate(item.createdAt || item.created_at || item.sentAt || item.sent_at)}
+          {new Date(item.createdAt).toLocaleDateString()}
         </Text>
       </View>
 
@@ -296,10 +246,7 @@ const MessagingScreen = ({ navigation }) => {
         {item.response && (
           <TouchableOpacity
             style={styles.viewResponseButton}
-            onPress={() => {
-              setResponseToView(item.response);
-              setViewResponseModal(true);
-            }}
+            onPress={() => Alert.alert('Response', item.response)}
           >
             <Text style={styles.viewResponseText}>View Response</Text>
           </TouchableOpacity>
@@ -309,26 +256,8 @@ const MessagingScreen = ({ navigation }) => {
   );
 
   useEffect(() => {
-    // Only load messages and fetch unread count on initial mount
-    const initializeMessages = async () => {
-      await loadMessages();
-      await refreshUnreadCount();
-    };
-
-    initializeMessages();
+    loadMessages();
   }, []);
-
-  // Only reset unread count when screen comes into focus (user is viewing messages)
-  useFocusEffect(
-    React.useCallback(() => {
-      // Reset unread count when user is actively viewing the messages screen
-      const timer = setTimeout(() => {
-        resetUnreadCount();
-      }, 1000); // 1 second delay to allow user to see the count first
-
-      return () => clearTimeout(timer);
-    }, [resetUnreadCount])
-  );
 
   // Tab rendering functions
   const renderComposeTab = () => (
@@ -518,7 +447,7 @@ const MessagingScreen = ({ navigation }) => {
                 From: {selectedMessage.sender_name} ({selectedMessage.sender_designation})
               </Text>
               <Text style={styles.messageDateFull}>
-                {formatDateTime(selectedMessage.created_at || selectedMessage.createdAt)}
+                {new Date(selectedMessage.created_at).toLocaleString()}
               </Text>
 
               <View style={styles.messageBodyContainer}>
@@ -530,7 +459,7 @@ const MessagingScreen = ({ navigation }) => {
                   <Text style={styles.responseTitle}>Your Response:</Text>
                   <Text style={styles.responseText}>{selectedMessage.response}</Text>
                   <Text style={styles.responseDate}>
-                    Sent: {formatDateTime(selectedMessage.responded_at || selectedMessage.respondedAt)}
+                    Sent: {new Date(selectedMessage.responded_at).toLocaleString()}
                   </Text>
                 </View>
               )}
@@ -582,46 +511,6 @@ const MessagingScreen = ({ navigation }) => {
             <Text style={styles.charCount}>{responseText.length}/1000</Text>
           </View>
         </SafeAreaView>
-      </Modal>
-
-      {/* View Response Modal */}
-      <Modal
-        visible={viewResponseModal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setViewResponseModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.responseModalContainer}>
-            <View style={styles.responseModalHeader}>
-              <Text style={styles.responseModalTitle}>Response</Text>
-              <TouchableOpacity
-                onPress={() => setViewResponseModal(false)}
-                style={styles.closeButton}
-              >
-                <X size={18} color={colors.textSecondary} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.responseModalBody}>
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.responseScrollContent}
-              >
-                <Text style={styles.responseModalText}>"{responseToView}"</Text>
-              </ScrollView>
-            </View>
-
-            <View style={styles.responseModalFooter}>
-              <TouchableOpacity
-                style={styles.responseModalCloseButton}
-                onPress={() => setViewResponseModal(false)}
-              >
-                <Text style={styles.responseModalCloseButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1006,93 +895,6 @@ const styles = StyleSheet.create({
   responseInput: {
     height: 120,
     textAlignVertical: 'top',
-  },
-  // View Response Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  responseModalContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    maxHeight: '80%',
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  responseModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  responseModalTitle: {
-    ...typography.h4,
-    color: colors.text,
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceVariant,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  responseModalBody: {
-    maxHeight: 300,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  responseScrollContent: {
-    paddingBottom: 8,
-  },
-  responseModalText: {
-    ...typography.body1,
-    color: colors.text,
-    lineHeight: 22,
-    fontSize: 15,
-    letterSpacing: 0.2,
-  },
-  responseModalFooter: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  responseModalCloseButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  responseModalCloseButtonText: {
-    ...typography.body1,
-    color: colors.white,
-    fontWeight: 'bold',
-    fontSize: 16,
   },
 });
 
