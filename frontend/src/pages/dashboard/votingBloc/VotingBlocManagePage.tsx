@@ -51,6 +51,7 @@ import FlyerModal from "../../../components/modals/FlyerModal";
 
 import { formatPhoneForWhatsApp } from "../../../utils/phoneUtils";
 import { statesLGAWardList } from "../../../utils/StateLGAWard";
+import { getPollingUnitMembers } from "../../../services/userService";
 
 export default function VotingBlocManagePage() {
   const { id } = useParams<{ id: string }>();
@@ -61,7 +62,7 @@ export default function VotingBlocManagePage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'pollingUnit' | 'inecVoters' | 'analytics'>('overview');
 
   // New states for member management
   const [invitations, setInvitations] = useState<VotingBlocInvitation[]>([]);
@@ -95,11 +96,46 @@ export default function VotingBlocManagePage() {
   const [showManualMemberModal, setShowManualMemberModal] = useState(false);
   const [manualMemberLoading, setManualMemberLoading] = useState(false);
 
+  // Polling unit members state
+  const [pollingUnitMembers, setPollingUnitMembers] = useState<any[]>([]);
+  const [pollingUnitLoading, setPollingUnitLoading] = useState(false);
+  const [pollingUnitError, setPollingUnitError] = useState<string | null>(null);
+  const [pollingUnitInfo, setPollingUnitInfo] = useState<any>(null);
+
+  // PU member management states
+  const [puMemberSearch, setPuMemberSearch] = useState('');
+
+  // INEC voters mock data and states
+  const [inecVoterSearch, setInecVoterSearch] = useState('');
+  const [inecVoters] = useState([
+    { id: 1, fullName: 'Adebayo Olumide', vin: 'VIN001234567890', age: 45, gender: 'Male', address: '15 Lagos Street, Ikeja', pvc: 'collected' },
+    { id: 2, fullName: 'Chioma Nwosu', vin: 'VIN001234567891', age: 32, gender: 'Female', address: '22 Aba Road, Onitsha', pvc: 'collected' },
+    { id: 3, fullName: 'Ibrahim Musa', vin: 'VIN001234567892', age: 28, gender: 'Male', address: '8 Kano Close, Kaduna', pvc: 'not_collected' },
+    { id: 4, fullName: 'Grace Okoro', vin: 'VIN001234567893', age: 41, gender: 'Female', address: '33 Port Harcourt Ave', pvc: 'collected' },
+    { id: 5, fullName: 'Yusuf Abubakar', vin: 'VIN001234567894', age: 36, gender: 'Male', address: '12 Abuja Street', pvc: 'collected' },
+    { id: 6, fullName: 'Blessing Eze', vin: 'VIN001234567895', age: 29, gender: 'Female', address: '45 Enugu Road', pvc: 'not_collected' },
+    { id: 7, fullName: 'Emeka Okafor', vin: 'VIN001234567896', age: 52, gender: 'Male', address: '7 Owerri Close', pvc: 'collected' },
+    { id: 8, fullName: 'Fatima Abdullahi', vin: 'VIN001234567897', age: 38, gender: 'Female', address: '19 Maiduguri Way', pvc: 'collected' },
+    { id: 9, fullName: 'John Ekong', vin: 'VIN001234567898', age: 44, gender: 'Male', address: '26 Calabar Street', pvc: 'not_collected' },
+    { id: 10, fullName: 'Mary Adamu', vin: 'VIN001234567899', age: 33, gender: 'Female', address: '11 Sokoto Road', pvc: 'collected' },
+    { id: 11, fullName: 'David Ogundimu', vin: 'VIN001234567900', age: 47, gender: 'Male', address: '9 Abeokuta Close', pvc: 'collected' },
+    { id: 12, fullName: 'Sarah Bello', vin: 'VIN001234567901', age: 31, gender: 'Female', address: '14 Ilorin Street', pvc: 'not_collected' },
+    { id: 13, fullName: 'Ahmed Hassan', vin: 'VIN001234567902', age: 39, gender: 'Male', address: '21 Bauchi Avenue', pvc: 'collected' },
+    { id: 14, fullName: 'Jennifer Ugwu', vin: 'VIN001234567903', age: 26, gender: 'Female', address: '35 Awka Road', pvc: 'collected' },
+    { id: 15, fullName: 'Babatunde Adeyemi', vin: 'VIN001234567904', age: 56, gender: 'Male', address: '2 Ibadan Close', pvc: 'not_collected' }
+  ]);
+
   useEffect(() => {
     if (id) {
       fetchVotingBloc();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (activeTab === 'pollingUnit' && pollingUnitMembers.length === 0) {
+      fetchPollingUnitMembers();
+    }
+  }, [activeTab]);
 
   const fetchVotingBloc = async () => {
     try {
@@ -157,6 +193,23 @@ export default function VotingBlocManagePage() {
       console.error('Failed to fetch member metadata:', error);
       // Fallback to using basic member data
       setMembersWithMetadata(votingBloc?.members || []);
+    }
+  };
+
+  const fetchPollingUnitMembers = async () => {
+    try {
+      setPollingUnitLoading(true);
+      setPollingUnitError(null);
+      const data = await getPollingUnitMembers();
+      setPollingUnitMembers(data.members || []);
+      setPollingUnitInfo(data.pollingUnit || null);
+    } catch (error) {
+      console.error('Failed to fetch polling unit members:', error);
+      setPollingUnitError(error instanceof Error ? error.message : 'Failed to load polling unit members');
+      setPollingUnitMembers([]);
+      setPollingUnitInfo(null);
+    } finally {
+      setPollingUnitLoading(false);
     }
   };
 
@@ -298,6 +351,22 @@ export default function VotingBlocManagePage() {
       member.personalInfo?.currentLocation?.lga?.toLowerCase().includes(locationFilter.toLowerCase());
 
     return matchesSearch && matchesDecision && matchesContact && matchesEngagement && matchesPvcStatus && matchesLocation;
+  });
+
+  // Filter INEC voters based on search
+  const filteredInecVoters = inecVoters.filter(voter => {
+    const matchesSearch = voter.fullName?.toLowerCase().includes(inecVoterSearch.toLowerCase()) ||
+      voter.vin?.toLowerCase().includes(inecVoterSearch.toLowerCase()) ||
+      voter.address?.toLowerCase().includes(inecVoterSearch.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Filter polling unit members based on search
+  const filteredPuMembers = pollingUnitMembers.filter(member => {
+    const matchesSearch = member.fullName?.toLowerCase().includes(puMemberSearch.toLowerCase()) ||
+      member.email?.toLowerCase().includes(puMemberSearch.toLowerCase()) ||
+      member.phoneNumber?.toLowerCase().includes(puMemberSearch.toLowerCase());
+    return matchesSearch;
   });
 
   const copyBlocLink = () => {
@@ -601,6 +670,8 @@ export default function VotingBlocManagePage() {
             {[
               { id: 'overview', label: 'Overview', icon: BarChart3 },
               { id: 'members', label: 'Members', icon: Users },
+              { id: 'pollingUnit', label: 'Obidients in Your PU', icon: MapPin },
+              { id: 'inecVoters', label: 'Registered Voters in Your PU', icon: Target },
               { id: 'analytics', label: 'Analytics', icon: BarChart3 }
             ].map((tab) => (
               <button
@@ -688,7 +759,7 @@ export default function VotingBlocManagePage() {
           {activeTab === 'members' && (
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                <h3 className="text-base sm:text-3xl font-semibold text-gray-900">
                   Members ({votingBloc.metrics.totalMembers})
                 </h3>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
@@ -1004,6 +1075,23 @@ export default function VotingBlocManagePage() {
                               </span>
                             </div>
 
+                            {member.phone && !member.isManualMember && (
+                              <div className="flex flex-col gap-1 items-center">
+                                <button
+                                  onClick={() => openWhatsAppChat(member.phone, member.countryCode)}
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg"
+                                  title="Chat on WhatsApp"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.886 3.488" />
+                                  </svg>
+                                </button>
+                                <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                                  WhatsApp
+                                </span>
+                              </div>
+                            )}
+
                             {!member.isManualMember && (
                               <div className="flex flex-col gap-1 items-center">
                                 <button
@@ -1019,23 +1107,6 @@ export default function VotingBlocManagePage() {
                                 </button>
                                 <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
                                   Send Message
-                                </span>
-                              </div>
-                            )}
-
-                            {member.phone && (
-                              <div className="flex flex-col gap-1 items-center">
-                                <button
-                                  onClick={() => openWhatsAppChat(member.phone, member.countryCode)}
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg"
-                                  title="Chat on WhatsApp"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.886 3.488" />
-                                  </svg>
-                                </button>
-                                <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
-                                  WhatsApp
                                 </span>
                               </div>
                             )}
@@ -1087,7 +1158,393 @@ export default function VotingBlocManagePage() {
                 </div>
               </div>
             </div>
-          )}          {activeTab === 'analytics' && (
+          )}
+
+          {activeTab === 'pollingUnit' && (
+            <div>
+              {/* Enhanced Header with Hierarchy */}
+              <div className="mb-6">
+                <h3 className="text-base sm:text-3xl font-semibold text-gray-900 mb-4">
+                  Obidients in Your Polling Unit ({filteredPuMembers.length})
+                </h3>
+
+                {pollingUnitInfo && (
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                        <MapPin className="w-5 h-5 text-white" />
+                      </div>
+                      <h4 className="text-lg sm:text-xl font-semibold text-gray-900">Your Polling Unit Location</h4>
+                    </div>
+
+                    {/* Breadcrumb-style hierarchy */}
+                    <div className="flex items-center flex-wrap gap-2 text-sm sm:text-base">
+                      <span className="px-3 py-1 bg-blue-600 text-white rounded-lg font-medium">
+                        {pollingUnitInfo.state || 'Unknown State'}
+                      </span>
+                      <span className="text-gray-500">→</span>
+                      <span className="px-3 py-1 bg-green-600 text-white rounded-lg font-medium">
+                        {pollingUnitInfo.lga || 'Unknown LGA'}
+                      </span>
+                      <span className="text-gray-500">→</span>
+                      <span className="px-3 py-1 bg-purple-600 text-white rounded-lg font-medium">
+                        {pollingUnitInfo.ward || 'Unknown Ward'}
+                      </span>
+                      <span className="text-gray-500">→</span>
+                      <span className="px-3 py-1 bg-orange-600 text-white rounded-lg font-medium">
+                        PU {pollingUnitInfo.code}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {pollingUnitLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <Loading />
+                </div>
+              )}
+
+              {pollingUnitError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center gap-2 text-red-700">
+                    <div className="text-sm">{pollingUnitError}</div>
+                  </div>
+                  <button
+                    onClick={fetchPollingUnitMembers}
+                    className="mt-3 flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
+                  >
+                    <RotateCcw size={16} />
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!pollingUnitLoading && !pollingUnitError && pollingUnitMembers.length === 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                  <MapPin className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Polling Unit Set</h3>
+                  <p className="text-sm text-gray-600">
+                    Please update your profile to set your polling unit to see other Obidients in your area.
+                  </p>
+                </div>
+              )}
+
+              {!pollingUnitLoading && !pollingUnitError && pollingUnitMembers.length > 0 && (
+                <div>
+                  {/* Stats Summary */}
+                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="text-sm text-green-700">
+                        <strong>{pollingUnitMembers.length}</strong> Obidient{pollingUnitMembers.length !== 1 ? 's' : ''} found in your polling unit
+                      </div>
+                      <div className="text-xs sm:text-sm text-green-600">
+                        Showing {filteredPuMembers.length} of {pollingUnitMembers.length} members
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                      <input
+                        type="text"
+                        placeholder="Search members by name, email, or phone..."
+                        value={puMemberSearch}
+                        onChange={(e) => setPuMemberSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Members List - Same style as Members tab */}
+                  <div className="space-y-3">
+                    {filteredPuMembers.map((member) => (
+                      <div key={member.id} className="flex items-start gap-3 p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-300 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User size={16} className="sm:w-5 sm:h-5 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <div className="font-medium text-gray-900 text-sm sm:text-base break-words">
+                              {member.fullName || 'No Name'}
+                            </div>
+                            {member.isCurrentUser && (
+                              <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full flex-shrink-0">
+                                <Crown size={8} className="sm:w-2.5 sm:h-2.5" />
+                                You
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex-shrink-0">
+                              <MapPin size={8} className="sm:w-2.5 sm:h-2.5" />
+                              Same PU
+                            </span>
+                          </div>
+                          <div className="text-xs sm:text-sm text-gray-500 mb-2 break-all">
+                            {member.email || 'No email provided'}
+                          </div>
+
+                          {/* Phone Number */}
+                          {member.phoneNumber && (
+                            <div className="mb-2">
+                              <span className="text-xs sm:text-sm text-gray-500 break-all">
+                                {member.phoneNumber}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Member Tags - Simplified for PU members */}
+                          <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-2">
+                            <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                              Obidient
+                            </span>
+                            <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                              Platform Member
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 flex-shrink-0">
+                          {!member.isCurrentUser && (
+                            <>
+                              {member.phoneNumber && (
+                                <div className="flex flex-col gap-1 items-center">
+                                  <button
+                                    onClick={() => openWhatsAppChat(member.phoneNumber, member.countryCode)}
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg p-2"
+                                    title="Chat on WhatsApp"
+                                  >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.886 3.488" />
+                                    </svg>
+                                  </button>
+                                  <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                                    WhatsApp
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="flex flex-col gap-1 items-center">
+                                <button
+                                  onClick={() => {
+                                    // Adapt polling unit member to match expected interface
+                                    const adaptedMember = {
+                                      _id: member.id.toString(),
+                                      name: member.fullName,
+                                      email: member.email || 'No email'
+                                    };
+                                    setSelectedMember(adaptedMember);
+                                    setShowPrivateMessageModal(true);
+                                  }}
+                                  disabled={broadcastLoading || inviteLoading || privateMessageLoading}
+                                  className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Send Private Message"
+                                >
+                                  <MessageSquare size={14} className="sm:w-4 sm:h-4" />
+                                </button>
+                                <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                                  Message
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {filteredPuMembers.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users size={36} className="sm:w-12 sm:h-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-sm sm:text-base">No members found matching your search.</p>
+                        {puMemberSearch && (
+                          <button
+                            onClick={() => setPuMemberSearch('')}
+                            className="mt-2 text-green-600 hover:text-green-700 text-sm"
+                          >
+                            Clear search
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'inecVoters' && (
+            <div>
+              {/* Enhanced Header */}
+              <div className="mb-6">
+                <h3 className="text-base sm:text-3xl font-semibold text-gray-900 mb-4">
+                  Registered Voters in Your Polling Unit ({filteredInecVoters.length})
+                </h3>
+
+                {pollingUnitInfo && (
+                  <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-xl p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center">
+                        <Target className="w-5 h-5 text-white" />
+                      </div>
+                      <h4 className="text-lg sm:text-xl font-semibold text-gray-900">INEC Voter Registry</h4>
+                    </div>
+
+                    {/* Breadcrumb-style hierarchy */}
+                    <div className="flex items-center flex-wrap gap-2 text-sm sm:text-base">
+                      <span className="px-3 py-1 bg-blue-600 text-white rounded-lg font-medium">
+                        {pollingUnitInfo.state || 'Unknown State'}
+                      </span>
+                      <span className="text-gray-500">→</span>
+                      <span className="px-3 py-1 bg-green-600 text-white rounded-lg font-medium">
+                        {pollingUnitInfo.lga || 'Unknown LGA'}
+                      </span>
+                      <span className="text-gray-500">→</span>
+                      <span className="px-3 py-1 bg-purple-600 text-white rounded-lg font-medium">
+                        {pollingUnitInfo.ward || 'Unknown Ward'}
+                      </span>
+                      <span className="text-gray-500">→</span>
+                      <span className="px-3 py-1 bg-orange-600 text-white rounded-lg font-medium">
+                        PU {pollingUnitInfo.code}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Stats Summary */}
+              <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-sm text-orange-700">
+                    <strong>{inecVoters.length}</strong> registered voters in this polling unit
+                  </div>
+                  <div className="flex items-center gap-4 text-xs sm:text-sm">
+                    <span className="text-green-600 font-medium">
+                      {inecVoters.filter(v => v.pvc === 'collected').length} PVCs Collected
+                    </span>
+                    <span className="text-red-600 font-medium">
+                      {inecVoters.filter(v => v.pvc === 'not_collected').length} PVCs Not Collected
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search voters by name, VIN, or address..."
+                    value={inecVoterSearch}
+                    onChange={(e) => setInecVoterSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Voters List */}
+              <div className="space-y-3">
+                {filteredInecVoters.map((voter) => (
+                  <div key={voter.id} className="flex items-start gap-3 p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-300 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Target size={16} className="sm:w-5 sm:h-5 text-orange-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <div className="font-medium text-gray-900 text-sm sm:text-base break-words">
+                          {voter.fullName}
+                        </div>
+                        <span className="flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full flex-shrink-0">
+                          <Target size={8} className="sm:w-2.5 sm:h-2.5" />
+                          INEC Voter
+                        </span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${voter.pvc === 'collected'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}>
+                          {voter.pvc === 'collected' ? 'PVC Collected' : 'PVC Not Collected'}
+                        </span>
+                      </div>
+
+                      <div className="text-xs sm:text-sm text-gray-500 mb-2">
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <span><strong>VIN:</strong> {voter.vin}</span>
+                          <span><strong>Age:</strong> {voter.age}</span>
+                          <span><strong>Gender:</strong> {voter.gender}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-xs sm:text-sm text-gray-600 mb-2">
+                        <strong>Address:</strong> {voter.address}
+                      </div>
+
+                      {/* Voter Status Tags */}
+                      <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-2">
+                        <span className={`px-2 py-1 text-xs rounded-full ${voter.age >= 18 && voter.age <= 35 ? 'bg-blue-100 text-blue-800' :
+                            voter.age >= 36 && voter.age <= 55 ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                          }`}>
+                          {voter.age >= 18 && voter.age <= 35 ? 'Youth' :
+                            voter.age >= 36 && voter.age <= 55 ? 'Adult' : 'Senior'}
+                        </span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${voter.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                          }`}>
+                          {voter.gender}
+                        </span>
+                        <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
+                          Registered Voter
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Info Badge */}
+                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                      <div className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-500" style={{ fontSize: '9px' }}>
+                        INEC Data
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {filteredInecVoters.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Target size={36} className="sm:w-12 sm:h-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-sm sm:text-base">No voters found matching your search.</p>
+                    {inecVoterSearch && (
+                      <button
+                        onClick={() => setInecVoterSearch('')}
+                        className="mt-2 text-orange-600 hover:text-orange-700 text-sm"
+                      >
+                        Clear search
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Demo Notice */}
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                  </svg>
+                  <p className="text-sm font-medium">Demo Data</p>
+                </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  This is sample INEC voter registry data for demonstration purposes. In production, this will be populated with real INEC data.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
             <div>
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Analytics & Insights</h3>
 

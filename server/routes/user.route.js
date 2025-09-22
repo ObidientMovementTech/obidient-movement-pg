@@ -16,7 +16,8 @@ import {
   updateNotificationPreferences,
   deleteAccount,
   getProfileCompletion,
-  checkUsernameAvailability
+  checkUsernameAvailability,
+  getPollingUnitMembers
 } from '../controllers/user.controller.js'
 import { parseFileUpload } from '../utils/s3Upload.js';
 
@@ -31,6 +32,9 @@ router.get('/check-username', protect, checkUsernameAvailability);
 
 // Profile completion (safe read-only endpoint)
 router.get('/profile-completion', protect, getProfileCompletion);
+
+// Polling unit members
+router.get('/polling-unit-members', protect, getPollingUnitMembers);
 
 // Password change endpoints
 router.post('/change-password-request', authenticateUser, requestPasswordChange);

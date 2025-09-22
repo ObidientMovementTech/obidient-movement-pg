@@ -528,6 +528,7 @@ export const getCurrentUser = async (req, res) => {
       votingState: user.votingState,
       votingLGA: user.votingLGA,
       votingWard: user.votingWard,
+      votingPU: user.votingPU,
       isVoter: user.isVoter,
       willVote: user.willVote,
 

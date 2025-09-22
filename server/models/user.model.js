@@ -137,7 +137,7 @@ class User {
                      "kycStatus", "twoFactorEnabled", "twoFactorQRCode", otp, "otpExpiry", 
                      "otpPurpose", "pendingEmail", "kycRejectionReason", "hasTakenCauseSurvey",
                      "countryOfResidence", "createdAt", "updatedAt", "votingState", "votingLGA",
-                     "votingWard", gender, "ageRange", citizenship, "isVoter", "willVote",
+                     "votingWard", "votingPU", gender, "ageRange", citizenship, "isVoter", "willVote",
                      "userName", "countryCode", "stateOfOrigin", lga, ward, "votingEngagementState",
                      "profileCompletionPercentage", designation, "assignedState", "assignedLGA", "assignedWard"`;
     }
@@ -253,7 +253,7 @@ class User {
       'otp', 'otpExpiry', 'otpPurpose', 'pendingEmail', 'kycRejectionReason',
       'hasTakenCauseSurvey', 'countryOfResidence',
       // Add all the new profile fields
-      'votingState', 'votingLGA', 'votingWard', 'gender', 'ageRange', 'citizenship',
+      'votingState', 'votingLGA', 'votingWard', 'votingPU', 'gender', 'ageRange', 'citizenship',
       'isVoter', 'willVote', 'userName', 'countryCode', 'stateOfOrigin',
       // Add designation fields
       'designation', 'assignedState', 'assignedLGA', 'assignedWard'

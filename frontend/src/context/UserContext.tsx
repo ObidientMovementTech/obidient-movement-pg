@@ -75,6 +75,7 @@ export interface UserProfile {
   votingState?: string;
   votingLGA?: string;
   votingWard?: string;
+  votingPU?: string; // Add polling unit field
   citizenship?: string;
   isVoter?: string;
   willVote?: string;

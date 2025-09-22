@@ -185,3 +185,17 @@ export async function deleteAccount(password: string, confirmationText: string) 
     throw new Error("Account deletion failed. Please try again.");
   }
 }
+
+export async function getPollingUnitMembers() {
+  try {
+    const res = await axios.get(`${API_BASE}/users/polling-unit-members`, {
+      withCredentials: true
+    });
+    return res.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(error.response.data.message || "Failed to get polling unit members");
+    }
+    throw new Error("Failed to get polling unit members. Please try again.");
+  }
+}

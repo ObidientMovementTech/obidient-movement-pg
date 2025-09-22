@@ -1,5 +1,6 @@
 import s3Client from '../config/aws.js';
 import User from '../models/user.model.js';
+import { query } from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import { uploadBufferToS3 } from '../utils/s3Upload.js';
 import { generateOTP, createOTPExpiry, isOTPValid } from '../utils/otpUtils.js';
@@ -127,7 +128,7 @@ export const updateMe = async (req, res) => {
 
     // Update top-level fields (expanded to include all personal info fields)
     const allowedTopLevelFields = [
-      'name', 'phone', 'profileImage', 'votingState', 'votingLGA', 'votingWard',
+      'name', 'phone', 'profileImage', 'votingState', 'votingLGA', 'votingWard', 'votingPU',
       'gender', 'ageRange', 'citizenship', 'isVoter', 'willVote', 'userName',
       'countryCode', 'stateOfOrigin', 'notificationPreferences', 'onboardingData'
     ];
@@ -805,6 +806,74 @@ export const getProfileCompletion = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to get profile completion'
+    });
+  }
+};
+
+// Get users in the same polling unit
+export const getPollingUnitMembers = async (req, res) => {
+  try {
+    const userId = req.userId; // From auth middleware
+
+    // Get the current user to find their polling unit
+    const currentUser = await User.findByIdSelect(userId, ['passwordHash']);
+
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!currentUser.votingPU) {
+      return res.status(400).json({
+        success: false,
+        message: 'User has not set their polling unit',
+        members: [],
+        pollingUnit: null,
+        total: 0
+      });
+    }
+
+    // Find all users with the same polling unit using direct query
+    const result = await query(
+      `SELECT id, name, email, phone, "votingPU", "countryCode", "createdAt", "votingState", "votingLGA", "votingWard"
+       FROM users 
+       WHERE "votingPU" = $1 
+       ORDER BY "createdAt" ASC`,
+      [currentUser.votingPU]
+    );
+
+    const members = result.rows;
+
+    // Move current user to the top of the list
+    const currentUserData = members.find(member => member.id === parseInt(userId));
+    const otherMembers = members.filter(member => member.id !== parseInt(userId));
+    const sortedMembers = currentUserData ? [currentUserData, ...otherMembers] : otherMembers;
+
+    return res.status(200).json({
+      success: true,
+      members: sortedMembers.map(member => ({
+        id: member.id,
+        fullName: member.name,
+        email: member.email,
+        phoneNumber: member.phone,
+        countryCode: member.countryCode || '+234', // Default to +234 if NULL
+        isCurrentUser: member.id === parseInt(userId)
+      })),
+      pollingUnit: {
+        code: currentUser.votingPU,
+        state: currentUser.votingState,
+        lga: currentUser.votingLGA,
+        ward: currentUser.votingWard
+      },
+      total: sortedMembers.length
+    });
+  } catch (error) {
+    console.error('Get polling unit members error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get polling unit members'
     });
   }
 };

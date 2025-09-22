@@ -157,6 +157,7 @@ class VotingBloc {
           vm."notes",
           u.name as "platformName", 
           u.email, 
+          u.phone,
           u."countryCode"
          FROM "votingBlocMembers" vm
          LEFT JOIN users u ON vm."userId" = u.id AND vm."memberType" = 'platform'
@@ -224,7 +225,7 @@ class VotingBloc {
               userId: row.userId,
               name: row.platformName,
               email: row.email,
-              phone: row.phoneNumber,
+              phone: row.phone, // Use phone from users table, not phoneNumber from manual members
               countryCode: row.countryCode,
               joinDate: row.joinDate
             });

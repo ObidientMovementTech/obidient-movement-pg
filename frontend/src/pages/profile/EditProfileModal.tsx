@@ -8,6 +8,7 @@ import compressImage from '../../utils/ImageCompression';
 import FormSelect from '../../components/select/FormSelect';
 import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
 import { statesLGAWardList } from '../../utils/StateLGAWard';
+import { getPollingUnitsForWard } from '../../utils/pollingUnitUtils';
 import { formatStateName, formatLocationName } from '../../utils/textUtils';
 import { validateUsernameFormat, debouncedUsernameCheck } from '../../services/profileService';
 import axios from 'axios';
@@ -62,6 +63,9 @@ export default function EditProfileModal({
   );
   const [votingWard, setVotingWard] = useState(
     profile.votingWard || profile.personalInfo?.ward || ''
+  );
+  const [votingPU, setVotingPU] = useState(
+    profile.votingPU || ''
   );
   const [citizenship, setCitizenship] = useState(
     profile.citizenship || profile.personalInfo?.citizenship || ''
@@ -161,11 +165,52 @@ export default function EditProfileModal({
   const getWards = (lga: string, state: string): OptionType[] => {
     const stateData = statesLGAWardList.find(s => s.state === state);
     const lgaData = stateData?.lgas.find(l => l.lga === lga);
-    return lgaData ? lgaData.wards.map((w, i) => ({
+
+    const wards = lgaData ? lgaData.wards.map((w, i) => ({
       id: i,
       label: formatLocationName(w), // Display formatted name
       value: w // Keep original value for backend
     })) : [];
+
+    return wards;
+  };
+
+  // Get polling units for the selected location
+  const getPollingUnits = (): OptionType[] => {
+    if (!votingState || !votingLGA || !votingWard) {
+      return [];
+    }
+
+    try {
+      // Convert to the uppercase format expected by the new data structure
+      const stateUpper = votingState.toUpperCase().replace(/-/g, ' ');
+      const lgaUpper = votingLGA.toUpperCase().replace(/-/g, ' ');
+      const wardUpper = votingWard.toUpperCase().replace(/-/g, ' ');
+
+      const pollingUnits = getPollingUnitsForWard(stateUpper, lgaUpper, wardUpper);
+
+      return pollingUnits.map((pu, i) => ({
+        id: i,
+        label: pu.label,
+        value: pu.value
+      }));
+    } catch (error) {
+      console.error('Error getting polling units:', error);
+      return [];
+    }
+  };
+
+  // Helper function to convert formatted data back to original format for dropdowns
+  const convertToOriginalFormat = (formattedValue: string, type: 'state' | 'location'): string => {
+    if (!formattedValue) return '';
+
+    if (type === 'state') {
+      // Convert "Abia" back to "abia"
+      return formattedValue.toLowerCase();
+    } else {
+      // Convert "Aba North" back to "aba-north"
+      return formattedValue.toLowerCase().replace(/\s+/g, '-');
+    }
   };
 
   // Dropdown options (same as KYC)
@@ -182,25 +227,6 @@ export default function EditProfileModal({
 
   useEffect(() => {
     if (isOpen) {
-      // Debug: Log the profile object to see what data is available
-      console.log('🔍 EditProfileModal - Profile object:', {
-        profile: profile,
-        personalInfo: profile.personalInfo,
-        onboardingData: profile.onboardingData,
-        directFields: {
-          userName: profile.userName,
-          gender: profile.gender,
-          ageRange: profile.ageRange,
-          citizenship: profile.citizenship,
-          stateOfOrigin: profile.stateOfOrigin,
-          votingState: profile.votingState,
-          votingLGA: profile.votingLGA,
-          votingWard: profile.votingWard,
-          isVoter: profile.isVoter,
-          willVote: profile.willVote
-        }
-      });
-
       setName(profile.name);
       setPhone(profile.phone);
       setImageUrl(profile.profileImage);
@@ -218,20 +244,6 @@ export default function EditProfileModal({
       const newIsVoter = profile.isVoter || profile.onboardingData?.votingBehavior?.is_registered || '';
       const newWillVote = profile.willVote || profile.onboardingData?.votingBehavior?.likely_to_vote || '';
 
-      // Debug: Log the resolved values
-      console.log('🔍 EditProfileModal - Resolved values:', {
-        newUserName,
-        newGender,
-        newAgeRange,
-        newCitizenship,
-        newStateOfOrigin,
-        newVotingState,
-        newVotingLGA,
-        newVotingWard,
-        newIsVoter,
-        newWillVote
-      });
-
       setUserName(newUserName);
       setGender(newGender);
       setAgeRange(newAgeRange);
@@ -240,14 +252,29 @@ export default function EditProfileModal({
       setVotingState(newVotingState);
       setVotingLGA(newVotingLGA);
       setVotingWard(newVotingWard);
+      setVotingPU(profile.votingPU || '');
       setIsVoter(newIsVoter);
       setWillVote(newWillVote);
 
-      // Update cascading dropdown states
-      setSelectedState(newVotingState);
-      setSelectedLGA(newVotingLGA);
+      // Update cascading dropdown states - convert to formats expected by StateLGAWard
+      const originalLGA = convertToOriginalFormat(newVotingLGA, 'location'); // "Osisioma" -> "osisioma"
 
-      console.log('✅ EditProfileModal - All fields initialized');
+      setSelectedState(newVotingState); // StateLGAWard uses "Abia" (Title Case)
+      setSelectedLGA(originalLGA); // StateLGAWard uses "osisioma" (lowercase)
+
+      // Load polling units if we have all required values
+      if (newVotingState && newVotingLGA && newVotingWard) {
+        try {
+          // Convert to uppercase format for the new data structure
+          getPollingUnitsForWard(
+            newVotingState.toUpperCase().replace(/-/g, ' '),
+            newVotingLGA.toUpperCase().replace(/-/g, ' '),
+            newVotingWard.toUpperCase().replace(/-/g, ' ')
+          );
+        } catch (error) {
+          console.error('Error loading polling units:', error);
+        }
+      }
     }
   }, [isOpen, profile]);
 
@@ -332,6 +359,7 @@ export default function EditProfileModal({
         votingState: votingState ? formatStateName(votingState) : votingState,
         votingLGA: votingLGA ? formatLocationName(votingLGA) : votingLGA,
         votingWard: votingWard ? formatLocationName(votingWard) : votingWard,
+        votingPU: votingPU || '', // Add polling unit
         isVoter,
         willVote,
       };
@@ -348,7 +376,6 @@ export default function EditProfileModal({
   };
 
   const handleClose = () => {
-    console.log('Modal closed via close button');
     onClose();
   };
 
@@ -508,7 +535,6 @@ export default function EditProfileModal({
                   options={genderOptions}
                   defaultSelected={gender}
                   onChange={(opt) => {
-                    console.log('🔄 Gender changed:', opt);
                     if (opt) setGender(opt.value);
                   }}
                   key={`gender-${gender}`} // Force re-render when gender changes
@@ -522,7 +548,6 @@ export default function EditProfileModal({
                   options={ageRangeOptions}
                   defaultSelected={ageRange}
                   onChange={(opt) => {
-                    console.log('🔄 Age Range changed:', opt);
                     if (opt) setAgeRange(opt.value);
                   }}
                   key={`ageRange-${ageRange}`} // Force re-render when ageRange changes
@@ -536,7 +561,6 @@ export default function EditProfileModal({
                   options={citizenshipOptions}
                   defaultSelected={citizenship}
                   onChange={(opt) => {
-                    console.log('🔄 Citizenship changed:', opt);
                     if (opt) {
                       setCitizenship(opt.value);
                       // Set default country based on citizenship
@@ -584,7 +608,6 @@ export default function EditProfileModal({
                   options={states}
                   defaultSelected={stateOfOrigin}
                   onChange={(opt) => {
-                    console.log('🔄 State of Origin changed:', opt);
                     if (opt) setStateOfOrigin(opt.value);
                   }}
                   key={`stateOfOrigin-${stateOfOrigin}`} // Force re-render when stateOfOrigin changes
@@ -598,7 +621,6 @@ export default function EditProfileModal({
                   options={states}
                   defaultSelected={selectedState}
                   onChange={(opt) => {
-                    console.log('🔄 Voting State changed:', opt);
                     const newState = opt?.value || '';
                     setSelectedState(newState);
                     setVotingState(newState);
@@ -606,6 +628,7 @@ export default function EditProfileModal({
                     setSelectedLGA('');
                     setVotingLGA('');
                     setVotingWard('');
+                    setVotingPU(''); // Reset polling unit when state changes
                   }}
                   key={`votingState-${selectedState}`} // Force re-render when selectedState changes
                 />
@@ -618,12 +641,12 @@ export default function EditProfileModal({
                   options={getLgas(selectedState)}
                   defaultSelected={selectedLGA}
                   onChange={(opt) => {
-                    console.log('🔄 Voting LGA changed:', opt);
                     const newLGA = opt?.value || '';
                     setSelectedLGA(newLGA);
                     setVotingLGA(newLGA);
-                    // Reset ward
+                    // Reset dependent fields
                     setVotingWard('');
+                    setVotingPU(''); // Reset polling unit when LGA changes
                   }}
                   disabled={!selectedState}
                   key={`votingLGA-${selectedLGA}`} // Force re-render when selectedLGA changes
@@ -635,13 +658,34 @@ export default function EditProfileModal({
                 <FormSelect
                   label="Voting Ward"
                   options={getWards(selectedLGA, selectedState)}
-                  defaultSelected={votingWard}
+                  defaultSelected={convertToOriginalFormat(votingWard, 'location')}
                   onChange={(opt) => {
-                    console.log('🔄 Voting Ward changed:', opt);
-                    if (opt) setVotingWard(opt.value);
+                    if (opt) {
+                      setVotingWard(opt.value);
+                      // Reset polling unit when ward changes
+                      setVotingPU('');
+                    } else {
+                      setVotingWard('');
+                      setVotingPU('');
+                    }
                   }}
                   disabled={!selectedLGA}
-                  key={`votingWard-${votingWard}`} // Force re-render when votingWard changes
+                  key={`votingWard-${votingWard}-${selectedLGA}`} // Force re-render when votingWard or LGA changes
+                />
+              </div>
+
+              {/* Voting Polling Unit */}
+              <div>
+                <FormSelect
+                  label="Voting Polling Unit"
+                  options={getPollingUnits()}
+                  defaultSelected={votingPU}
+                  onChange={(opt) => {
+                    if (opt) setVotingPU(opt.value);
+                  }}
+                  disabled={!votingWard}
+                  key={`votingPU-${votingWard}-${votingPU}`} // Force re-render when ward or PU changes
+                  placeholder="Select your polling unit"
                 />
               </div>
 
@@ -652,7 +696,6 @@ export default function EditProfileModal({
                   options={yesNoOptions}
                   defaultSelected={isVoter}
                   onChange={(opt) => {
-                    console.log('🔄 Voter Registration changed:', opt);
                     if (opt) setIsVoter(opt.value);
                   }}
                   key={`isVoter-${isVoter}`} // Force re-render when isVoter changes
@@ -666,7 +709,6 @@ export default function EditProfileModal({
                   options={yesNoOptions}
                   defaultSelected={willVote}
                   onChange={(opt) => {
-                    console.log('🔄 Voting Intention changed:', opt);
                     if (opt) setWillVote(opt.value);
                   }}
                   key={`willVote-${willVote}`} // Force re-render when willVote changes
