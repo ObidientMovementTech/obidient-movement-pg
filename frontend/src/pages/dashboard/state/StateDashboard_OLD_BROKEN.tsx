@@ -2,9 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   ChevronRight,
   Search,
+  Users,
+  TrendingUp,
+  MapPin,
+  BarChart3,
   SortAsc,
   SortDesc
 } from 'lucide-react';
+import { Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -26,8 +31,6 @@ import {
   PerformanceFilter
 } from '../types/dashboard.types';
 import { mobiliseDashboardService } from '../../../services/mobiliseDashboardService';
-import DashboardCharts from '../components/DashboardCharts';
-import StatsCards from '../components/StatsCards';
 
 // Register ChartJS components
 ChartJS.register(
@@ -228,11 +231,7 @@ const StateDashboard: React.FC = () => {
     setNationalStats(stats);
     setCurrentData(items || []);
     setCurrentView(view);
-
-    // Filter breadcrumbs based on user permissions before setting them
-    const breadcrumbsToUse = serverBreadcrumbs || breadcrumbsToSet;
-    const filteredBreadcrumbs = filterBreadcrumbsByPermissions(breadcrumbsToUse);
-    setBreadcrumbs(filteredBreadcrumbs);
+    setBreadcrumbs(serverBreadcrumbs || breadcrumbsToSet);
 
     console.log(`✅ Dashboard loaded: ${view} level, ${items?.length || 0} items`);
     console.log('📊 DEBUG - Final stats state:', stats);
@@ -258,13 +257,10 @@ const StateDashboard: React.FC = () => {
       setCurrentView('state');
       setNationalStats(stats);
       setCurrentData(items || []);
-
-      const fallbackBreadcrumbs = [
+      setBreadcrumbs(breadcrumbs || [
         { level: 'national', name: 'National Overview' },
         { level: 'state', name: stateName, id: stateId }
-      ];
-      const breadcrumbsToUse = breadcrumbs || fallbackBreadcrumbs;
-      setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbsToUse));
+      ]);
 
       console.log(`✅ Navigated to ${stateName}`);
     } catch (error) {
@@ -288,7 +284,7 @@ const StateDashboard: React.FC = () => {
       setCurrentView('lga');
       setNationalStats(stats);
       setCurrentData(items || []);
-      setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbs || []));
+      setBreadcrumbs(breadcrumbs || []);
 
       console.log(`✅ Navigated to ${lgaName}`);
     } catch (error) {
@@ -311,7 +307,7 @@ const StateDashboard: React.FC = () => {
       setCurrentView('ward');
       setNationalStats(stats);
       setCurrentData(items || []);
-      setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbs || []));
+      setBreadcrumbs(breadcrumbs || []);
 
       console.log(`✅ Navigated to ${wardName}`);
     } catch (error) {
@@ -322,36 +318,10 @@ const StateDashboard: React.FC = () => {
     }
   };
 
-  // Helper function to check if user can access a specific level
-  // const canAccessLevel = (level: string): boolean => {
-  //   if (!userLevel || !userLevel.allowedLevels) return false;
-  //   return userLevel.allowedLevels.includes(level);
-  // };
-
-  // Helper function to filter breadcrumbs based on user permissions
-  const filterBreadcrumbsByPermissions = (breadcrumbs: BreadcrumbItem[]): BreadcrumbItem[] => {
-    if (!userLevel) return breadcrumbs;
-
-    // Define the hierarchy order (from highest to lowest permission level)
-    const levelHierarchy = ['national', 'state', 'lga', 'ward', 'pu'];
-    const userCurrentLevel = userLevel.userLevel;
-    const userCurrentIndex = levelHierarchy.indexOf(userCurrentLevel);
-
-    // If user level is not found, return empty array for security
-    if (userCurrentIndex === -1) return [];
-
-    // Filter out breadcrumbs that are above the user's permission level
-    return breadcrumbs.filter(breadcrumb => {
-      const breadcrumbIndex = levelHierarchy.indexOf(breadcrumb.level);
-      return breadcrumbIndex >= userCurrentIndex;
-    });
-  };
-
   const navigateToBreadcrumb = async (index: number) => {
     try {
       setLoading(true);
       const targetBreadcrumb = breadcrumbs[index];
-
       console.log(`🔍 Navigating to breadcrumb: ${targetBreadcrumb.name}`);
 
       let response;
@@ -396,9 +366,7 @@ const StateDashboard: React.FC = () => {
       const { stats, items, breadcrumbs: newBreadcrumbs } = response.data;
       setNationalStats(stats);
       setCurrentData(items || []);
-
-      const breadcrumbsToUse = newBreadcrumbs?.slice(0, index + 1) || breadcrumbs.slice(0, index + 1);
-      setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbsToUse));
+      setBreadcrumbs(newBreadcrumbs?.slice(0, index + 1) || breadcrumbs.slice(0, index + 1));
 
       console.log(`✅ Navigated to ${targetBreadcrumb.name}`);
     } catch (error) {
@@ -491,6 +459,26 @@ const StateDashboard: React.FC = () => {
     return filtered;
   }, [currentData, searchQuery, filterRegion, performanceFilter, showOnlyWithObidients, sortBy, sortOrder, currentView]);
 
+  // Chart data preparation
+  const chartData = React.useMemo(() => {
+    if (!nationalStats) return null;
+
+    return {
+      labels: ['Obidient Voters', 'Other Voters'],
+      datasets: [
+        {
+          data: [
+            nationalStats.obidientRegisteredVoters,
+            nationalStats.inecRegisteredVoters - nationalStats.obidientRegisteredVoters
+          ],
+          backgroundColor: ['#22c55e', '#e5e7eb'],
+          borderColor: ['#16a34a', '#d1d5db'],
+          borderWidth: 2,
+        },
+      ],
+    };
+  }, [nationalStats]);
+
   // Loading state
   if (loading) {
     return <Loading />;
@@ -560,28 +548,23 @@ const StateDashboard: React.FC = () => {
 
           {/* Breadcrumbs */}
           <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-            {breadcrumbs.map((breadcrumb, index) => {
-              const isCurrentPage = index === breadcrumbs.length - 1;
+            {breadcrumbs.map((breadcrumb, index) => (
+              <React.Fragment key={index}>
+                <button
+                  onClick={() => navigateToBreadcrumb(index)}
+                  className="hover:text-blue-600 transition-colors"
+                  disabled={index === breadcrumbs.length - 1}
+                >
+                  {breadcrumb.name}
+                </button>
+                {index < breadcrumbs.length - 1 && (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </React.Fragment>
+            ))}
+          </nav>
 
-              return (
-                <React.Fragment key={index}>
-                  <button
-                    onClick={() => !isCurrentPage ? navigateToBreadcrumb(index) : null}
-                    className={`transition-colors ${isCurrentPage
-                      ? 'text-gray-900 font-medium cursor-default'
-                      : 'hover:text-blue-600 cursor-pointer'
-                      }`}
-                    disabled={isCurrentPage}
-                  >
-                    {breadcrumb.name}
-                  </button>
-                  {index < breadcrumbs.length - 1 && (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </nav>          {/* User context info */}
+          {/* User context info */}
           {userLevel && (
             <div className="text-sm text-gray-600">
               Logged in as: <span className="font-medium">{userLevel.designation}</span>
@@ -590,46 +573,63 @@ const StateDashboard: React.FC = () => {
                   • {userLevel.assignedLocation.stateName || userLevel.assignedLocation.name}
                 </span>
               )}
-              <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                Access Level: {userLevel.userLevel.charAt(0).toUpperCase() + userLevel.userLevel.slice(1)}
-              </span>
             </div>
           )}
         </div>
 
         {/* Stats Cards */}
         {nationalStats && (
-          <StatsCards
-            currentStats={{
-              ...nationalStats,
-              // Calculate any additional stats needed by the component
-              unconvertedVoters: nationalStats.inecRegisteredVoters - nationalStats.obidientRegisteredVoters,
-              conversionRate: nationalStats.inecRegisteredVoters > 0
-                ? (nationalStats.obidientRegisteredVoters / nationalStats.inecRegisteredVoters) * 100
-                : 0,
-              // Adding PVC data if available
-              pvcWithStatus: nationalStats.obidientVotersWithPVC || 0,
-              pvcWithoutStatus: nationalStats.obidientVotersWithoutPVC || 0
-            }}
-            currentView={currentView}
-            currentScope={(() => {
-              // Get the current scope name from breadcrumbs
-              switch (currentView) {
-                case 'national':
-                  return 'National';
-                case 'state':
-                  return breadcrumbs.find(b => b.level === 'state')?.name || '';
-                case 'lga':
-                  return breadcrumbs.find(b => b.level === 'lga')?.name || '';
-                case 'ward':
-                  return breadcrumbs.find(b => b.level === 'ward')?.name || '';
-                default:
-                  return '';
-              }
-            })()}
-            loading={loading}
-            formatNumber={formatNumber}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <Users className="w-8 h-8 text-blue-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Total Registered</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatNumber(nationalStats.inecRegisteredVoters)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <TrendingUp className="w-8 h-8 text-green-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Obidient Voters</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatNumber(nationalStats.obidientRegisteredVoters)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <BarChart3 className="w-8 h-8 text-purple-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {nationalStats.inecRegisteredVoters > 0
+                      ? ((nationalStats.obidientRegisteredVoters / nationalStats.inecRegisteredVoters) * 100).toFixed(1)
+                      : '0.0'}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <MapPin className="w-8 h-8 text-indigo-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Total {getNextLevelLabel()}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatNumber(currentData.length)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Filters and Search */}
@@ -731,104 +731,6 @@ const StateDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Discrepancy Notice - Shown when there's a discrepancy between parent and children counts */}
-        {nationalStats && currentData.length > 0 && (
-          <React.Fragment>
-            {(() => {
-              // Calculate the sum of children's obidient voters
-              const childrenSum = filteredAndSortedData.reduce((sum, item) => sum + (item.obidientRegisteredVoters || 0), 0);
-              const parentTotalVoters = nationalStats.obidientRegisteredVoters;
-              const discrepancy = parentTotalVoters - childrenSum;
-
-              // Only show the message if there's a discrepancy of at least 1
-              if (discrepancy > 0) {
-                // Determine the appropriate message based on current view
-                let message = '';
-                let childType = '';
-
-                switch (currentView) {
-                  case 'national':
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} with no State assignment. These users are included in the national total but not in any State count.`;
-                    childType = 'State';
-                    break;
-                  case 'state':
-                    const stateName = breadcrumbs.find(b => b.level === 'state')?.name || '';
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} in ${stateName} with no LGA assignment. These users are included in the state total but not in any LGA count.`;
-                    childType = 'LGA';
-                    break;
-                  case 'lga':
-                    const lgaName = breadcrumbs.find(b => b.level === 'lga')?.name || '';
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} in ${lgaName} with no Ward assignment. These users are included in the LGA total but not in any Ward count.`;
-                    childType = 'Ward';
-                    break;
-                  case 'ward':
-                    const wardName = breadcrumbs.find(b => b.level === 'ward')?.name || '';
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} in ${wardName} with no Polling Unit assignment. These users are included in the Ward total but not in any Polling Unit count.`;
-                    childType = 'Polling Unit';
-                    break;
-                  default:
-                    return null;
-                }
-
-                return (
-                  <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4 rounded-md">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm text-amber-700 flex items-center">
-                          <span className="font-medium">Data Discrepancy: </span>
-                          <span dangerouslySetInnerHTML={{ __html: message }}></span>
-                          <span className="relative group ml-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 w-64 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10">
-                              When a user registers but doesn't provide complete location information, they're still counted in the parent total but can't be displayed in child locations.
-                            </div>
-                          </span>
-                        </p>
-                        <p className="mt-2 text-xs text-amber-600">
-                          <span className="font-medium">Tip for admins: </span>
-                          These users need their {childType.toLowerCase()} information updated in the database to ensure accurate reporting.
-                        </p>
-                        {userLevel && userLevel.designation.includes('Admin') && (
-                          <button
-                            onClick={() => {
-                              // This would trigger an export or report generation in a real implementation
-                              alert(`Export of ${discrepancy} users with missing ${childType} data will be prepared and sent to your email.`);
-                            }}
-                            className="mt-2 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded flex items-center w-fit"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Export List
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-          </React.Fragment>
-        )}
-
-        {/* Charts Section */}
-        {nationalStats && (
-          <DashboardCharts
-            nationalStats={nationalStats}
-            currentView={currentView}
-            currentData={currentData}
-            formatNumber={formatNumber}
-          />
-        )}
-
         {/* Data Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -925,6 +827,32 @@ const StateDashboard: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Chart Section */}
+        {chartData && (
+          <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Voter Distribution
+            </h3>
+            <div className="max-w-md mx-auto">
+              <Doughnut
+                data={chartData}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    legend: {
+                      position: 'bottom' as const,
+                    },
+                    title: {
+                      display: true,
+                      text: 'Obidient vs Other Voters'
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

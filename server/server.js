@@ -22,6 +22,7 @@ import monitorKeyRoutes from './routes/monitorKey.route.js';
 import electionRoutes from './routes/election.routes.js';
 import monitoringRoutes from './routes/monitoring.route.js';
 import mobileRoutes from './routes/mobile.route.js';
+import mobiliseDashboardRoutes from './routes/mobiliseDashboard.routes.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -78,6 +79,7 @@ app.use('/kyc', kycRoutes);
 app.use('/voting-blocs', votingBlocRoutes);
 app.use('/api', imageProxyRoutes); // Image proxy route
 app.use('/state-dashboard', stateDashboardRoutes); // State Dashboard routes
+app.use('/mobilise-dashboard', mobiliseDashboardRoutes); // Mobilise Dashboard routes
 app.use('/monitor-key', monitorKeyRoutes); // Monitor Key routes
 app.use('/elections', electionRoutes); // Election Management routes
 app.use('/monitoring', monitoringRoutes); // Vote Protection monitoring routes
