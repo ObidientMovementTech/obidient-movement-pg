@@ -30,4 +30,10 @@ router.get('/subordinates', (req, res) => {
   stateDashboardController.getSubordinateCoordinators(req, res);
 });
 
+// Get Obidient voter data aggregated by voting locations
+router.get('/voters', (req, res) => {
+  console.log('Voters endpoint hit!');
+  stateDashboardController.getObidientVoterData(req, res);
+});
+
 export default router;

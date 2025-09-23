@@ -104,7 +104,7 @@ const StateDashboard: React.FC = () => {
   ]);
   const [selectedStateId, setSelectedStateId] = useState<string | null>(null);
   const [selectedLGAId, setSelectedLGAId] = useState<string | null>(null);
-  const [selectedWardId, setSelectedWardId] = useState<string | null>(null);
+  const [_selectedWardId, setSelectedWardId] = useState<string | null>(null);
 
   // Data state
   const [nationalStats, setNationalStats] = useState<MobilizationStats | null>(null);
@@ -405,6 +405,87 @@ const StateDashboard: React.FC = () => {
     }
   };
 
+  const navigateToLGA = (lgaId: string, lgaName: string, stateName: string) => {
+    setSelectedLGAId(lgaId);
+    setCurrentView('lga');
+    setBreadcrumbs([
+      { level: 'national', name: 'National Overview' },
+      { level: 'state', name: stateName, id: selectedStateId! },
+      { level: 'lga', name: lgaName, id: lgaId }
+    ]);
+
+    // Generate Ward data for the selected LGA
+    const stateData = StateLGAWardPollingUnits[stateName];
+    if (stateData && stateData.lgas[lgaName]) {
+      const lgaData = stateData.lgas[lgaName];
+      const wardsData: WardData[] = Object.values(lgaData.wards).map(ward => {
+        const inecVoters = Math.floor(Math.random() * 100000) + 20000;
+        const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.08 + 0.01));
+        const unconverted = inecVoters - obidientVoters;
+        const conversionRate = (obidientVoters / inecVoters) * 100;
+
+        return {
+          id: ward.id,
+          name: ward.name,
+          lgaId: lgaId,
+          inecRegisteredVoters: inecVoters,
+          obidientRegisteredVoters: obidientVoters,
+          unconvertedVoters: unconverted,
+          conversionRate: Number(conversionRate.toFixed(2)),
+          reachedCalls: Math.floor(inecVoters * (Math.random() * 0.12 + 0.02)),
+          reachedTexts: Math.floor(inecVoters * (Math.random() * 0.18 + 0.04)),
+          pvcWithStatus: Math.floor(inecVoters * (Math.random() * 0.25 + 0.08)),
+          pvcWithoutStatus: Math.floor(inecVoters * (Math.random() * 0.12 + 0.02)),
+          agentCoverage: Number((Math.random() * 35 + 10).toFixed(1)),
+          pollingUnits: []
+        };
+      });
+
+      setCurrentData(wardsData);
+    }
+  };
+
+  const navigateToWard = (wardId: string, wardName: string, lgaName: string, stateName: string) => {
+    setSelectedWardId(wardId);
+    setCurrentView('ward');
+    setBreadcrumbs([
+      { level: 'national', name: 'National Overview' },
+      { level: 'state', name: stateName, id: selectedStateId! },
+      { level: 'lga', name: lgaName, id: selectedLGAId! },
+      { level: 'ward', name: wardName, id: wardId }
+    ]);
+
+    // Generate Polling Unit data for the selected Ward
+    const stateData = StateLGAWardPollingUnits[stateName];
+    if (stateData && stateData.lgas[lgaName] && stateData.lgas[lgaName].wards[wardName]) {
+      const wardData = stateData.lgas[lgaName].wards[wardName];
+      const pollingUnitsData: PUData[] = wardData.pollingUnits.map((pu: any) => {
+        const inecVoters = Math.floor(Math.random() * 2000) + 500;
+        const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.10 + 0.005));
+        const unconverted = inecVoters - obidientVoters;
+        const conversionRate = (obidientVoters / inecVoters) * 100;
+
+        return {
+          id: pu.id,
+          name: pu.name,
+          code: pu.abbreviation || pu.id,
+          wardId: wardId,
+          inecRegisteredVoters: inecVoters,
+          obidientRegisteredVoters: obidientVoters,
+          unconvertedVoters: unconverted,
+          conversionRate: Number(conversionRate.toFixed(2)),
+          reachedCalls: Math.floor(inecVoters * (Math.random() * 0.15 + 0.01)),
+          reachedTexts: Math.floor(inecVoters * (Math.random() * 0.20 + 0.02)),
+          pvcWithStatus: Math.floor(inecVoters * (Math.random() * 0.30 + 0.05)),
+          pvcWithoutStatus: Math.floor(inecVoters * (Math.random() * 0.15 + 0.01)),
+          agentCoverage: Number((Math.random() * 30 + 5).toFixed(1))
+        };
+      });
+
+      setCurrentData(pollingUnitsData);
+    }
+  };
+
   const navigateToBreadcrumb = (index: number) => {
     const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
     setBreadcrumbs(newBreadcrumbs);
@@ -416,6 +497,16 @@ const StateDashboard: React.FC = () => {
       setSelectedLGAId(null);
       setSelectedWardId(null);
       setCurrentData(statesData);
+    } else if (targetLevel.level === 'state') {
+      setSelectedLGAId(null);
+      setSelectedWardId(null);
+      // Regenerate LGA data for the selected state
+      navigateToState(targetLevel.id!, targetLevel.name);
+    } else if (targetLevel.level === 'lga') {
+      setSelectedWardId(null);
+      // Regenerate Ward data for the selected LGA
+      const stateName = breadcrumbs[1].name;
+      navigateToLGA(targetLevel.id!, targetLevel.name, stateName);
     }
   };
 
@@ -560,7 +651,15 @@ const StateDashboard: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Mobilization Dashboard - National</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Mobilization Dashboard - {
+                  currentView === 'national' ? 'National' :
+                    currentView === 'state' ? breadcrumbs[1]?.name || 'State' :
+                      currentView === 'lga' ? breadcrumbs[2]?.name || 'LGA' :
+                        currentView === 'ward' ? breadcrumbs[3]?.name || 'Ward' :
+                          'Polling Units'
+                }
+              </h1>
               <p className="text-gray-600 mt-1">Real-time voter conversion and mobilization analytics</p>
             </div>
             <div className="flex items-center gap-3">
@@ -910,11 +1009,20 @@ const StateDashboard: React.FC = () => {
               {filteredData.map((item) => (
                 <div
                   key={item.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  className={`border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${currentView !== 'ward' ? 'cursor-pointer' : 'cursor-default'
+                    }`}
                   onClick={() => {
                     if (currentView === 'national') {
                       navigateToState(item.id, item.name);
+                    } else if (currentView === 'state') {
+                      const stateName = breadcrumbs[1].name;
+                      navigateToLGA(item.id, item.name, stateName);
+                    } else if (currentView === 'lga') {
+                      const stateName = breadcrumbs[1].name;
+                      const lgaName = breadcrumbs[2].name;
+                      navigateToWard(item.id, item.name, lgaName, stateName);
                     }
+                    // No navigation for PU level (final level)
                   }}
                 >
                   <div className="flex items-center justify-between">
@@ -925,7 +1033,14 @@ const StateDashboard: React.FC = () => {
                         </span>
                       </div>
                       <div>
-                        <h4 className="font-semibold text-gray-900">{item.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-gray-900">{item.name}</h4>
+                          {currentView === 'ward' && 'code' in item && (
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
+                              PU: {(item as PUData).code}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-sm text-gray-500 space-x-4">
                           <span>INEC: {formatNumber(item.inecRegisteredVoters)}</span>
                           <span>Obidient: {formatNumber(item.obidientRegisteredVoters)}</span>
@@ -951,7 +1066,14 @@ const StateDashboard: React.FC = () => {
                         <div className="font-semibold">{item.agentCoverage.toFixed(1)}%</div>
                       </div>
 
-                      <ChevronRight size={20} className="text-gray-400" />
+                      {currentView !== 'ward' && (
+                        <ChevronRight size={20} className="text-gray-400" />
+                      )}
+                      {currentView === 'ward' && (
+                        <div className="w-5 h-5 flex items-center justify-center">
+                          <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

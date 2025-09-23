@@ -17,6 +17,15 @@ export const stateDashboardService = {
       withCredentials: true,
     });
     return response.data;
+  },
+
+  // Get Obidient voter data aggregated by voting locations
+  getObidientVoterData: async (includeBreakdown = false) => {
+    const url = `${API_BASE}/state-dashboard/voters${includeBreakdown ? '?includeBreakdown=true' : ''}`;
+    const response = await axios.get(url, {
+      withCredentials: true,
+    });
+    return response.data;
   }
 };
 

@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users,
-  MapPin,
-  Shield,
-  Award,
   ChevronRight,
   Search,
-  BarChart3,
-  Target,
-  Phone,
-  MessageSquare,
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
@@ -25,7 +17,19 @@ import {
   ArcElement
 } from 'chart.js';
 import Loading from '../../../components/Loader';
-import { StateLGAWardPollingUnits, getStateNames } from '../../../utils/StateLGAWardPollingUnits';
+import {
+  HierarchicalData,
+  MobilizationStats,
+  StateData,
+  PUData,
+  ViewLevel,
+  BreadcrumbItem,
+  SortField,
+  SortOrder,
+  PerformanceFilter
+} from '../types/dashboard.types';
+import StatsCards from '../components/StatsCards';
+import { stateDashboardService } from '../../../services/stateDashboardService';
 
 // Register ChartJS components
 ChartJS.register(
@@ -38,63 +42,15 @@ ChartJS.register(
   ArcElement
 );
 
-interface MobilizationStats {
-  inecRegisteredVoters: number;
-  obidientRegisteredVoters: number;
-  unconvertedVoters: number;
-  conversionRate: number;
-  reachedCalls: number;
-  reachedTexts: number;
-  pvcWithStatus: number;
-  pvcWithoutStatus: number;
-  agentCoverage: number;
-}
-
-interface StateData extends MobilizationStats {
-  id: string;
-  name: string;
-  lgas: LGAData[];
-}
-
-interface LGAData extends MobilizationStats {
-  id: string;
-  name: string;
-  stateId: string;
-  wards: WardData[];
-}
-
-interface WardData extends MobilizationStats {
-  id: string;
-  name: string;
-  lgaId: string;
-  pollingUnits: PUData[];
-}
-
-interface PUData extends MobilizationStats {
-  id: string;
-  name: string;
-  wardId: string;
-  code: string;
-}
-
-type ViewLevel = 'national' | 'state' | 'lga' | 'ward' | 'pu';
-
-interface BreadcrumbItem {
-  level: ViewLevel;
-  name: string;
-  id?: string;
-}
-
 const StateDashboard: React.FC = () => {
   // State management
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('all');
-  const [performanceFilter, setPerformanceFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
-  const [mobilizationFilter, setMobilizationFilter] = useState<'all' | 'above-average' | 'below-average'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'inec' | 'obidient' | 'conversion' | 'reached'>('conversion');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [performanceFilter, setPerformanceFilter] = useState<PerformanceFilter>('all');
+  const [sortBy, setSortBy] = useState<SortField>('conversion');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [showOnlyWithObidients, setShowOnlyWithObidients] = useState(false);
 
   // Navigation state
@@ -104,12 +60,18 @@ const StateDashboard: React.FC = () => {
   ]);
   const [selectedStateId, setSelectedStateId] = useState<string | null>(null);
   const [selectedLGAId, setSelectedLGAId] = useState<string | null>(null);
-  const [selectedWardId, setSelectedWardId] = useState<string | null>(null);
+  const [_selectedWardId, setSelectedWardId] = useState<string | null>(null);
 
   // Data state
   const [nationalStats, setNationalStats] = useState<MobilizationStats | null>(null);
   const [statesData, setStatesData] = useState<StateData[]>([]);
-  const [currentData, setCurrentData] = useState<(StateData | LGAData | WardData | PUData)[]>([]);
+  const [currentData, setCurrentData] = useState<HierarchicalData[]>([]);
+  const [hierarchicalData, setHierarchicalData] = useState<Record<string, any>>({});
+
+  // User context for role-based access
+  const [userDesignation, setUserDesignation] = useState<string>('');
+  const [assignedLocation, setAssignedLocation] = useState<any>(null);
+  const [allowedLevel, setAllowedLevel] = useState<ViewLevel>('national');
 
   // Regional categorization of Nigerian states
   const getStateRegion = (stateName: string): string => {
@@ -151,96 +113,122 @@ const StateDashboard: React.FC = () => {
     return 'low';
   };
 
-  // Mock INEC data generation using real state structure
-  const generateMockINECData = () => {
-    const stateNames = getStateNames();
+  // Calculate aggregated stats for current viewing level
+  const calculateCurrentLevelStats = (): MobilizationStats | null => {
+    if (!currentData || currentData.length === 0) {
+      return nationalStats; // Fallback to national stats if no current data
+    }
 
-    // Mock INEC registration numbers for major states
-    const inecDataMap: Record<string, number> = {
-      'Lagos State': 7200000,
-      'Anambra State': 2800000,
-      'Kano State': 5600000,
-      'Rivers State': 3400000,
-      'Kaduna State': 4200000,
-      'Ogun State': 2100000,
-      'Oyo State': 3800000,
-      'Delta State': 2900000,
-      'Edo State': 2200000,
-      'Cross River State': 1800000,
-      'Enugu State': 2100000,
-      'Imo State': 2400000,
-      'Abia State': 1900000,
-      'Akwa Ibom State': 2600000,
-      'Bayelsa State': 1200000,
-      'Ebonyi State': 1400000,
-      'Osun State': 2000000,
-      'Ondo State': 2100000,
-      'Ekiti State': 1500000,
-      'Kwara State': 1700000,
-      'Niger State': 3000000,
-      'FCT': 1800000,
-      'Plateau State': 2300000,
-      'Benue State': 2800000,
-      'Kogi State': 2100000,
-      'Nasarawa State': 1600000,
-      'Taraba State': 1900000,
-      'Adamawa State': 2400000,
-      'Gombe State': 1700000,
-      'Bauchi State': 3200000,
-      'Yobe State': 1800000,
-      'Borno State': 2900000,
-      'Jigawa State': 2800000,
-      'Katsina State': 4100000,
-      'Kebbi State': 2200000,
-      'Sokoto State': 2700000,
-      'Zamfara State': 2100000
-    };
-
-    const mockStates: StateData[] = stateNames.map((stateName) => {
-      const stateData = StateLGAWardPollingUnits[stateName];
-      const inecVoters = inecDataMap[stateName] || Math.floor(Math.random() * 1000000) + 500000;
-
-      // Generate realistic mobilization data
-      const reachedCalls = Math.floor(inecVoters * (Math.random() * 0.15 + 0.05));
-      const reachedTexts = Math.floor(inecVoters * (Math.random() * 0.20 + 0.08));
-      const pvcWith = Math.floor(inecVoters * (Math.random() * 0.25 + 0.15));
-      const pvcWithout = Math.floor(inecVoters * (Math.random() * 0.15 + 0.05));
-      const agentCoverage = Math.random() * 40 + 20;
-
-      return {
-        id: stateData.id.toString(),
-        name: stateName,
-        inecRegisteredVoters: inecVoters,
+    // Aggregate all stats from current level data
+    const aggregated = currentData.reduce(
+      (acc, item) => ({
+        inecRegisteredVoters: acc.inecRegisteredVoters + item.inecRegisteredVoters,
+        obidientRegisteredVoters: acc.obidientRegisteredVoters + item.obidientRegisteredVoters,
+        obidientVotersWithPVC: acc.obidientVotersWithPVC + (item.obidientVotersWithPVC || 0),
+        obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + (item.obidientVotersWithoutPVC || 0),
+        unconvertedVoters: acc.unconvertedVoters + item.unconvertedVoters,
+        pvcWithStatus: acc.pvcWithStatus + item.pvcWithStatus,
+        pvcWithoutStatus: acc.pvcWithoutStatus + item.pvcWithoutStatus,
+        totalRealObidientUsers: acc.totalRealObidientUsers + (item.realData?.totalObidientUsers || 0),
+        totalRealVotersWithPVC: acc.totalRealVotersWithPVC + (item.realData?.votersWithPVC || 0),
+        totalRealVotersWithoutPVC: acc.totalRealVotersWithoutPVC + (item.realData?.votersWithoutPVC || 0),
+        totalRealVotersWithPhone: acc.totalRealVotersWithPhone + (item.realData?.votersWithPhone || 0),
+        totalRealVotersWithEmail: acc.totalRealVotersWithEmail + (item.realData?.votersWithEmail || 0),
+        hasRealData: acc.hasRealData || (item.realData?.isRealData || false)
+      }),
+      {
+        inecRegisteredVoters: 0,
         obidientRegisteredVoters: 0,
+        obidientVotersWithPVC: 0,
+        obidientVotersWithoutPVC: 0,
         unconvertedVoters: 0,
-        conversionRate: 0,
-        reachedCalls,
-        reachedTexts,
-        pvcWithStatus: pvcWith,
-        pvcWithoutStatus: pvcWithout,
-        agentCoverage: Number(agentCoverage.toFixed(1)),
-        lgas: []
-      };
-    });
+        pvcWithStatus: 0,
+        pvcWithoutStatus: 0,
+        totalRealObidientUsers: 0,
+        totalRealVotersWithPVC: 0,
+        totalRealVotersWithoutPVC: 0,
+        totalRealVotersWithPhone: 0,
+        totalRealVotersWithEmail: 0,
+        hasRealData: false
+      }
+    );
 
-    // Calculate national totals
-    const totalINEC = mockStates.reduce((sum, state) => sum + state.inecRegisteredVoters, 0);
-    const totalReachedCalls = mockStates.reduce((sum, state) => sum + state.reachedCalls, 0);
-    const totalReachedTexts = mockStates.reduce((sum, state) => sum + state.reachedTexts, 0);
-    const totalPVCWith = mockStates.reduce((sum, state) => sum + state.pvcWithStatus, 0);
-    const totalPVCWithout = mockStates.reduce((sum, state) => sum + state.pvcWithoutStatus, 0);
-    const averageAgentCoverage = mockStates.reduce((sum, state) => sum + state.agentCoverage, 0) / mockStates.length;
+    // Calculate conversion rate
+    const conversionRate = aggregated.inecRegisteredVoters > 0
+      ? (aggregated.obidientRegisteredVoters / aggregated.inecRegisteredVoters) * 100
+      : 0;
+
+    // Calculate PVC completion rate  
+    const pvcCompletionRate = aggregated.totalRealObidientUsers > 0
+      ? (aggregated.totalRealVotersWithPVC / aggregated.totalRealObidientUsers) * 100
+      : (aggregated.pvcWithStatus / (aggregated.pvcWithStatus + aggregated.pvcWithoutStatus)) * 100;
 
     return {
-      mockStates,
-      totalINEC,
-      totalReachedCalls,
-      totalReachedTexts,
-      totalPVCWith,
-      totalPVCWithout,
-      averageAgentCoverage: Number(averageAgentCoverage.toFixed(1))
+      inecRegisteredVoters: aggregated.inecRegisteredVoters,
+      obidientRegisteredVoters: aggregated.obidientRegisteredVoters,
+      obidientVotersWithPVC: aggregated.obidientVotersWithPVC,
+      obidientVotersWithoutPVC: aggregated.obidientVotersWithoutPVC,
+      unconvertedVoters: aggregated.unconvertedVoters,
+      conversionRate: Number(conversionRate.toFixed(2)),
+      pvcWithStatus: aggregated.pvcWithStatus,
+      pvcWithoutStatus: aggregated.pvcWithoutStatus,
+      realData: {
+        totalObidientUsers: aggregated.totalRealObidientUsers,
+        votersWithPVC: aggregated.totalRealVotersWithPVC,
+        votersWithoutPVC: aggregated.totalRealVotersWithoutPVC,
+        votersWithPhone: aggregated.totalRealVotersWithPhone,
+        votersWithEmail: aggregated.totalRealVotersWithEmail,
+        pvcCompletionRate: Number(pvcCompletionRate.toFixed(2)),
+        isRealData: aggregated.hasRealData
+      }
     };
   };
+
+  // Get current scope name based on breadcrumbs
+  const getCurrentScopeName = (): string => {
+    if (breadcrumbs.length === 0) return 'National Overview';
+    const current = breadcrumbs[breadcrumbs.length - 1];
+    return current.name;
+  };
+
+  // Generate dynamic dashboard title
+  const getDashboardTitle = (): string => {
+    switch (currentView) {
+      case 'national':
+        return 'National Mobilization Dashboard';
+      case 'state':
+        return `${getCurrentScopeName()} State Dashboard`;
+      case 'lga':
+        return `${getCurrentScopeName()} LGA Dashboard`;
+      case 'ward':
+        return `${getCurrentScopeName()} Ward Dashboard`;
+      case 'pu':
+        return `${getCurrentScopeName()} Dashboard`;
+      default:
+        return 'Mobilization Dashboard';
+    }
+  };
+
+  // Generate dynamic dashboard description
+  const getDashboardDescription = (): string => {
+    switch (currentView) {
+      case 'national':
+        return 'Real-time voter registration and PVC tracking across all Nigerian states';
+      case 'state':
+        return `Voter registration and PVC tracking in ${getCurrentScopeName()}`;
+      case 'lga':
+        return `Voter registration and PVC tracking in ${getCurrentScopeName()} Local Government Area`;
+      case 'ward':
+        return `Voter registration and PVC tracking in ${getCurrentScopeName()} Ward`;
+      case 'pu':
+        return `Voter registration and PVC tracking at ${getCurrentScopeName()}`;
+      default:
+        return 'Real-time voter registration and PVC tracking analytics';
+    }
+  };
+
+  // Mock INEC data generation using real state structure
+
 
   useEffect(() => {
     fetchDashboardData();
@@ -249,125 +237,125 @@ const StateDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      console.log('Attempting to fetch dashboard data from backend API...');
 
-      const {
-        mockStates,
-        totalINEC,
-        totalReachedCalls,
-        totalReachedTexts,
-        totalPVCWith,
-        totalPVCWithout,
-        averageAgentCoverage
-      } = generateMockINECData();
+      // Use the role-based state dashboard API
+      const response = await stateDashboardService.getDashboardData();
+      console.log('Backend API response:', response);
 
-      const obidientVotersByState = await fetchObidientVotersByState();
+      // Extract user context from response
+      const { userDesignation, assignedLocation, dashboardData } = response;
 
-      const mergedStates = mockStates.map(state => {
-        const obidientCount = obidientVotersByState[state.name] || Math.floor(Math.random() * state.inecRegisteredVoters * 0.05);
-        const unconverted = Math.max(0, state.inecRegisteredVoters - obidientCount);
-        const conversionRate = state.inecRegisteredVoters > 0
-          ? ((obidientCount / state.inecRegisteredVoters) * 100)
-          : 0;
+      console.log('User designation:', userDesignation);
+      console.log('Assigned location:', assignedLocation);
 
-        return {
-          ...state,
-          obidientRegisteredVoters: obidientCount,
-          unconvertedVoters: unconverted,
-          conversionRate: Number(conversionRate.toFixed(2))
-        };
+      // Set user context state
+      setUserDesignation(userDesignation);
+      setAssignedLocation(assignedLocation);
+
+      // Determine the allowed level and initial view based on designation
+      let allowedLevel: ViewLevel = 'national';
+      let initialView: ViewLevel = 'national';
+      let initialBreadcrumbs: BreadcrumbItem[] = [{ level: 'national', name: 'National Overview' }];
+
+      switch (userDesignation) {
+        case 'State Coordinator':
+          allowedLevel = 'state';
+          initialView = 'state';
+          initialBreadcrumbs = [
+            { level: 'national', name: 'National Overview' },
+            { level: 'state', name: assignedLocation.name, id: assignedLocation.id }
+          ];
+          setSelectedStateId(assignedLocation.id);
+          break;
+        case 'LGA Coordinator':
+          allowedLevel = 'lga';
+          initialView = 'lga';
+          initialBreadcrumbs = [
+            { level: 'national', name: 'National Overview' },
+            { level: 'state', name: assignedLocation.state.name, id: assignedLocation.state.id },
+            { level: 'lga', name: assignedLocation.name, id: assignedLocation.id }
+          ];
+          setSelectedStateId(assignedLocation.state.id);
+          setSelectedLGAId(assignedLocation.id);
+          break;
+        case 'Ward Coordinator':
+          allowedLevel = 'ward';
+          initialView = 'ward';
+          initialBreadcrumbs = [
+            { level: 'national', name: 'National Overview' },
+            { level: 'state', name: assignedLocation.lga.state.name, id: assignedLocation.lga.state.id },
+            { level: 'lga', name: assignedLocation.lga.name, id: assignedLocation.lga.id },
+            { level: 'ward', name: assignedLocation.name, id: assignedLocation.id }
+          ];
+          setSelectedStateId(assignedLocation.lga.state.id);
+          setSelectedLGAId(assignedLocation.lga.id);
+          setSelectedWardId(assignedLocation.id);
+          break;
+        default:
+          // National Coordinator or default - full access
+          allowedLevel = 'national';
+          initialView = 'national';
+          break;
+      }
+
+      setAllowedLevel(allowedLevel);
+      setCurrentView(initialView);
+      setBreadcrumbs(initialBreadcrumbs);
+
+      // Process the dashboard data
+      const { nationalStats, statesData, hierarchicalData } = dashboardData;
+
+      console.log('🔍 Debug - Dashboard data received:', {
+        nationalStats,
+        statesData,
+        hierarchicalData,
+        assignedLocation,
+        initialView
       });
 
-      const totalObidient = mergedStates.reduce((sum, state) => sum + state.obidientRegisteredVoters, 0);
-      const totalUnconverted = totalINEC - totalObidient;
-      const nationalConversionRate = totalINEC > 0 ? ((totalObidient / totalINEC) * 100) : 0;
+      setNationalStats(nationalStats);
+      setStatesData(statesData);
+      setHierarchicalData(hierarchicalData || {});
 
-      const national: MobilizationStats = {
-        inecRegisteredVoters: totalINEC,
-        obidientRegisteredVoters: totalObidient,
-        unconvertedVoters: totalUnconverted,
-        conversionRate: Number(nationalConversionRate.toFixed(2)),
-        reachedCalls: totalReachedCalls,
-        reachedTexts: totalReachedTexts,
-        pvcWithStatus: totalPVCWith,
-        pvcWithoutStatus: totalPVCWithout,
-        agentCoverage: averageAgentCoverage
-      };
-
-      setNationalStats(national);
-      setStatesData(mergedStates);
-      setCurrentData(mergedStates);
+      // Set current data based on initial view
+      // Note: The backend returns the appropriate data level in statesData
+      // For National Coordinator: statesData contains states
+      // For State Coordinator: statesData contains LGAs  
+      // For LGA Coordinator: statesData contains wards
+      // For Ward Coordinator: statesData contains polling units
+      console.log('Setting current data from statesData:', statesData);
+      setCurrentData(statesData || []);
 
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch dashboard data');
+      console.error('Dashboard API Error:', err);
+      console.error('Error response:', err.response);
+      setError(err.response?.data?.message || err.message || 'Failed to fetch dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchObidientVotersByState = async (): Promise<Record<string, number>> => {
-    try {
-      const stateNames = getStateNames();
-      const mockObidientData: Record<string, number> = {};
 
-      stateNames.forEach(stateName => {
-        const baseConversion: Record<string, number> = {
-          'Lagos State': 180000,
-          'Anambra State': 95000,
-          'Kano State': 65000,
-          'Rivers State': 78000,
-          'Kaduna State': 52000,
-          'Ogun State': 48000,
-          'Oyo State': 72000,
-          'Delta State': 45000,
-          'Edo State': 38000,
-          'Cross River State': 28000,
-          'Enugu State': 55000,
-          'Imo State': 48000,
-          'Abia State': 42000,
-          'Akwa Ibom State': 35000,
-          'Bayelsa State': 18000,
-          'Ebonyi State': 25000,
-          'Osun State': 38000,
-          'Ondo State': 32000,
-          'Ekiti State': 25000,
-          'Kwara State': 28000,
-          'Niger State': 35000,
-          'FCT': 85000,
-          'Plateau State': 42000,
-          'Benue State': 38000,
-          'Kogi State': 28000,
-          'Nasarawa State': 22000,
-          'Taraba State': 25000,
-          'Adamawa State': 32000,
-          'Gombe State': 18000,
-          'Bauchi State': 28000,
-          'Yobe State': 15000,
-          'Borno State': 35000,
-          'Jigawa State': 22000,
-          'Katsina State': 28000,
-          'Kebbi State': 18000,
-          'Sokoto State': 25000,
-          'Zamfara State': 15000
-        };
 
-        mockObidientData[stateName] = baseConversion[stateName] || Math.floor(Math.random() * 30000) + 10000;
-      });
-
-      return mockObidientData;
-
-    } catch (error) {
-      console.error('Error fetching Obidient voter data:', error);
-      const stateNames = getStateNames();
-      const fallbackData: Record<string, number> = {};
-      stateNames.forEach(stateName => {
-        fallbackData[stateName] = Math.floor(Math.random() * 20000) + 5000;
-      });
-      return fallbackData;
-    }
-  };
+  // Fetch additional voter details for enhanced metrics
 
   // Navigation handlers
   const navigateToState = (stateId: string, stateName: string) => {
+    // Check if user has access to navigate to this state
+    if (userDesignation === 'State Coordinator' || userDesignation === 'LGA Coordinator' || userDesignation === 'Ward Coordinator') {
+      // For state/LGA/ward coordinators, only allow navigation within their assigned area
+      if (!assignedLocation || (
+        userDesignation === 'State Coordinator' && assignedLocation.id !== stateId
+      ) || (
+          userDesignation === 'LGA Coordinator' && assignedLocation.state.id !== stateId
+        ) || (
+          userDesignation === 'Ward Coordinator' && assignedLocation.lga.state.id !== stateId
+        )) {
+        return; // Block unauthorized navigation
+      }
+    }
+
     setSelectedStateId(stateId);
     setCurrentView('state');
     setBreadcrumbs([
@@ -375,37 +363,88 @@ const StateDashboard: React.FC = () => {
       { level: 'state', name: stateName, id: stateId }
     ]);
 
-    // Generate LGA data for the selected state
-    const stateData = StateLGAWardPollingUnits[stateName];
-    if (stateData) {
-      const lgasData: LGAData[] = Object.values(stateData.lgas).map(lga => {
-        const inecVoters = Math.floor(Math.random() * 500000) + 100000;
-        const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.08 + 0.01));
-        const unconverted = inecVoters - obidientVoters;
-        const conversionRate = (obidientVoters / inecVoters) * 100;
+    // Use hierarchical data from backend API instead of generating mock data
+    if (hierarchicalData && hierarchicalData[stateName]) {
+      const stateHierarchicalData = hierarchicalData[stateName];
+      const lgaList = Object.keys(stateHierarchicalData).map(lgaName => {
+        // Calculate LGA totals from its ward data
+        const lgaWards = stateHierarchicalData[lgaName];
+        let lgaObidientTotal = 0;
+        let lgaPVCTotal = 0;
+        let lgaNonPVCTotal = 0;
+
+        Object.values(lgaWards).forEach((wardData: any) => {
+          Object.values(wardData).forEach((puData: any) => {
+            lgaObidientTotal += puData.total_obidient_users || 0;
+            lgaPVCTotal += puData.voters_with_pvc || 0;
+            lgaNonPVCTotal += puData.voters_without_pvc || 0;
+          });
+        });
+
+        // Find INEC data for the state to calculate proportions
+        const stateStats = statesData.find(s => s.name === stateName);
+        const stateINECTotal = stateStats?.inecRegisteredVoters || 0;
+        const stateObidientTotal = statesData.reduce((sum, state) => sum + state.obidientRegisteredVoters, 0);
+
+        // Estimate LGA INEC voters proportionally
+        const lgaINECEstimate = stateObidientTotal > 0
+          ? Math.round((lgaObidientTotal / stateObidientTotal) * stateINECTotal)
+          : Math.round(stateINECTotal * 0.1);
+
+        const unconverted = Math.max(0, lgaINECEstimate - lgaObidientTotal);
+        const conversionRate = lgaINECEstimate > 0 ? ((lgaObidientTotal / lgaINECEstimate) * 100) : 0;
 
         return {
-          id: lga.id,
-          name: lga.name,
+          id: lgaName.toLowerCase().replace(/\s+/g, '-'),
+          name: lgaName,
           stateId: stateId,
-          inecRegisteredVoters: inecVoters,
-          obidientRegisteredVoters: obidientVoters,
+          inecRegisteredVoters: lgaINECEstimate,
+          obidientRegisteredVoters: lgaObidientTotal,
+          obidientVotersWithPVC: lgaPVCTotal,
+          obidientVotersWithoutPVC: lgaNonPVCTotal,
           unconvertedVoters: unconverted,
           conversionRate: Number(conversionRate.toFixed(2)),
-          reachedCalls: Math.floor(inecVoters * (Math.random() * 0.1 + 0.03)),
-          reachedTexts: Math.floor(inecVoters * (Math.random() * 0.15 + 0.05)),
-          pvcWithStatus: Math.floor(inecVoters * (Math.random() * 0.2 + 0.1)),
-          pvcWithoutStatus: Math.floor(inecVoters * (Math.random() * 0.1 + 0.03)),
-          agentCoverage: Number((Math.random() * 40 + 15).toFixed(1)),
-          wards: []
+          pvcWithStatus: lgaPVCTotal,
+          pvcWithoutStatus: lgaNonPVCTotal,
+          wards: [],
+          realData: {
+            totalObidientUsers: lgaObidientTotal,
+            votersWithPVC: lgaPVCTotal,
+            votersWithoutPVC: lgaNonPVCTotal,
+            votersWithPhone: 0,
+            votersWithEmail: 0,
+            pvcCompletionRate: lgaObidientTotal > 0 ? ((lgaPVCTotal / lgaObidientTotal) * 100) : 0,
+            isRealData: true
+          }
         };
       });
 
-      setCurrentData(lgasData);
+      console.log('🔍 Generated LGA data from hierarchical data:', lgaList);
+      setCurrentData(lgaList);
+    } else {
+      console.log('❌ No hierarchical data available for state:', stateName);
+      setCurrentData([]);
     }
   };
 
   const navigateToLGA = (lgaId: string, lgaName: string, stateName: string) => {
+    // Check if user has access to navigate to this LGA
+    if (userDesignation === 'LGA Coordinator' || userDesignation === 'Ward Coordinator') {
+      // For LGA/ward coordinators, only allow navigation within their assigned area
+      if (!assignedLocation || (
+        userDesignation === 'LGA Coordinator' && assignedLocation.id !== lgaId
+      ) || (
+          userDesignation === 'Ward Coordinator' && assignedLocation.lga.id !== lgaId
+        )) {
+        return; // Block unauthorized navigation
+      }
+    } else if (userDesignation === 'State Coordinator') {
+      // State coordinators can navigate to any LGA within their state
+      if (!assignedLocation || assignedLocation.name !== stateName) {
+        return; // Block unauthorized navigation
+      }
+    }
+
     setSelectedLGAId(lgaId);
     setCurrentView('lga');
     setBreadcrumbs([
@@ -414,38 +453,95 @@ const StateDashboard: React.FC = () => {
       { level: 'lga', name: lgaName, id: lgaId }
     ]);
 
-    // Generate Ward data for the selected LGA
-    const stateData = StateLGAWardPollingUnits[stateName];
-    if (stateData && stateData.lgas[lgaName]) {
-      const lgaData = stateData.lgas[lgaName];
-      const wardsData: WardData[] = Object.values(lgaData.wards).map(ward => {
-        const inecVoters = Math.floor(Math.random() * 100000) + 20000;
-        const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.08 + 0.01));
-        const unconverted = inecVoters - obidientVoters;
-        const conversionRate = (obidientVoters / inecVoters) * 100;
+    // Use hierarchical data to get ward information for this LGA
+    if (hierarchicalData && hierarchicalData[stateName] && hierarchicalData[stateName][lgaName]) {
+      const lgaHierarchicalData = hierarchicalData[stateName][lgaName];
+      const wardList = Object.keys(lgaHierarchicalData).map(wardName => {
+        // Calculate ward totals from its polling unit data
+        const wardPollingUnits = lgaHierarchicalData[wardName];
+        let wardObidientTotal = 0;
+        let wardPVCTotal = 0;
+        let wardNonPVCTotal = 0;
+
+        Object.values(wardPollingUnits).forEach((puData: any) => {
+          wardObidientTotal += puData.total_obidient_users || 0;
+          wardPVCTotal += puData.voters_with_pvc || 0;
+          wardNonPVCTotal += puData.voters_without_pvc || 0;
+        });
+
+        // Find current LGA stats to calculate proportions
+        const lgaStats = currentData.find((lga: any) => lga.name === lgaName);
+        const lgaINECTotal = lgaStats?.inecRegisteredVoters || 0;
+        const lgaObidientTotal = lgaStats?.obidientRegisteredVoters || 1;
+
+        // Estimate ward INEC voters proportionally
+        const wardINECEstimate = lgaObidientTotal > 0
+          ? Math.round((wardObidientTotal / lgaObidientTotal) * lgaINECTotal)
+          : Math.round(lgaINECTotal * 0.2); // 20% fallback
+
+        const unconverted = Math.max(0, wardINECEstimate - wardObidientTotal);
+        const conversionRate = wardINECEstimate > 0 ? ((wardObidientTotal / wardINECEstimate) * 100) : 0;
 
         return {
-          id: ward.id,
-          name: ward.name,
+          id: `${lgaId}-${wardName}`.toLowerCase().replace(/\s+/g, '-'),
+          name: wardName,
           lgaId: lgaId,
-          inecRegisteredVoters: inecVoters,
-          obidientRegisteredVoters: obidientVoters,
+          stateId: selectedStateId!,
+          inecRegisteredVoters: wardINECEstimate,
+          obidientRegisteredVoters: wardObidientTotal,
+          obidientVotersWithPVC: wardPVCTotal,
+          obidientVotersWithoutPVC: wardNonPVCTotal,
           unconvertedVoters: unconverted,
           conversionRate: Number(conversionRate.toFixed(2)),
-          reachedCalls: Math.floor(inecVoters * (Math.random() * 0.12 + 0.02)),
-          reachedTexts: Math.floor(inecVoters * (Math.random() * 0.18 + 0.04)),
-          pvcWithStatus: Math.floor(inecVoters * (Math.random() * 0.25 + 0.08)),
-          pvcWithoutStatus: Math.floor(inecVoters * (Math.random() * 0.12 + 0.02)),
-          agentCoverage: Number((Math.random() * 35 + 10).toFixed(1)),
-          pollingUnits: []
+          pvcWithStatus: wardPVCTotal,
+          pvcWithoutStatus: wardNonPVCTotal,
+          pollingUnits: [],
+          realData: {
+            totalObidientUsers: wardObidientTotal,
+            votersWithPVC: wardPVCTotal,
+            votersWithoutPVC: wardNonPVCTotal,
+            votersWithPhone: 0,
+            votersWithEmail: 0,
+            pvcCompletionRate: wardObidientTotal > 0 ? ((wardPVCTotal / wardObidientTotal) * 100) : 0,
+            isRealData: true
+          }
         };
       });
 
-      setCurrentData(wardsData);
+      console.log('🔍 Generated Ward data from hierarchical data:', wardList);
+      setCurrentData(wardList);
+
+      // Update stats to show LGA-level stats
+      const lgaStats = statesData.find((lga: any) => lga.name === lgaName);
+      if (lgaStats) {
+        setNationalStats(lgaStats as MobilizationStats);
+        console.log('📈 Updated stats to LGA level:', lgaStats);
+      }
+    } else {
+      console.log('❌ No hierarchical data available for LGA:', lgaName, 'in state:', stateName);
+      setCurrentData([]);
     }
   };
 
   const navigateToWard = (wardId: string, wardName: string, lgaName: string, stateName: string) => {
+    // Check if user has access to navigate to this ward
+    if (userDesignation === 'Ward Coordinator') {
+      // Ward coordinators can only navigate to their assigned ward
+      if (!assignedLocation || assignedLocation.id !== wardId) {
+        return; // Block unauthorized navigation
+      }
+    } else if (userDesignation === 'LGA Coordinator') {
+      // LGA coordinators can navigate to any ward within their LGA
+      if (!assignedLocation || assignedLocation.name !== lgaName) {
+        return; // Block unauthorized navigation
+      }
+    } else if (userDesignation === 'State Coordinator') {
+      // State coordinators can navigate to any ward within their state
+      if (!assignedLocation || assignedLocation.name !== stateName) {
+        return; // Block unauthorized navigation
+      }
+    }
+
     setSelectedWardId(wardId);
     setCurrentView('ward');
     setBreadcrumbs([
@@ -455,41 +551,81 @@ const StateDashboard: React.FC = () => {
       { level: 'ward', name: wardName, id: wardId }
     ]);
 
-    // Generate Polling Unit data for the selected Ward
-    const stateData = StateLGAWardPollingUnits[stateName];
-    if (stateData && stateData.lgas[lgaName] && stateData.lgas[lgaName].wards[wardName]) {
-      const wardData = stateData.lgas[lgaName].wards[wardName];
-      const pollingUnitsData: PUData[] = wardData.pollingUnits.map((pu: any) => {
-        const inecVoters = Math.floor(Math.random() * 2000) + 500;
-        const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.10 + 0.005));
-        const unconverted = inecVoters - obidientVoters;
-        const conversionRate = (obidientVoters / inecVoters) * 100;
+    // Use hierarchical data to get polling unit information for this ward
+    if (hierarchicalData && hierarchicalData[stateName] && hierarchicalData[stateName][lgaName] && hierarchicalData[stateName][lgaName][wardName]) {
+      const wardHierarchicalData = hierarchicalData[stateName][lgaName][wardName];
+      const pollingUnitList = Object.keys(wardHierarchicalData).map((puName, index) => {
+        // Get polling unit data directly from hierarchical data
+        const puData = wardHierarchicalData[puName];
+        const puObidientUsers = puData.total_obidient_users || 0;
+        const puPVCUsers = puData.voters_with_pvc || 0;
+        const puNonPVCUsers = puData.voters_without_pvc || 0;
+
+        // Find current ward stats to calculate proportions
+        const wardStats = currentData.find((ward: any) => ward.name === wardName);
+        const wardINECTotal = wardStats?.inecRegisteredVoters || 0;
+        const wardObidientTotal = wardStats?.obidientRegisteredVoters || 1;
+
+        // Estimate polling unit INEC voters proportionally
+        const puINECEstimate = wardObidientTotal > 0
+          ? Math.round((puObidientUsers / wardObidientTotal) * wardINECTotal)
+          : Math.round(wardINECTotal * 0.1); // 10% fallback
+
+        const unconverted = Math.max(0, puINECEstimate - puObidientUsers);
+        const conversionRate = puINECEstimate > 0 ? ((puObidientUsers / puINECEstimate) * 100) : 0;
 
         return {
-          id: pu.id,
-          name: pu.name,
-          code: pu.abbreviation || pu.id,
+          id: `${wardId}-${puName}`.toLowerCase().replace(/\s+/g, '-'),
+          name: puName,
+          code: puData.polling_unit_code || `PU-${index + 1}`,
           wardId: wardId,
-          inecRegisteredVoters: inecVoters,
-          obidientRegisteredVoters: obidientVoters,
+          lgaId: selectedLGAId!,
+          stateId: selectedStateId!,
+          inecRegisteredVoters: puINECEstimate,
+          obidientRegisteredVoters: puObidientUsers,
+          obidientVotersWithPVC: puPVCUsers,
+          obidientVotersWithoutPVC: puNonPVCUsers,
           unconvertedVoters: unconverted,
           conversionRate: Number(conversionRate.toFixed(2)),
-          reachedCalls: Math.floor(inecVoters * (Math.random() * 0.15 + 0.01)),
-          reachedTexts: Math.floor(inecVoters * (Math.random() * 0.20 + 0.02)),
-          pvcWithStatus: Math.floor(inecVoters * (Math.random() * 0.30 + 0.05)),
-          pvcWithoutStatus: Math.floor(inecVoters * (Math.random() * 0.15 + 0.01)),
-          agentCoverage: Number((Math.random() * 30 + 5).toFixed(1))
+          pvcWithStatus: puPVCUsers,
+          pvcWithoutStatus: puNonPVCUsers,
+          realData: {
+            totalObidientUsers: puObidientUsers,
+            votersWithPVC: puPVCUsers,
+            votersWithoutPVC: puNonPVCUsers,
+            votersWithPhone: puData.voters_with_phone || 0,
+            votersWithEmail: puData.voters_with_email || 0,
+            pvcCompletionRate: puObidientUsers > 0 ? ((puPVCUsers / puObidientUsers) * 100) : 0,
+            isRealData: true
+          }
         };
       });
 
-      setCurrentData(pollingUnitsData);
+      console.log('🔍 Generated Polling Unit data from hierarchical data:', pollingUnitList);
+      setCurrentData(pollingUnitList);
+
+      // Update stats to show ward-level stats
+      const wardStats = currentData.find((ward: any) => ward.name === wardName);
+      if (wardStats) {
+        setNationalStats(wardStats as MobilizationStats);
+        console.log('📈 Updated stats to Ward level:', wardStats);
+      }
+    } else {
+      console.log('❌ No hierarchical data available for Ward:', wardName, 'in LGA:', lgaName, 'in state:', stateName);
+      setCurrentData([]);
     }
   };
 
   const navigateToBreadcrumb = (index: number) => {
     const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
-    setBreadcrumbs(newBreadcrumbs);
     const targetLevel = newBreadcrumbs[newBreadcrumbs.length - 1];
+
+    // Check if user has access to navigate to this level
+    if (targetLevel.level === 'national' && userDesignation !== 'National Coordinator' && allowedLevel !== 'national') {
+      return; // Block unauthorized navigation to national level
+    }
+
+    setBreadcrumbs(newBreadcrumbs);
     setCurrentView(targetLevel.level);
 
     if (targetLevel.level === 'national') {
@@ -512,11 +648,7 @@ const StateDashboard: React.FC = () => {
 
   // Utility functions
   const formatNumber = (num: number): string => {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`;
-    } else if (num >= 1000) {
-      return `${(num / 1000).toFixed(0)}K`;
-    }
+    // Always show full numbers with comma separators for better precision
     return num.toLocaleString();
   };
 
@@ -547,14 +679,6 @@ const StateDashboard: React.FC = () => {
       if (performanceCategory !== performanceFilter) return false;
     }
 
-    if (mobilizationFilter !== 'all') {
-      const totalReached = item.reachedCalls + item.reachedTexts;
-      const reachRate = (totalReached / item.inecRegisteredVoters) * 100;
-
-      if (mobilizationFilter === 'above-average' && reachRate < 15) return false;
-      if (mobilizationFilter === 'below-average' && reachRate >= 15) return false;
-    }
-
     if (showOnlyWithObidients && item.obidientRegisteredVoters === 0) return false;
 
     return true;
@@ -577,10 +701,6 @@ const StateDashboard: React.FC = () => {
       case 'conversion':
         aVal = a.conversionRate;
         bVal = b.conversionRate;
-        break;
-      case 'reached':
-        aVal = a.reachedCalls + a.reachedTexts;
-        bVal = b.reachedCalls + b.reachedTexts;
         break;
       default:
         return 0;
@@ -652,15 +772,20 @@ const StateDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                Mobilization Dashboard - {
-                  currentView === 'national' ? 'National' :
-                    currentView === 'state' ? breadcrumbs[1]?.name || 'State' :
-                      currentView === 'lga' ? breadcrumbs[2]?.name || 'LGA' :
-                        currentView === 'ward' ? breadcrumbs[3]?.name || 'Ward' :
-                          'Polling Units'
-                }
+                {getDashboardTitle()}
               </h1>
-              <p className="text-gray-600 mt-1">Real-time voter conversion and mobilization analytics</p>
+              <p className="text-gray-600 mt-1">{getDashboardDescription()}</p>
+              {/* User Context */}
+              {userDesignation && assignedLocation && (
+                <div className="mt-2 flex items-center gap-4">
+                  <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                    {userDesignation}
+                  </div>
+                  <span className="text-sm text-gray-600">
+                    Assigned to: <span className="font-medium">{assignedLocation.name}</span>
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -674,140 +799,146 @@ const StateDashboard: React.FC = () => {
 
           {/* Breadcrumbs */}
           <div className="flex items-center space-x-2 text-sm">
-            {breadcrumbs.map((crumb, index) => (
-              <React.Fragment key={index}>
-                <button
-                  onClick={() => navigateToBreadcrumb(index)}
-                  className="text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  {crumb.name}
-                </button>
-                {index < breadcrumbs.length - 1 && (
-                  <ChevronRight size={16} className="text-gray-400" />
-                )}
-              </React.Fragment>
-            ))}
+            {breadcrumbs.map((crumb, index) => {
+              // Check if this breadcrumb should be clickable based on user access
+              const isClickable = !(crumb.level === 'national' && userDesignation !== 'National Coordinator' && allowedLevel !== 'national');
+
+              return (
+                <React.Fragment key={index}>
+                  {isClickable ? (
+                    <button
+                      onClick={() => navigateToBreadcrumb(index)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {crumb.name}
+                    </button>
+                  ) : (
+                    <span className="text-gray-500 cursor-not-allowed">
+                      {crumb.name}
+                    </span>
+                  )}
+                  {index < breadcrumbs.length - 1 && (
+                    <ChevronRight size={16} className="text-gray-400" />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
 
         {/* Stats Cards */}
-        {nationalStats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Users className="w-6 h-6 text-blue-600" />
+        <StatsCards
+          currentStats={calculateCurrentLevelStats()}
+          currentView={currentView}
+          currentScope={getCurrentScopeName()}
+          loading={loading}
+          formatNumber={formatNumber}
+        />
+
+        {/* Enhanced Filters and Search */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder={`Search ${currentView === 'national' ? 'states' : currentView}s...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-64"
+                  />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Obidient Voters</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatNumber(nationalStats.obidientRegisteredVoters)}</p>
+
+                {currentView === 'national' && (
+                  <select
+                    value={filterRegion}
+                    onChange={(e) => setFilterRegion(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">All Regions</option>
+                    <option value="North Central">North Central</option>
+                    <option value="North East">North East</option>
+                    <option value="North West">North West</option>
+                    <option value="South East">South East</option>
+                    <option value="South South">South South</option>
+                    <option value="South West">South West</option>
+                  </select>
+                )}
+
+                <select
+                  value={performanceFilter}
+                  onChange={(e) => setPerformanceFilter(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Performance</option>
+                  <option value="high">High (≥4%)</option>
+                  <option value="medium">Medium (2-4%)</option>
+                  <option value="low">Low (&lt;2%)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Sort by:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="conversion">Conversion Rate</option>
+                    <option value="obidient">Obidient Voters</option>
+                    <option value="inec">INEC Voters</option>
+                    <option value="name">Name</option>
+                  </select>
                 </div>
+
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+                >
+                  {sortOrder === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+                </button>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-green-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Registered Voters</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatNumber(nationalStats.inecRegisteredVoters)}</p>
-                </div>
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyWithObidients}
+                    onChange={(e) => setShowOnlyWithObidients(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700">Only areas with Obidient voters</span>
+                </label>
               </div>
-            </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <div className="p-3 bg-red-100 rounded-lg">
-                  <Target className="w-6 h-6 text-red-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Unconverted Voters</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatNumber(nationalStats.unconvertedVoters)}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <div className="p-3 bg-indigo-100 rounded-lg">
-                  <Award className="w-6 h-6 text-indigo-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Conversion Rate</p>
-                  <p className="text-2xl font-bold text-gray-900">{nationalStats.conversionRate.toFixed(2)}%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Additional Stats Section */}
-        {nationalStats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Phone size={20} />
-                <h3 className="text-lg font-semibold">Outreach Summary</h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Calls Made</span>
-                  <span className="font-bold">{formatNumber(nationalStats.reachedCalls)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Texts Sent</span>
-                  <span className="font-bold">{formatNumber(nationalStats.reachedTexts)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Total Reached</span>
-                  <span className="font-bold">{formatNumber(nationalStats.reachedCalls + nationalStats.reachedTexts)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Shield size={20} />
-                <h3 className="text-lg font-semibold">PVC Status</h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">With PVC</span>
-                  <span className="font-bold">{formatNumber(nationalStats.pvcWithStatus)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Without PVC</span>
-                  <span className="font-bold">{formatNumber(nationalStats.pvcWithoutStatus)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">PVC Rate</span>
-                  <span className="font-bold">
-                    {((nationalStats.pvcWithStatus / (nationalStats.pvcWithStatus + nationalStats.pvcWithoutStatus)) * 100).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <MapPin size={20} />
-                <h3 className="text-lg font-semibold">Agent Coverage</h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Coverage</span>
-                  <span className="font-bold">{nationalStats.agentCoverage.toFixed(1)}%</span>
-                </div>
-                <div className="text-sm text-gray-500">
-                  Average coverage across all states
-                </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-sm text-gray-500">
+                  Showing {filteredData.length} of {currentData.length} {currentView === 'national' ? 'states' : currentView}s
+                </span>
+                {(searchQuery || filterRegion !== 'all' || performanceFilter !== 'all' ||
+                  showOnlyWithObidients) && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setFilterRegion('all');
+                        setPerformanceFilter('all');
+                        setShowOnlyWithObidients(false);
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Clear filters
+                    </button>
+                  )}
               </div>
             </div>
           </div>
-        )}
-
+        </div>
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -874,124 +1005,6 @@ const StateDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Enhanced Filters and Search */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                  <input
-                    type="text"
-                    placeholder={`Search ${currentView === 'national' ? 'states' : currentView}s...`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-64"
-                  />
-                </div>
-
-                {currentView === 'national' && (
-                  <select
-                    value={filterRegion}
-                    onChange={(e) => setFilterRegion(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Regions</option>
-                    <option value="North Central">North Central</option>
-                    <option value="North East">North East</option>
-                    <option value="North West">North West</option>
-                    <option value="South East">South East</option>
-                    <option value="South South">South South</option>
-                    <option value="South West">South West</option>
-                  </select>
-                )}
-
-                <select
-                  value={performanceFilter}
-                  onChange={(e) => setPerformanceFilter(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Performance</option>
-                  <option value="high">High (≥4%)</option>
-                  <option value="medium">Medium (2-4%)</option>
-                  <option value="low">Low (&lt;2%)</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Sort by:</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  >
-                    <option value="conversion">Conversion Rate</option>
-                    <option value="obidient">Obidient Voters</option>
-                    <option value="inec">INEC Voters</option>
-                    <option value="reached">Total Reached</option>
-                    <option value="name">Name</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-                >
-                  {sortOrder === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4 pt-4 border-t border-gray-200">
-              <div className="flex items-center gap-4 flex-wrap">
-                <select
-                  value={mobilizationFilter}
-                  onChange={(e) => setMobilizationFilter(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                >
-                  <option value="all">All Mobilization</option>
-                  <option value="above-average">Above Average (≥15%)</option>
-                  <option value="below-average">Below Average (&lt;15%)</option>
-                </select>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyWithObidients}
-                    onChange={(e) => setShowOnlyWithObidients(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-700">Only areas with Obidient voters</span>
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-sm text-gray-500">
-                  Showing {filteredData.length} of {currentData.length} {currentView === 'national' ? 'states' : currentView}s
-                </span>
-                {(searchQuery || filterRegion !== 'all' || performanceFilter !== 'all' ||
-                  mobilizationFilter !== 'all' || showOnlyWithObidients) && (
-                    <button
-                      onClick={() => {
-                        setSearchQuery('');
-                        setFilterRegion('all');
-                        setPerformanceFilter('all');
-                        setMobilizationFilter('all');
-                        setShowOnlyWithObidients(false);
-                      }}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Clear filters
-                    </button>
-                  )}
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Data Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -1044,28 +1057,18 @@ const StateDashboard: React.FC = () => {
                         <div className="text-sm text-gray-500 space-x-4">
                           <span>INEC: {formatNumber(item.inecRegisteredVoters)}</span>
                           <span>Obidient: {formatNumber(item.obidientRegisteredVoters)}</span>
+                          {item.obidientVotersWithPVC !== undefined && item.obidientVotersWithoutPVC !== undefined && (
+                            <span className="text-xs text-blue-600">
+                              (PVC: {formatNumber(item.obidientVotersWithPVC)},
+                              No-PVC: {formatNumber(item.obidientVotersWithoutPVC)})
+                            </span>
+                          )}
                           <span>Unconverted: {formatNumber(item.unconvertedVoters)}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-6 text-sm">
-                      <div className="text-center">
-                        <div className="flex items-center gap-1 mb-1">
-                          <Phone size={14} className="text-blue-500" />
-                          <span>{formatNumber(item.reachedCalls)}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MessageSquare size={14} className="text-green-500" />
-                          <span>{formatNumber(item.reachedTexts)}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-center">
-                        <div className="text-gray-500 text-xs">Agent Coverage</div>
-                        <div className="font-semibold">{item.agentCoverage.toFixed(1)}%</div>
-                      </div>
-
                       {currentView !== 'ward' && (
                         <ChevronRight size={20} className="text-gray-400" />
                       )}
@@ -1089,7 +1092,6 @@ const StateDashboard: React.FC = () => {
                   setSearchQuery('');
                   setFilterRegion('all');
                   setPerformanceFilter('all');
-                  setMobilizationFilter('all');
                   setShowOnlyWithObidients(false);
                 }}
                 className="text-blue-600 hover:text-blue-800 underline mt-2"
@@ -1099,6 +1101,8 @@ const StateDashboard: React.FC = () => {
             </div>
           )}
         </div>
+
+
       </div>
     </div>
   );
