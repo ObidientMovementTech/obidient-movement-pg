@@ -9,5 +9,6 @@ scripts
 migrations
 runMigrations.js
 logs
+ecosystem.config.js
 
 obidient-movement-mobile-firebase-adminsdk-fbsvc-e2f433955b.json

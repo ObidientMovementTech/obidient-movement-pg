@@ -125,14 +125,12 @@ const StateDashboard: React.FC = () => {
   const initializeDashboard = async () => {
     try {
       setLoading(true);
-      console.log('🚀 Initializing dashboard...');
 
       // Step 1: Get user level and permissions
       const userLevelResponse = await mobiliseDashboardService.getUserLevel();
       const userData = userLevelResponse.data;
       setUserLevel(userData);
 
-      console.log('👤 User context:', userData);
 
       // Step 2: Load initial data based on user level
       await loadInitialData(userData);
@@ -220,10 +218,7 @@ const StateDashboard: React.FC = () => {
     // Set the data
     const { stats, items, breadcrumbs: serverBreadcrumbs } = response.data;
 
-    console.log('🔍 DEBUG - Response data:', response.data);
-    console.log('📊 DEBUG - Stats received:', stats);
-    console.log('📋 DEBUG - Items received:', items);
-    console.log('🍞 DEBUG - Breadcrumbs received:', serverBreadcrumbs);
+    
 
     setNationalStats(stats);
     setCurrentData(items || []);
@@ -233,24 +228,16 @@ const StateDashboard: React.FC = () => {
     const breadcrumbsToUse = serverBreadcrumbs || breadcrumbsToSet;
     const filteredBreadcrumbs = filterBreadcrumbsByPermissions(breadcrumbsToUse);
     setBreadcrumbs(filteredBreadcrumbs);
-
-    console.log(`✅ Dashboard loaded: ${view} level, ${items?.length || 0} items`);
-    console.log('📊 DEBUG - Final stats state:', stats);
-    console.log('📋 DEBUG - Final current data:', items || []);
   };
 
   // Navigation functions
   const navigateToState = async (stateId: string, stateName: string) => {
     try {
       setLoading(true);
-      console.log(`🔍 Navigating to state: ${stateName} (ID: ${stateId})`);
 
       const response = await mobiliseDashboardService.getStateData(stateId);
-      console.log('🔍 DEBUG - Navigation response:', response);
 
       const { stats, items, breadcrumbs } = response.data;
-      console.log('📊 DEBUG - Navigation stats:', stats);
-      console.log('📋 DEBUG - Navigation items:', items);
 
       setSelectedStateId(stateId);
       setSelectedLGAId(null);
@@ -266,7 +253,6 @@ const StateDashboard: React.FC = () => {
       const breadcrumbsToUse = breadcrumbs || fallbackBreadcrumbs;
       setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbsToUse));
 
-      console.log(`✅ Navigated to ${stateName}`);
     } catch (error) {
       console.error(`❌ Navigation error:`, error);
       setError(`Failed to load data for ${stateName}`);
@@ -278,7 +264,6 @@ const StateDashboard: React.FC = () => {
   const navigateToLGA = async (lgaId: string, lgaName: string) => {
     try {
       setLoading(true);
-      console.log(`🔍 Navigating to LGA: ${lgaName}`);
 
       const response = await mobiliseDashboardService.getLGAData(lgaId);
       const { stats, items, breadcrumbs } = response.data;
@@ -290,7 +275,6 @@ const StateDashboard: React.FC = () => {
       setCurrentData(items || []);
       setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbs || []));
 
-      console.log(`✅ Navigated to ${lgaName}`);
     } catch (error) {
       console.error(`❌ Navigation error:`, error);
       setError(`Failed to load data for ${lgaName}`);
@@ -302,7 +286,6 @@ const StateDashboard: React.FC = () => {
   const navigateToWard = async (wardId: string, wardName: string) => {
     try {
       setLoading(true);
-      console.log(`🔍 Navigating to Ward: ${wardName}`);
 
       const response = await mobiliseDashboardService.getWardData(wardId);
       const { stats, items, breadcrumbs } = response.data;
@@ -313,7 +296,6 @@ const StateDashboard: React.FC = () => {
       setCurrentData(items || []);
       setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbs || []));
 
-      console.log(`✅ Navigated to ${wardName}`);
     } catch (error) {
       console.error(`❌ Navigation error:`, error);
       setError(`Failed to load data for ${wardName}`);
@@ -352,7 +334,6 @@ const StateDashboard: React.FC = () => {
       setLoading(true);
       const targetBreadcrumb = breadcrumbs[index];
 
-      console.log(`🔍 Navigating to breadcrumb: ${targetBreadcrumb.name}`);
 
       let response;
 
@@ -400,7 +381,6 @@ const StateDashboard: React.FC = () => {
       const breadcrumbsToUse = newBreadcrumbs?.slice(0, index + 1) || breadcrumbs.slice(0, index + 1);
       setBreadcrumbs(filterBreadcrumbsByPermissions(breadcrumbsToUse));
 
-      console.log(`✅ Navigated to ${targetBreadcrumb.name}`);
     } catch (error) {
       console.error(`❌ Breadcrumb navigation error:`, error);
       setError('Failed to navigate to selected level');
@@ -501,7 +481,7 @@ const StateDashboard: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
-          <div className="text-red-500 text-xl mb-4">⚠️ Error</div>
+          <div className="text-red-500 text-xl mb-4">⚠️ Something went wrong!</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={initializeDashboard}
