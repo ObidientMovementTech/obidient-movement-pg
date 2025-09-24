@@ -1,6 +1,43 @@
 import { query } from '../config/db.js';
 import { getObidientVotersByState, getObidientVotersDetailed } from '../services/obidientVotersService.js';
 
+/**
+ * Helper function to convert location name to URL-friendly slug
+ * e.g., "Aba North" -> "aba-north"
+ */
+const toSlug = (name) => {
+  if (!name) return '';
+  return name.toLowerCase().replace(/\s+/g, '-').trim();
+};
+
+/**
+ * Helper function to convert slug back to proper title case
+ * e.g., "aba-north" -> "Aba North"
+ */
+const fromSlug = (slug) => {
+  if (!slug) return '';
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+/**
+ * Helper function to normalize location names for comparison
+ * Handles both slug format and title case
+ */
+const normalizeLocationName = (name) => {
+  if (!name) return '';
+  // Convert to lowercase and replace spaces/hyphens with a consistent separator
+  return name.toLowerCase().replace(/[\s\-]+/g, '-').trim();
+};
+
+/**
+ * Helper function to check if two location names match
+ * Accounts for different formats (slug vs title case)
+ */
+const locationNamesMatch = (name1, name2) => {
+  if (!name1 || !name2) return false;
+  return normalizeLocationName(name1) === normalizeLocationName(name2);
+};
+
 
 /**
  * Get user's designation level and assigned location
@@ -29,6 +66,8 @@ export const getUserLevel = async (req, res) => {
     const user = userResult.rows[0];
     const { designation, assignedState, assignedLGA, assignedWard, role } = user;
 
+    
+
     // Determine user's access level and assigned location
     let userLevel = 'national'; // default
     let assignedLocation = null;
@@ -48,30 +87,33 @@ export const getUserLevel = async (req, res) => {
         case 'State Coordinator':
           userLevel = 'state';
           assignedLocation = {
-            stateId: assignedState,
-            stateName: assignedState
+            stateId: toSlug(assignedState),
+            stateName: fromSlug(assignedState) || assignedState
           };
           allowedLevels = ['state', 'lga', 'ward', 'pu'];
           break;
         case 'LGA Coordinator':
           userLevel = 'lga';
           assignedLocation = {
-            stateId: assignedState,
-            stateName: assignedState,
-            lgaId: assignedLGA,
-            lgaName: assignedLGA
+            stateId: toSlug(assignedState),
+            stateName: fromSlug(assignedState) || assignedState,
+            lgaId: assignedLGA, // Keep original format for comparison
+            lgaName: fromSlug(assignedLGA) || assignedLGA,
+            lgaSlug: toSlug(assignedLGA) // Add slug version for URL construction
           };
           allowedLevels = ['lga', 'ward', 'pu'];
           break;
         case 'Ward Coordinator':
           userLevel = 'ward';
           assignedLocation = {
-            stateId: assignedState,
-            stateName: assignedState,
-            lgaId: assignedLGA,
-            lgaName: assignedLGA,
-            wardId: assignedWard,
-            wardName: assignedWard
+            stateId: toSlug(assignedState),
+            stateName: fromSlug(assignedState) || assignedState,
+            lgaId: assignedLGA, // Keep original format for comparison
+            lgaName: fromSlug(assignedLGA) || assignedLGA,
+            lgaSlug: toSlug(assignedLGA),
+            wardId: assignedWard, // Keep original format for comparison
+            wardName: fromSlug(assignedWard) || assignedWard,
+            wardSlug: toSlug(assignedWard) // Add slug version for URL construction
           };
           allowedLevels = ['ward', 'pu'];
           break;
@@ -132,7 +174,6 @@ export const getNationalData = async (req, res) => {
 
     // Get all states data
     const votersData = await getObidientVotersByState();
-    console.log('🔍 DEBUG - getObidientVotersByState() response:', JSON.stringify(votersData, null, 2));
 
     const statesData = votersData.map(stateData => {
       const totalObidient = stateData.totalObidientUsers || 0;
@@ -208,12 +249,12 @@ export const getNationalData = async (req, res) => {
 export const getStateData = async (req, res) => {
   try {
     const { stateId } = req.params;
-    const stateName = stateId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const stateName = fromSlug(stateId);
 
     // Check if user has access to this state using direct query
     const userId = req.user.userId || req.user.id;
     const userQuery = `
-      SELECT designation, "assignedState" FROM users WHERE id = $1
+      SELECT designation, "assignedState", role FROM users WHERE id = $1
     `;
     const userResult = await query(userQuery, [userId]);
 
@@ -224,35 +265,35 @@ export const getStateData = async (req, res) => {
       });
     }
 
-    const { designation, assignedState } = userResult.rows[0];
+    const { designation, assignedState, role } = userResult.rows[0];
 
-    if (designation === 'State Coordinator' && assignedState !== stateName) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only view data for your assigned state.'
-      });
-    }
-    if (designation === 'LGA Coordinator' && assignedState !== stateName) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only view data for your assigned state.'
-      });
-    }
-    if (designation === 'Ward Coordinator' && assignedState !== stateName) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only view data for your assigned state.'
-      });
+    // Allow admin users full access
+    if (role !== 'admin') {
+      // For non-admin users, check specific access permissions
+      if (designation === 'State Coordinator' && !locationNamesMatch(assignedState, stateName)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. You can only view data for your assigned state. Your assigned: "${assignedState}", Requested: "${stateName}"`
+        });
+      }
+      if (designation === 'LGA Coordinator' && !locationNamesMatch(assignedState, stateName)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. You can only view data for your assigned state. Your assigned: "${assignedState}", Requested: "${stateName}"`
+        });
+      }
+      if (designation === 'Ward Coordinator' && !locationNamesMatch(assignedState, stateName)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. You can only view data for your assigned state. Your assigned: "${assignedState}", Requested: "${stateName}"`
+        });
+      }
     }
 
     // Get detailed voter data for the state
     const detailedData = await getObidientVotersDetailed();
-    console.log('🔍 DEBUG - getObidientVotersDetailed() response:', JSON.stringify(detailedData, null, 2));
 
     const stateData = detailedData[stateName];
-    console.log(`🔍 DEBUG - Looking for state: "${stateName}"`);
-    console.log('🔍 DEBUG - Available states:', Object.keys(detailedData));
-    console.log(`🔍 DEBUG - State data found:`, stateData);
 
     if (!stateData) {
       console.log(`❌ No data found for state: ${stateName}`);
@@ -263,21 +304,12 @@ export const getStateData = async (req, res) => {
     }
 
     // Process LGA data
-    console.log('🔍 DEBUG - Processing LGAs for state data:', stateData);
-    console.log('🔍 DEBUG - State LGAs:', stateData.lgas);
 
     const lgasData = Object.entries(stateData.lgas || {}).map(([lgaName, lgaData]) => {
-      console.log(`🔍 DEBUG - Processing LGA: ${lgaName}`, lgaData);
 
       const totalObidient = lgaData.obidientRegisteredVoters || 0;
       const votersWithPVC = lgaData.obidientVotersWithPVC || 0;
       const votersWithoutPVC = lgaData.obidientVotersWithoutPVC || 0;
-
-      console.log(`📊 DEBUG - LGA ${lgaName} stats:`, {
-        totalObidient,
-        votersWithPVC,
-        votersWithoutPVC
-      });
 
       // Mock INEC data for LGA
       const estimatedINECVoters = Math.round(totalObidient * (Math.random() * 15 + 20));
@@ -299,11 +331,9 @@ export const getStateData = async (req, res) => {
         pvcWithoutStatus: votersWithoutPVC
       };
 
-      console.log(`✅ DEBUG - Processed LGA:`, lgaResult);
       return lgaResult;
     });
 
-    console.log(`📊 DEBUG - All processed LGAs:`, lgasData);
 
     // Calculate state totals
     const stateStats = lgasData.reduce((acc, lga) => ({
@@ -357,16 +387,18 @@ export const getStateData = async (req, res) => {
 export const getLGAData = async (req, res) => {
   try {
     const { lgaId } = req.params;
-    const stateId = lgaId.split('-')[0]; // Get the first part as stateId
-    const stateName = stateId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const parts = lgaId.split('-');
+    const stateId = parts[0];
+    const stateName = fromSlug(stateId);
 
-    // Reconstruct LGA name from slug
-    const lgaName = lgaId.replace(`${stateId}-`, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    // Reconstruct LGA name from slug (everything after the first part)
+    const lgaSlugPart = lgaId.replace(`${stateId}-`, '');
+    const lgaName = fromSlug(lgaSlugPart);
 
     // Check if user has access to this LGA using direct query
     const userId = req.user.userId || req.user.id;
     const userQuery = `
-      SELECT designation, "assignedLGA" FROM users WHERE id = $1
+      SELECT designation, "assignedLGA", "assignedState", role FROM users WHERE id = $1
     `;
     const userResult = await query(userQuery, [userId]);
 
@@ -377,19 +409,42 @@ export const getLGAData = async (req, res) => {
       });
     }
 
-    const { designation, assignedLGA } = userResult.rows[0];
+    const { designation, assignedLGA, assignedState, role } = userResult.rows[0];
 
-    if (designation === 'LGA Coordinator' && assignedLGA !== lgaName) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only view data for your assigned LGA.'
-      });
-    }
-    if (designation === 'Ward Coordinator' && assignedLGA !== lgaName) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only view data for your assigned LGA.'
-      });
+
+    // Allow admin users full access
+    if (role !== 'admin') {
+      // For non-admin users, check specific access permissions
+      if (designation === 'LGA Coordinator') {
+        // Check both state and LGA match
+        if (!locationNamesMatch(assignedState, stateName)) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. State mismatch. Your assigned: "${assignedState}", Requested: "${stateName}"`
+          });
+        }
+        if (!locationNamesMatch(assignedLGA, lgaName)) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. LGA mismatch. Your assigned: "${assignedLGA}", Requested: "${lgaName}"`
+          });
+        }
+      }
+      if (designation === 'Ward Coordinator') {
+        // Check both state and LGA match
+        if (!locationNamesMatch(assignedState, stateName)) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. State mismatch. Your assigned: "${assignedState}", Requested: "${stateName}"`
+          });
+        }
+        if (!locationNamesMatch(assignedLGA, lgaName)) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. LGA mismatch. Your assigned: "${assignedLGA}", Requested: "${lgaName}"`
+          });
+        }
+      }
     }
 
     // Get detailed voter data
@@ -489,26 +544,65 @@ export const getWardData = async (req, res) => {
     const { wardId } = req.params;
 
     // Parse ward ID to extract components
+    // Format: stateId-lgaSlug-wardSlug
+    // Note: lgaSlug and wardSlug can contain hyphens, so we need to split carefully
     const wardIdParts = wardId.split('-');
     if (wardIdParts.length < 3) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid ward ID format'
+        message: 'Invalid ward ID format. Expected: stateId-lgaSlug-wardSlug'
       });
     }
 
+    // The first part is always the state
     const stateId = wardIdParts[0];
-    const lgaSlug = wardIdParts[1];
-    const wardSlug = wardIdParts.slice(2).join('-');
 
-    const stateName = stateId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    const lgaName = lgaSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    const wardName = wardSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    // Find the LGA and ward parts by looking for the pattern that matches our data
+    // We'll try different combinations to find the right split
+    let lgaSlug, wardSlug, stateName, lgaName, wardName;
+    let foundValidCombination = false;
+
+    // Try different split points to find valid state-lga-ward combination
+    for (let i = 1; i < wardIdParts.length - 1; i++) {
+      const testLgaSlug = wardIdParts.slice(1, i + 1).join('-');
+      const testWardSlug = wardIdParts.slice(i + 1).join('-');
+
+      const testStateName = fromSlug(stateId);
+      const testLgaName = fromSlug(testLgaSlug);
+      const testWardName = fromSlug(testWardSlug);
+
+      // Check if this combination exists in our data
+      try {
+        const detailedData = await getObidientVotersDetailed();
+        if (detailedData[testStateName] &&
+          detailedData[testStateName].lgas[testLgaName] &&
+          detailedData[testStateName].lgas[testLgaName].wards[testWardName]) {
+
+          lgaSlug = testLgaSlug;
+          wardSlug = testWardSlug;
+          stateName = testStateName;
+          lgaName = testLgaName;
+          wardName = testWardName;
+          foundValidCombination = true;
+          break;
+        }
+      } catch (error) {
+        console.log(`🔍 Testing combination failed: ${testStateName}-${testLgaName}-${testWardName}`);
+        continue;
+      }
+    }
+
+    if (!foundValidCombination) {
+      return res.status(404).json({
+        success: false,
+        message: `Invalid ward ID format or data not found: ${wardId}`
+      });
+    }
 
     // Check if user has access to this Ward using direct query
     const userId = req.user.userId || req.user.id;
     const userQuery = `
-      SELECT designation, "assignedWard" FROM users WHERE id = $1
+      SELECT designation, "assignedWard", "assignedLGA", "assignedState", role FROM users WHERE id = $1
     `;
     const userResult = await query(userQuery, [userId]);
 
@@ -519,13 +613,32 @@ export const getWardData = async (req, res) => {
       });
     }
 
-    const { designation, assignedWard } = userResult.rows[0];
+    const { designation, assignedWard, assignedLGA, assignedState, role } = userResult.rows[0];
 
-    if (designation === 'Ward Coordinator' && assignedWard !== wardName) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only view data for your assigned Ward.'
-      });
+
+    // Allow admin users full access
+    if (role !== 'admin') {
+      // For Ward Coordinators, check state, LGA, and ward match
+      if (designation === 'Ward Coordinator') {
+        if (!locationNamesMatch(assignedState, stateName)) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. State mismatch. Your assigned: "${assignedState}", Requested: "${stateName}"`
+          });
+        }
+        if (!locationNamesMatch(assignedLGA, lgaName)) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. LGA mismatch. Your assigned: "${assignedLGA}", Requested: "${lgaName}"`
+          });
+        }
+        if (!locationNamesMatch(assignedWard, wardName)) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. Ward mismatch. Your assigned: "${assignedWard}", Requested: "${wardName}"`
+          });
+        }
+      }
     }
 
     // Get detailed voter data

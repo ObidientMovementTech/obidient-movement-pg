@@ -175,12 +175,12 @@ const StateDashboard: React.FC = () => {
         break;
 
       case 'lga':
-        if (!assignedLocation?.stateId || !assignedLocation?.lgaId) {
+        if (!assignedLocation?.stateId || !assignedLocation?.lgaSlug) {
           throw new Error('LGA location data incomplete');
         }
-        const lgaStateId = assignedLocation.stateId.toLowerCase().replace(/\s+/g, '-');
-        const lgaId = assignedLocation.lgaId.toLowerCase().replace(/\s+/g, '-');
-        const fullLgaId = `${lgaStateId}-${lgaId}`;
+        const lgaStateId = assignedLocation.stateId; // Already in slug format from backend
+        const lgaSlug = assignedLocation.lgaSlug; // Already in slug format from backend
+        const fullLgaId = `${lgaStateId}-${lgaSlug}`;
         response = await mobiliseDashboardService.getLGAData(fullLgaId);
         view = 'lga';
         breadcrumbsToSet = [
@@ -193,23 +193,23 @@ const StateDashboard: React.FC = () => {
         break;
 
       case 'ward':
-        if (!assignedLocation?.stateId || !assignedLocation?.lgaId || !assignedLocation?.wardId) {
+        if (!assignedLocation?.stateId || !assignedLocation?.lgaSlug || !assignedLocation?.wardSlug) {
           throw new Error('Ward location data incomplete');
         }
-        const wardStateId = assignedLocation.stateId.toLowerCase().replace(/\s+/g, '-');
-        const wardLgaId = assignedLocation.lgaId.toLowerCase().replace(/\s+/g, '-');
-        const wardId = assignedLocation.wardId.toLowerCase().replace(/\s+/g, '-');
-        const fullWardId = `${wardStateId}-${wardLgaId}-${wardId}`;
+        const wardStateId = assignedLocation.stateId; // Already in slug format from backend
+        const wardLgaSlug = assignedLocation.lgaSlug; // Already in slug format from backend
+        const wardSlug = assignedLocation.wardSlug; // Already in slug format from backend
+        const fullWardId = `${wardStateId}-${wardLgaSlug}-${wardSlug}`;
         response = await mobiliseDashboardService.getWardData(fullWardId);
         view = 'ward';
         breadcrumbsToSet = [
           { level: 'national', name: 'National Overview' },
           { level: 'state', name: assignedLocation.stateName, id: wardStateId },
-          { level: 'lga', name: assignedLocation.lgaName, id: `${wardStateId}-${wardLgaId}` },
+          { level: 'lga', name: assignedLocation.lgaName, id: `${wardStateId}-${wardLgaSlug}` },
           { level: 'ward', name: assignedLocation.wardName, id: fullWardId }
         ];
         setSelectedStateId(wardStateId);
-        setSelectedLGAId(`${wardStateId}-${wardLgaId}`);
+        setSelectedLGAId(`${wardStateId}-${wardLgaSlug}`);
         setSelectedWardId(fullWardId);
         break;
 

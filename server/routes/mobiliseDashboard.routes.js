@@ -20,11 +20,6 @@ router.use((req, res, next) => {
 // All routes require authentication only
 router.use(protect);
 
-// Test route for debugging
-router.get('/test', (req, res) => {
-  res.json({ message: 'Mobilise Dashboard routes are working!', user: req.user });
-});
-
 // Get user's designation level and assigned location
 router.get('/user-level', getUserLevel);
 

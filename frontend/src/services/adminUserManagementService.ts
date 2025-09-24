@@ -9,11 +9,23 @@ interface UserStatusUpdate {
 
 interface UserProfileUpdate {
   name?: string;
+  userName?: string;
   email?: string;
   phone?: string;
+  profileImage?: string;
   countryOfResidence?: string;
   votingState?: string;
   votingLGA?: string;
+  votingWard?: string;
+  votingPU?: string;
+  gender?: string;
+  ageRange?: string;
+  citizenship?: string;
+  isVoter?: boolean;
+  stateOfOrigin?: string;
+  role?: 'user' | 'admin';
+  emailVerified?: boolean;
+  kycStatus?: 'unsubmitted' | 'draft' | 'pending' | 'approved' | 'rejected';
   personalInfo?: Record<string, any>;
 }
 

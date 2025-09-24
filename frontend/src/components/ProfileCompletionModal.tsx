@@ -29,6 +29,7 @@ export default function ProfileCompletionModal({
         { key: 'votingState', label: 'Voting State', getValue: (p: any) => p.votingState || p.personalInfo?.voting_engagement_state },
         { key: 'votingLGA', label: 'Voting LGA', getValue: (p: any) => p.votingLGA || p.personalInfo?.lga },
         { key: 'votingWard', label: 'Voting Ward', getValue: (p: any) => p.votingWard || p.personalInfo?.ward },
+        { key: 'votingPU', label: 'Voting Polling Unit', getValue: (p: any) => p.votingPU || p.personalInfo?.voting_pu },
         { key: 'citizenship', label: 'Citizenship', getValue: (p: any) => p.citizenship || p.personalInfo?.citizenship },
         { key: 'isVoter', label: 'Voter Status', getValue: (p: any) => p.isVoter || p.onboardingData?.votingBehavior?.is_registered },
         { key: 'willVote', label: 'Voting Intention', getValue: (p: any) => p.willVote || p.onboardingData?.votingBehavior?.likely_to_vote },

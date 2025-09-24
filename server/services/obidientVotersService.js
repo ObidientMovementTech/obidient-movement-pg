@@ -1,6 +1,33 @@
 import { query } from '../config/db.js';
 
 /**
+ * Helper function to normalize location names for consistency
+ * Converts to title case and handles common variations
+ */
+function normalizeLocationName(name) {
+  if (!name) return '';
+
+  // Convert to title case and handle common patterns
+  const normalized = name
+    .toLowerCase()
+    .replace(/\s+/g, ' ')  // Multiple spaces to single space
+    .replace(/-/g, ' ')    // Convert hyphens to spaces
+    .trim()
+    .replace(/\b\w/g, l => l.toUpperCase()); // Title case
+
+  return normalized;
+}
+
+/**
+ * Helper function to create a normalized key for location names
+ * This ensures consistent grouping regardless of case or spacing
+ */
+function createLocationKey(name) {
+  if (!name) return '';
+  return name.toLowerCase().replace(/[\s\-]+/g, '-').trim();
+}
+
+/**
  * Get Obidient voter data aggregated by state
  */
 export async function getObidientVotersByState() {
@@ -17,11 +44,8 @@ export async function getObidientVotersByState() {
       ORDER BY "votingState"
     `;
 
-    console.log('🔍 DEBUG - Executing getObidientVotersByState query:', sqlQuery);
     const result = await query(sqlQuery);
 
-    console.log('🔍 DEBUG - getObidientVotersByState result count:', result.rows.length);
-    console.log('🔍 DEBUG - Sample state data:', result.rows[0]);
 
     return result.rows.map(row => ({
       state: row.state,
@@ -69,7 +93,6 @@ function createLocationData(row) {
  */
 export async function getObidientVotersDetailed() {
   try {
-    console.log('🚀 Starting getObidientVotersDetailed...');
 
     // Query for state-level data
     const statesQuery = `
@@ -130,7 +153,6 @@ export async function getObidientVotersDetailed() {
       ORDER BY "votingState", "votingLGA", "votingWard", "votingPU"
     `;
 
-    console.log('🔍 Executing queries...');
 
     const [statesResult, lgasResult, wardsResult, pollingUnitsResult] = await Promise.all([
       query(statesQuery),
@@ -139,17 +161,11 @@ export async function getObidientVotersDetailed() {
       query(pollingUnitsQuery)
     ]);
 
-    console.log('📊 Query results:');
-    console.log('  - States:', statesResult.rows.length);
-    console.log('  - LGAs:', lgasResult.rows.length);
-    console.log('  - Wards:', wardsResult.rows.length);
-    console.log('  - Polling Units:', pollingUnitsResult.rows.length);
 
     // Build hierarchical data structure
     const detailedData = {};
 
     // Start with states
-    console.log('📊 Processing states data...');
     statesResult.rows.forEach((row, index) => {
       // Skip rows with empty/null state values
       if (!row.state) {
@@ -157,10 +173,10 @@ export async function getObidientVotersDetailed() {
         return;
       }
 
-      console.log(`📊 Processing state ${index + 1}/${statesResult.rows.length}:`, {
-        state: row.state,
-        total_obidient_users: row.total_obidient_users
-      });
+      // console.log(`📊 Processing state ${index + 1}/${statesResult.rows.length}:`, {
+      //   state: row.state,
+      //   total_obidient_users: row.total_obidient_users
+      // });
 
       detailedData[row.state] = {
         ...createLocationData(row),
@@ -169,7 +185,7 @@ export async function getObidientVotersDetailed() {
       console.log(`✅ Successfully set state: ${row.state}`);
     });
 
-    // Add LGAs to each state
+    // Add LGAs to each state with normalization and aggregation
     console.log('📊 Processing LGAs data...');
     console.log('📊 LGAs count:', lgasResult.rows.length);
 
@@ -183,32 +199,50 @@ export async function getObidientVotersDetailed() {
         return;
       }
 
-      console.log(`📊 Processing LGA ${index + 1}/${lgasResult.rows.length}:`, {
-        state: row.state,
-        lga: row.lga,
-        total_obidient_users: row.total_obidient_users
-      });
+      // Normalize the LGA name and create a consistent key
+      const normalizedLgaName = normalizeLocationName(row.lga);
+      const lgaKey = createLocationKey(normalizedLgaName);
+
 
       if (!detailedData[row.state]) {
-        console.log(`🔧 Creating state: ${row.state}`);
+        console.log(`Creating state: ${row.state}`);
         detailedData[row.state] = {
           ...createLocationData({ total_obidient_users: 0, voters_with_pvc: 0, voters_without_pvc: 0 }),
           lgas: {}
         };
       }
       if (!detailedData[row.state].lgas) {
-        console.log(`🔧 Creating lgas object for state: ${row.state}`);
+        console.log(`Creating lgas object for state: ${row.state}`);
         detailedData[row.state].lgas = {};
       }
-      console.log(`🔧 Setting LGA data: ${row.lga}`);
-      detailedData[row.state].lgas[row.lga] = createLocationData(row);
-      console.log(`✅ Successfully set LGA: ${row.lga}`);
+
+      // Check if we already have this LGA (by normalized name)
+      if (detailedData[row.state].lgas[normalizedLgaName]) {
+        // Aggregate the data if we have duplicate entries
+        console.log(`Aggregating duplicate LGA data: ${normalizedLgaName} (original: ${row.lga})`);
+        const existing = detailedData[row.state].lgas[normalizedLgaName];
+        const newData = createLocationData(row);
+
+        detailedData[row.state].lgas[normalizedLgaName] = {
+          inecRegisteredVoters: existing.inecRegisteredVoters + newData.inecRegisteredVoters,
+          obidientRegisteredVoters: existing.obidientRegisteredVoters + newData.obidientRegisteredVoters,
+          obidientVotersWithPVC: existing.obidientVotersWithPVC + newData.obidientVotersWithPVC,
+          obidientVotersWithoutPVC: existing.obidientVotersWithoutPVC + newData.obidientVotersWithoutPVC,
+          wards: existing.wards || {}
+        };
+        console.log(`✅ Aggregated LGA data: ${normalizedLgaName}`, detailedData[row.state].lgas[normalizedLgaName]);
+      } else {
+        // Create new LGA entry
+        console.log(`🔧 Setting LGA data: ${normalizedLgaName}`);
+        detailedData[row.state].lgas[normalizedLgaName] = {
+          ...createLocationData(row),
+          wards: {}
+        };
+        console.log(`✅ Successfully set LGA: ${normalizedLgaName}`);
+      }
     });
 
-    // Add Wards to each LGA
-    console.log('📊 Processing wards data...');
-    console.log('📊 Wards count:', wardsResult.rows.length);
-
+    // Add Wards to each LGA with normalization and aggregation
     wardsResult.rows.forEach((row, index) => {
       // Skip rows with empty/null critical values
       if (!row.state || !row.lga || !row.ward) {
@@ -220,12 +254,11 @@ export async function getObidientVotersDetailed() {
         return;
       }
 
-      console.log(`📊 Processing ward ${index + 1}/${wardsResult.rows.length}:`, {
-        state: row.state,
-        lga: row.lga,
-        ward: row.ward,
-        total_obidient_users: row.total_obidient_users
-      });
+      // Normalize the location names
+      const normalizedLgaName = normalizeLocationName(row.lga);
+      const normalizedWardName = normalizeLocationName(row.ward);
+
+      
 
       if (!detailedData[row.state]) {
         console.log(`🔧 Creating state: ${row.state}`);
@@ -238,25 +271,45 @@ export async function getObidientVotersDetailed() {
         console.log(`🔧 Creating lgas object for state: ${row.state}`);
         detailedData[row.state].lgas = {};
       }
-      if (!detailedData[row.state].lgas[row.lga]) {
-        console.log(`🔧 Creating LGA: ${row.lga} in state: ${row.state}`);
-        detailedData[row.state].lgas[row.lga] = {
+      if (!detailedData[row.state].lgas[normalizedLgaName]) {
+        console.log(`🔧 Creating LGA: ${normalizedLgaName} in state: ${row.state}`);
+        detailedData[row.state].lgas[normalizedLgaName] = {
           ...createLocationData({ total_obidient_users: 0, voters_with_pvc: 0, voters_without_pvc: 0 }),
           wards: {}
         };
       }
-      if (!detailedData[row.state].lgas[row.lga].wards) {
-        console.log(`🔧 Creating wards object for LGA: ${row.lga}`);
-        detailedData[row.state].lgas[row.lga].wards = {};
+      if (!detailedData[row.state].lgas[normalizedLgaName].wards) {
+        console.log(`🔧 Creating wards object for LGA: ${normalizedLgaName}`);
+        detailedData[row.state].lgas[normalizedLgaName].wards = {};
       }
-      console.log(`🔧 Setting ward data: ${row.ward}`);
-      detailedData[row.state].lgas[row.lga].wards[row.ward] = createLocationData(row);
-      console.log(`✅ Successfully set ward: ${row.ward}`);
+
+      // Check if we already have this ward (by normalized name)
+      if (detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName]) {
+        // Aggregate the data if we have duplicate entries
+        console.log(`🔄 Aggregating duplicate Ward data: ${normalizedWardName} (original: ${row.ward})`);
+        const existing = detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName];
+        const newData = createLocationData(row);
+
+        detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName] = {
+          inecRegisteredVoters: existing.inecRegisteredVoters + newData.inecRegisteredVoters,
+          obidientRegisteredVoters: existing.obidientRegisteredVoters + newData.obidientRegisteredVoters,
+          obidientVotersWithPVC: existing.obidientVotersWithPVC + newData.obidientVotersWithPVC,
+          obidientVotersWithoutPVC: existing.obidientVotersWithoutPVC + newData.obidientVotersWithoutPVC,
+          pollingUnits: existing.pollingUnits || {}
+        };
+        // console.log(`Aggregated Ward data: ${normalizedWardName}`, detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName]);
+      } else {
+        // Create new ward entry
+        console.log(`🔧 Setting ward data: ${normalizedWardName}`);
+        detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName] = {
+          ...createLocationData(row),
+          pollingUnits: {}
+        };
+        console.log(`✅ Successfully set ward: ${normalizedWardName}`);
+      }
     });
 
-    // Add Polling Units to each Ward
-    console.log('📊 Processing polling units data...');
-    console.log('📊 Polling units count:', pollingUnitsResult.rows.length);
+    // Add Polling Units to each Ward with normalization and aggregation
 
     pollingUnitsResult.rows.forEach((row, index) => {
       // Skip rows with empty/null critical values
@@ -270,13 +323,12 @@ export async function getObidientVotersDetailed() {
         return;
       }
 
-      console.log(`📊 Processing polling unit ${index + 1}/${pollingUnitsResult.rows.length}:`, {
-        state: row.state,
-        lga: row.lga,
-        ward: row.ward,
-        polling_unit: row.polling_unit,
-        total_obidient_users: row.total_obidient_users
-      });
+      // Normalize the location names
+      const normalizedLgaName = normalizeLocationName(row.lga);
+      const normalizedWardName = normalizeLocationName(row.ward);
+      const normalizedPUName = normalizeLocationName(row.polling_unit);
+
+      
 
       // Ensure state exists
       if (!detailedData[row.state]) {
@@ -294,57 +346,57 @@ export async function getObidientVotersDetailed() {
       }
 
       // Ensure LGA exists
-      if (!detailedData[row.state].lgas[row.lga]) {
-        console.log(`🔧 Creating LGA: ${row.lga} in state: ${row.state}`);
-        detailedData[row.state].lgas[row.lga] = {
+      if (!detailedData[row.state].lgas[normalizedLgaName]) {
+        console.log(`🔧 Creating LGA: ${normalizedLgaName} in state: ${row.state}`);
+        detailedData[row.state].lgas[normalizedLgaName] = {
           ...createLocationData({ total_obidient_users: 0, voters_with_pvc: 0, voters_without_pvc: 0 }),
           wards: {}
         };
       }
 
       // Ensure wards object exists
-      if (!detailedData[row.state].lgas[row.lga].wards) {
-        console.log(`🔧 Creating wards object for LGA: ${row.lga}`);
-        detailedData[row.state].lgas[row.lga].wards = {};
+      if (!detailedData[row.state].lgas[normalizedLgaName].wards) {
+        console.log(`🔧 Creating wards object for LGA: ${normalizedLgaName}`);
+        detailedData[row.state].lgas[normalizedLgaName].wards = {};
       }
 
       // Ensure Ward exists
-      if (!detailedData[row.state].lgas[row.lga].wards[row.ward]) {
-        console.log(`🔧 Creating Ward: ${row.ward} in LGA: ${row.lga}`);
-        detailedData[row.state].lgas[row.lga].wards[row.ward] = {
+      if (!detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName]) {
+        console.log(`🔧 Creating Ward: ${normalizedWardName} in LGA: ${normalizedLgaName}`);
+        detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName] = {
           ...createLocationData({ total_obidient_users: 0, voters_with_pvc: 0, voters_without_pvc: 0 }),
           pollingUnits: {}
         };
       }
 
       // Ensure pollingUnits object exists
-      if (!detailedData[row.state].lgas[row.lga].wards[row.ward].pollingUnits) {
-        console.log(`🔧 Creating pollingUnits object for Ward: ${row.ward}`);
-        detailedData[row.state].lgas[row.lga].wards[row.ward].pollingUnits = {};
+      if (!detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName].pollingUnits) {
+        console.log(`🔧 Creating pollingUnits object for Ward: ${normalizedWardName}`);
+        detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName].pollingUnits = {};
       }
 
-      // Now safely set the polling unit data
-      console.log(`🔧 Setting polling unit data: ${row.polling_unit}`);
-      try {
-        detailedData[row.state].lgas[row.lga].wards[row.ward].pollingUnits[row.polling_unit] = createLocationData(row);
-        console.log(`✅ Successfully set polling unit: ${row.polling_unit}`);
-      } catch (error) {
-        console.error(`❌ Error setting polling unit ${row.polling_unit}:`, error);
-        console.error('Current data structure:', {
-          state: row.state,
-          hasState: !!detailedData[row.state],
-          hasLgas: !!detailedData[row.state]?.lgas,
-          hasLga: !!detailedData[row.state]?.lgas?.[row.lga],
-          hasWards: !!detailedData[row.state]?.lgas?.[row.lga]?.wards,
-          hasWard: !!detailedData[row.state]?.lgas?.[row.lga]?.wards?.[row.ward],
-          hasPollingUnits: !!detailedData[row.state]?.lgas?.[row.lga]?.wards?.[row.ward]?.pollingUnits
-        });
-        throw error;
+      // Check if we already have this polling unit (by normalized name)
+      if (detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName].pollingUnits[normalizedPUName]) {
+        // Aggregate the data if we have duplicate entries
+        console.log(`🔄 Aggregating duplicate PU data: ${normalizedPUName} (original: ${row.polling_unit})`);
+        const existing = detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName].pollingUnits[normalizedPUName];
+        const newData = createLocationData(row);
+
+        detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName].pollingUnits[normalizedPUName] = {
+          inecRegisteredVoters: existing.inecRegisteredVoters + newData.inecRegisteredVoters,
+          obidientRegisteredVoters: existing.obidientRegisteredVoters + newData.obidientRegisteredVoters,
+          obidientVotersWithPVC: existing.obidientVotersWithPVC + newData.obidientVotersWithPVC,
+          obidientVotersWithoutPVC: existing.obidientVotersWithoutPVC + newData.obidientVotersWithoutPVC
+        };
+        console.log(`✅ Aggregated PU data: ${normalizedPUName}`, detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName].pollingUnits[normalizedPUName]);
+      } else {
+        // Create new polling unit entry
+        console.log(`🔧 Setting polling unit data: ${normalizedPUName}`);
+        detailedData[row.state].lgas[normalizedLgaName].wards[normalizedWardName].pollingUnits[normalizedPUName] = createLocationData(row);
+        console.log(`✅ Successfully set polling unit: ${normalizedPUName}`);
       }
     });
 
-    console.log('🔍 DEBUG - Final detailed data structure keys:', Object.keys(detailedData));
-    console.log('🔍 DEBUG - Sample state structure:', Object.keys(detailedData[Object.keys(detailedData)[0]] || {}));
 
     return detailedData;
   } catch (error) {

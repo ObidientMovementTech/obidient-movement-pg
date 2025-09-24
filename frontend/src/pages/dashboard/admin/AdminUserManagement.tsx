@@ -5,7 +5,7 @@ import {
   // Plus, 
   Trash2, Shield, ShieldOff,
   CheckCircle, XCircle, UserCheck, UserX, Loader2, X, AlertTriangle, Mail, Send,
-  Edit3, Key, Download
+  Edit3, Key, Download, Eye
 } from 'lucide-react';
 import { adminUserManagementService } from '../../../services/adminUserManagementService';
 import { adminMaintenanceService } from '../../../services/adminMaintenanceService';
@@ -15,6 +15,7 @@ import MonitorKeyAssignmentModal from '../../../components/MonitorKeyAssignmentM
 interface User {
   id: string;
   name: string;
+  userName?: string;
   email: string;
   phone?: string;
   role: 'user' | 'admin';
@@ -24,6 +25,13 @@ interface User {
   countryOfResidence?: string;
   votingState?: string;
   votingLGA?: string;
+  votingWard?: string;
+  votingPU?: string;
+  gender?: string;
+  ageRange?: string;
+  citizenship?: string;
+  isVoter?: boolean;
+  stateOfOrigin?: string;
   designation?: string;
   assignedState?: string;
   assignedLGA?: string;
@@ -71,6 +79,28 @@ const DESIGNATIONS = {
 interface EditUserModal {
   isOpen: boolean;
   user: User | null;
+  // Personal Information
+  name: string;
+  userName: string;
+  email: string;
+  phone: string;
+  profileImage: string;
+  gender: string;
+  ageRange: string;
+  citizenship: string;
+  isVoter: boolean;
+  // Location Information
+  countryOfResidence: string;
+  stateOfOrigin: string;
+  votingState: string;
+  votingLGA: string;
+  votingWard: string;
+  votingPU: string;
+  // System Information
+  role: 'user' | 'admin';
+  emailVerified: boolean;
+  kycStatus: 'unsubmitted' | 'draft' | 'pending' | 'approved' | 'rejected';
+  // Administrative Information
   designation: string;
   assignedState: string;
   assignedLGA: string;
@@ -78,7 +108,10 @@ interface EditUserModal {
   loading: boolean;
 }
 
-// Confirmation modal interface
+//
+
+
+
 interface ConfirmationModal {
   isOpen: boolean;
   title: string;
@@ -88,6 +121,12 @@ interface ConfirmationModal {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+}
+
+// View user modal interface
+interface ViewUserModal {
+  isOpen: boolean;
+  user: User | null;
 }
 
 export default function AdminUserManagement() {
@@ -156,11 +195,39 @@ export default function AdminUserManagement() {
   const [editModal, setEditModal] = useState<EditUserModal>({
     isOpen: false,
     user: null,
+    // Personal Information
+    name: '',
+    userName: '',
+    email: '',
+    phone: '',
+    profileImage: '',
+    gender: '',
+    ageRange: '',
+    citizenship: '',
+    isVoter: false,
+    // Location Information
+    countryOfResidence: '',
+    stateOfOrigin: '',
+    votingState: '',
+    votingLGA: '',
+    votingWard: '',
+    votingPU: '',
+    // System Information
+    role: 'user',
+    emailVerified: false,
+    kycStatus: 'unsubmitted',
+    // Administrative Information
     designation: '',
     assignedState: '',
     assignedLGA: '',
     assignedWard: '',
     loading: false
+  });
+
+  // View user modal state
+  const [viewModal, setViewModal] = useState<ViewUserModal>({
+    isOpen: false,
+    user: null
   });
 
   // OPTIMIZED: Debounced search effect
@@ -492,6 +559,28 @@ export default function AdminUserManagement() {
     setEditModal({
       isOpen: true,
       user,
+      // Personal Information
+      name: user.name || '',
+      userName: user.userName || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      profileImage: user.profileImage || '',
+      gender: user.gender || '',
+      ageRange: user.ageRange || '',
+      citizenship: user.citizenship || '',
+      isVoter: user.isVoter || false,
+      // Location Information
+      countryOfResidence: user.countryOfResidence || '',
+      stateOfOrigin: user.stateOfOrigin || '',
+      votingState: user.votingState || '',
+      votingLGA: user.votingLGA || '',
+      votingWard: user.votingWard || '',
+      votingPU: user.votingPU || '',
+      // System Information
+      role: user.role || 'user',
+      emailVerified: user.emailVerified || false,
+      kycStatus: user.kycStatus || 'unsubmitted',
+      // Administrative Information
       designation: user.designation || DESIGNATIONS.COMMUNITY_MEMBER,
       assignedState: user.assignedState || '',
       assignedLGA: user.assignedLGA || '',
@@ -504,6 +593,28 @@ export default function AdminUserManagement() {
     setEditModal({
       isOpen: false,
       user: null,
+      // Personal Information
+      name: '',
+      userName: '',
+      email: '',
+      phone: '',
+      profileImage: '',
+      gender: '',
+      ageRange: '',
+      citizenship: '',
+      isVoter: false,
+      // Location Information
+      countryOfResidence: '',
+      stateOfOrigin: '',
+      votingState: '',
+      votingLGA: '',
+      votingWard: '',
+      votingPU: '',
+      // System Information
+      role: 'user',
+      emailVerified: false,
+      kycStatus: 'unsubmitted',
+      // Administrative Information
       designation: '',
       assignedState: '',
       assignedLGA: '',
@@ -512,12 +623,50 @@ export default function AdminUserManagement() {
     });
   };
 
-  const handleSaveUserDesignation = async () => {
+  // View modal functions
+  const openViewModal = (user: User) => {
+    setViewModal({
+      isOpen: true,
+      user
+    });
+  };
+
+  const closeViewModal = () => {
+    setViewModal({
+      isOpen: false,
+      user: null
+    });
+  };
+
+  const handleSaveUserDetails = async () => {
     if (!editModal.user) return;
 
     setEditModal(prev => ({ ...prev, loading: true }));
 
     try {
+      // Update user profile information
+      await adminUserManagementService.updateUserProfile(editModal.user.id, {
+        name: editModal.name,
+        userName: editModal.userName,
+        email: editModal.email,
+        phone: editModal.phone,
+        profileImage: editModal.profileImage,
+        countryOfResidence: editModal.countryOfResidence,
+        votingState: editModal.votingState,
+        votingLGA: editModal.votingLGA,
+        votingWard: editModal.votingWard,
+        votingPU: editModal.votingPU,
+        gender: editModal.gender,
+        ageRange: editModal.ageRange,
+        citizenship: editModal.citizenship,
+        isVoter: editModal.isVoter,
+        stateOfOrigin: editModal.stateOfOrigin,
+        role: editModal.role,
+        emailVerified: editModal.emailVerified,
+        kycStatus: editModal.kycStatus
+      });
+
+      // Update user designation and assignments
       await adminUserManagementService.updateUserDesignation(editModal.user.id, {
         designation: editModal.designation,
         assignedState: editModal.assignedState || null,
@@ -530,6 +679,24 @@ export default function AdminUserManagement() {
         user.id === editModal.user!.id
           ? {
             ...user,
+            name: editModal.name,
+            userName: editModal.userName,
+            email: editModal.email,
+            phone: editModal.phone,
+            profileImage: editModal.profileImage,
+            countryOfResidence: editModal.countryOfResidence,
+            votingState: editModal.votingState,
+            votingLGA: editModal.votingLGA,
+            votingWard: editModal.votingWard,
+            votingPU: editModal.votingPU,
+            gender: editModal.gender,
+            ageRange: editModal.ageRange,
+            citizenship: editModal.citizenship,
+            isVoter: editModal.isVoter,
+            stateOfOrigin: editModal.stateOfOrigin,
+            role: editModal.role,
+            emailVerified: editModal.emailVerified,
+            kycStatus: editModal.kycStatus,
             designation: editModal.designation,
             assignedState: editModal.assignedState || undefined,
             assignedLGA: editModal.assignedLGA || undefined,
@@ -539,9 +706,9 @@ export default function AdminUserManagement() {
       ));
 
       closeEditModal();
-      setSuccess(`Successfully updated designation for ${editModal.user.name}`);
+      setSuccess(`Successfully updated details for ${editModal.user.name}`);
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to update user designation');
+      setError(error.response?.data?.message || 'Failed to update user details');
     } finally {
       setEditModal(prev => ({ ...prev, loading: false }));
     }
@@ -1402,6 +1569,14 @@ export default function AdminUserManagement() {
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <button
+                            onClick={() => openViewModal(user)}
+                            className="text-gray-600 hover:text-gray-700"
+                            title="View User Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+
+                          <button
                             onClick={() => openEditModal(user)}
                             className="text-blue-600 hover:text-blue-700"
                             title="Edit User"
@@ -1659,59 +1834,130 @@ export default function AdminUserManagement() {
                   </div>
                 </div>
 
-                {/* Designation Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Designation
-                  </label>
-                  <select
-                    value={editModal.designation}
-                    onChange={(e) => {
-                      const newDesignation = e.target.value;
-                      setEditModal(prev => ({
-                        ...prev,
-                        designation: newDesignation,
-                        // Clear assignment fields when changing designation
-                        assignedState: '',
-                        assignedLGA: '',
-                        assignedWard: ''
-                      }));
-                    }}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {Object.values(DESIGNATIONS).map(designation => (
-                      <option key={designation} value={designation}>
-                        {designation}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* User Details Form */}
+                <div className="space-y-6 max-h-96 overflow-y-auto">
+                  {/* Personal Information Section */}
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-900">Personal Information</h4>
 
-                {/* Assignment Fields - Show based on designation */}
-                {(editModal.designation === DESIGNATIONS.STATE_COORDINATOR ||
-                  editModal.designation === DESIGNATIONS.LGA_COORDINATOR ||
-                  editModal.designation === DESIGNATIONS.WARD_COORDINATOR) && (
-                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
-                      <h4 className="text-sm font-medium text-blue-900">Assignment Location</h4>
-
-                      {/* State Selection */}
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Assigned State
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editModal.name}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, name: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter full name"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          value={editModal.userName}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, userName: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter username"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={editModal.email}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, email: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter email address"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={editModal.phone}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, phone: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter phone number"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Gender
                         </label>
                         <select
-                          value={editModal.assignedState}
-                          onChange={(e) => {
-                            setEditModal(prev => ({
-                              ...prev,
-                              assignedState: e.target.value,
-                              assignedLGA: '', // Reset LGA when state changes
-                              assignedWard: '' // Reset ward when state changes
-                            }));
-                          }}
+                          value={editModal.gender}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, gender: e.target.value }))}
                           className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
-                          <option value="">Select State</option>
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Age Range
+                        </label>
+                        <select
+                          value={editModal.ageRange}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, ageRange: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select Age Range</option>
+                          <option value="18-25">18-25</option>
+                          <option value="26-35">26-35</option>
+                          <option value="36-45">36-45</option>
+                          <option value="46-55">46-55</option>
+                          <option value="56-65">56-65</option>
+                          <option value="65+">65+</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location Information Section */}
+                  <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-blue-900">Location Information</h4>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Country of Residence
+                        </label>
+                        <input
+                          type="text"
+                          value={editModal.countryOfResidence}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, countryOfResidence: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter country of residence"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          State of Origin
+                        </label>
+                        <select
+                          value={editModal.stateOfOrigin}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, stateOfOrigin: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select State of Origin</option>
                           {statesLGAWardList.map(state => (
                             <option key={state.state} value={state.state}>
                               {state.state}
@@ -1720,81 +1966,327 @@ export default function AdminUserManagement() {
                         </select>
                       </div>
 
-                      {/* LGA Selection - Show for LGA and Ward coordinators */}
-                      {(editModal.designation === DESIGNATIONS.LGA_COORDINATOR ||
-                        editModal.designation === DESIGNATIONS.WARD_COORDINATOR) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Voting State
+                        </label>
+                        <select
+                          value={editModal.votingState}
+                          onChange={(e) => {
+                            setEditModal(prev => ({
+                              ...prev,
+                              votingState: e.target.value,
+                              votingLGA: '', // Reset LGA when state changes
+                              votingWard: '', // Reset ward when state changes
+                              votingPU: '' // Reset PU when state changes
+                            }));
+                          }}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select Voting State</option>
+                          {statesLGAWardList.map(state => (
+                            <option key={state.state} value={state.state}>
+                              {state.state}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Voting LGA
+                        </label>
+                        <select
+                          value={editModal.votingLGA}
+                          onChange={(e) => {
+                            setEditModal(prev => ({
+                              ...prev,
+                              votingLGA: e.target.value,
+                              votingWard: '', // Reset ward when LGA changes
+                              votingPU: '' // Reset PU when LGA changes
+                            }));
+                          }}
+                          disabled={!editModal.votingState}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                        >
+                          <option value="">Select Voting LGA</option>
+                          {editModal.votingState &&
+                            statesLGAWardList
+                              .find(s => s.state === editModal.votingState)
+                              ?.lgas.map(lga => (
+                                <option key={lga.lga} value={lga.lga}>
+                                  {lga.lga}
+                                </option>
+                              ))
+                          }
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Voting Ward
+                        </label>
+                        <select
+                          value={editModal.votingWard}
+                          onChange={(e) => {
+                            setEditModal(prev => ({
+                              ...prev,
+                              votingWard: e.target.value,
+                              votingPU: '' // Reset PU when ward changes
+                            }));
+                          }}
+                          disabled={!editModal.votingLGA}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                        >
+                          <option value="">Select Voting Ward</option>
+                          {editModal.votingState && editModal.votingLGA &&
+                            statesLGAWardList
+                              .find(s => s.state === editModal.votingState)
+                              ?.lgas.find(l => l.lga === editModal.votingLGA)
+                              ?.wards.map(ward => (
+                                <option key={ward} value={ward}>
+                                  {ward}
+                                </option>
+                              ))
+                          }
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Voting Polling Unit
+                        </label>
+                        <input
+                          type="text"
+                          value={editModal.votingPU}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, votingPU: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter polling unit"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* System Information Section */}
+                  <div className="space-y-4 p-4 bg-green-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-green-900">System Information</h4>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Role
+                        </label>
+                        <select
+                          value={editModal.role}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, role: e.target.value as 'user' | 'admin' }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          KYC Status
+                        </label>
+                        <select
+                          value={editModal.kycStatus}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, kycStatus: e.target.value as 'unsubmitted' | 'draft' | 'pending' | 'approved' | 'rejected' }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="unsubmitted">Unsubmitted</option>
+                          <option value="draft">Draft</option>
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Citizenship
+                        </label>
+                        <input
+                          type="text"
+                          value={editModal.citizenship}
+                          onChange={(e) => setEditModal(prev => ({ ...prev, citizenship: e.target.value }))}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter citizenship"
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id="emailVerified"
+                            checked={editModal.emailVerified}
+                            onChange={(e) => setEditModal(prev => ({ ...prev, emailVerified: e.target.checked }))}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor="emailVerified" className="ml-2 text-sm text-gray-700">
+                            Email Verified
+                          </label>
+                        </div>
+
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id="isVoter"
+                            checked={editModal.isVoter}
+                            onChange={(e) => setEditModal(prev => ({ ...prev, isVoter: e.target.checked }))}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor="isVoter" className="ml-2 text-sm text-gray-700">
+                            Is Voter
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Administrative Section */}
+                  <div className="space-y-4 p-4 bg-yellow-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-yellow-900">Administrative</h4>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Designation
+                      </label>
+                      <select
+                        value={editModal.designation}
+                        onChange={(e) => {
+                          const newDesignation = e.target.value;
+                          setEditModal(prev => ({
+                            ...prev,
+                            designation: newDesignation,
+                            // Clear assignment fields when changing designation
+                            assignedState: '',
+                            assignedLGA: '',
+                            assignedWard: ''
+                          }));
+                        }}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {Object.values(DESIGNATIONS).map(designation => (
+                          <option key={designation} value={designation}>
+                            {designation}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Assignment Fields - Show based on designation */}
+                    {(editModal.designation === DESIGNATIONS.STATE_COORDINATOR ||
+                      editModal.designation === DESIGNATIONS.LGA_COORDINATOR ||
+                      editModal.designation === DESIGNATIONS.WARD_COORDINATOR) && (
+                        <div className="space-y-4 p-4 bg-white rounded-lg border border-yellow-200">
+                          <h5 className="text-sm font-medium text-yellow-800">Assignment Location</h5>
+
+                          {/* State Selection */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Assigned LGA
+                              Assigned State
                             </label>
                             <select
-                              value={editModal.assignedLGA}
+                              value={editModal.assignedState}
                               onChange={(e) => {
                                 setEditModal(prev => ({
                                   ...prev,
-                                  assignedLGA: e.target.value,
-                                  assignedWard: '' // Reset ward when LGA changes
+                                  assignedState: e.target.value,
+                                  assignedLGA: '', // Reset LGA when state changes
+                                  assignedWard: '' // Reset ward when state changes
                                 }));
                               }}
-                              disabled={!editModal.assignedState}
-                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
-                              <option value="">Select LGA</option>
-                              {editModal.assignedState &&
-                                statesLGAWardList
-                                  .find(s => s.state === editModal.assignedState)
-                                  ?.lgas.map(lga => (
-                                    <option key={lga.lga} value={lga.lga}>
-                                      {lga.lga}
-                                    </option>
-                                  ))
-                              }
+                              <option value="">Select State</option>
+                              {statesLGAWardList.map(state => (
+                                <option key={state.state} value={state.state}>
+                                  {state.state}
+                                </option>
+                              ))}
                             </select>
                           </div>
-                        )}
 
-                      {/* Ward Selection - Show only for Ward coordinators */}
-                      {editModal.designation === DESIGNATIONS.WARD_COORDINATOR && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Assigned Ward
-                          </label>
-                          <select
-                            value={editModal.assignedWard}
-                            onChange={(e) => {
-                              setEditModal(prev => ({
-                                ...prev,
-                                assignedWard: e.target.value
-                              }));
-                            }}
-                            disabled={!editModal.assignedLGA}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                          >
-                            <option value="">Select Ward</option>
-                            {editModal.assignedState && editModal.assignedLGA &&
-                              statesLGAWardList
-                                .find(s => s.state === editModal.assignedState)
-                                ?.lgas.find(l => l.lga === editModal.assignedLGA)
-                                ?.wards.map(ward => (
-                                  <option key={ward} value={ward}>
-                                    {ward}
-                                  </option>
-                                ))
-                            }
-                          </select>
+                          {/* LGA Selection - Show for LGA and Ward coordinators */}
+                          {(editModal.designation === DESIGNATIONS.LGA_COORDINATOR ||
+                            editModal.designation === DESIGNATIONS.WARD_COORDINATOR) && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Assigned LGA
+                                </label>
+                                <select
+                                  value={editModal.assignedLGA}
+                                  onChange={(e) => {
+                                    setEditModal(prev => ({
+                                      ...prev,
+                                      assignedLGA: e.target.value,
+                                      assignedWard: '' // Reset ward when LGA changes
+                                    }));
+                                  }}
+                                  disabled={!editModal.assignedState}
+                                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                                >
+                                  <option value="">Select LGA</option>
+                                  {editModal.assignedState &&
+                                    statesLGAWardList
+                                      .find(s => s.state === editModal.assignedState)
+                                      ?.lgas.map(lga => (
+                                        <option key={lga.lga} value={lga.lga}>
+                                          {lga.lga}
+                                        </option>
+                                      ))
+                                  }
+                                </select>
+                              </div>
+                            )}
+
+                          {/* Ward Selection - Show only for Ward coordinators */}
+                          {editModal.designation === DESIGNATIONS.WARD_COORDINATOR && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Assigned Ward
+                              </label>
+                              <select
+                                value={editModal.assignedWard}
+                                onChange={(e) => {
+                                  setEditModal(prev => ({
+                                    ...prev,
+                                    assignedWard: e.target.value
+                                  }));
+                                }}
+                                disabled={!editModal.assignedLGA}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                              >
+                                <option value="">Select Ward</option>
+                                {editModal.assignedState && editModal.assignedLGA &&
+                                  statesLGAWardList
+                                    .find(s => s.state === editModal.assignedState)
+                                    ?.lgas.find(l => l.lga === editModal.assignedLGA)
+                                    ?.wards.map(ward => (
+                                      <option key={ward} value={ward}>
+                                        {ward}
+                                      </option>
+                                    ))
+                                }
+                              </select>
+                            </div>
+                          )}
+
+                          <div className="text-sm text-yellow-600">
+                            {editModal.designation === DESIGNATIONS.STATE_COORDINATOR &&
+                              "This coordinator will have access to all LGAs and wards in the assigned state."}
+                            {editModal.designation === DESIGNATIONS.LGA_COORDINATOR &&
+                              "This coordinator will have access to all wards in the assigned LGA."}
+                            {editModal.designation === DESIGNATIONS.WARD_COORDINATOR &&
+                              "This coordinator will have access only to the assigned ward."}
+                          </div>
                         </div>
                       )}
-
-                      <div className="text-sm text-blue-600">
-                        {editModal.designation === DESIGNATIONS.STATE_COORDINATOR &&
-                          "This coordinator will have access to all LGAs and wards in the assigned state."}
-                        {editModal.designation === DESIGNATIONS.LGA_COORDINATOR &&
-                          "This coordinator will have access to all wards in the assigned LGA."}
-                        {editModal.designation === DESIGNATIONS.WARD_COORDINATOR &&
-                          "This coordinator will have access only to the assigned ward."}
-                      </div>
-                    </div>
-                  )}
+                  </div>
+                </div>
               </div>
 
               {/* Modal Actions */}
@@ -1809,7 +2301,7 @@ export default function AdminUserManagement() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleSaveUserDesignation}
+                  onClick={handleSaveUserDetails}
                   disabled={editModal.loading}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center"
                 >
@@ -1817,6 +2309,253 @@ export default function AdminUserManagement() {
                   {editModal.loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View User Modal */}
+      {viewModal.isOpen && viewModal.user && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900">User Details</h2>
+              <button
+                onClick={closeViewModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 max-h-[calc(90vh-8rem)] overflow-y-auto">
+              {/* User Header */}
+              <div className="flex items-center mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center mr-4">
+                  {viewModal.user.profileImage ? (
+                    <img
+                      src={viewModal.user.profileImage}
+                      alt={viewModal.user.name}
+                      className="w-16 h-16 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xl font-semibold text-gray-600">
+                      {viewModal.user.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">{viewModal.user.name}</h3>
+                  <p className="text-sm text-gray-500">{viewModal.user.email}</p>
+                  <div className="flex items-center mt-1">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.role === 'admin'
+                        ? 'bg-purple-100 text-purple-800'
+                        : 'bg-gray-100 text-gray-800'
+                      }`}>
+                      {viewModal.user.role === 'admin' ? 'Admin' : 'User'}
+                    </span>
+                    <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.emailVerified
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                      }`}>
+                      {viewModal.user.emailVerified ? 'Verified' : 'Unverified'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Details Sections */}
+              <div className="space-y-6">
+                {/* Personal Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-3">Personal Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Full Name:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.name || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Username:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.userName || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Email:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.email || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Phone:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.phone || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Gender:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.gender || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Age Range:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.ageRange || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location Information */}
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-blue-900 mb-3">Location Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Country of Residence:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.countryOfResidence || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">State of Origin:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.stateOfOrigin || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Voting State:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.votingState || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Voting LGA:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.votingLGA || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Voting Ward:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.votingWard || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Voting Polling Unit:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.votingPU || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* System Information */}
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-green-900 mb-3">System Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Role:</span>
+                      <span className="ml-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.role === 'admin'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-gray-100 text-gray-800'
+                          }`}>
+                          {viewModal.user.role === 'admin' ? 'Admin' : 'User'}
+                        </span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Email Verified:</span>
+                      <span className="ml-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.emailVerified
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                          }`}>
+                          {viewModal.user.emailVerified ? 'Verified' : 'Unverified'}
+                        </span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">KYC Status:</span>
+                      <span className="ml-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.kycStatus === 'approved'
+                            ? 'bg-green-100 text-green-800'
+                            : viewModal.user.kycStatus === 'pending'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : viewModal.user.kycStatus === 'rejected'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                          }`}>
+                          {viewModal.user.kycStatus?.charAt(0).toUpperCase() + viewModal.user.kycStatus?.slice(1) || 'N/A'}
+                        </span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Citizenship:</span>
+                      <span className="ml-2 text-gray-900">{viewModal.user.citizenship || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Is Voter:</span>
+                      <span className="ml-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.isVoter
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                          }`}>
+                          {viewModal.user.isVoter ? 'Yes' : 'No'}
+                        </span>
+                      </span>
+                    </div>
+                    {/* <div>
+                      <span className="text-gray-500">User ID:</span>
+                      <span className="ml-2 text-gray-900 font-mono text-xs">{viewModal.user.id}</span>
+                    </div> */}
+                  </div>
+                </div>
+
+                {/* Administrative Information */}
+                {viewModal.user.designation && (
+                  <div className="bg-yellow-50 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-yellow-900 mb-3">Administrative Information</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Designation:</span>
+                        <span className="ml-2 text-gray-900">{viewModal.user.designation || 'N/A'}</span>
+                      </div>
+                      {viewModal.user.assignedState && (
+                        <div>
+                          <span className="text-gray-500">Assigned State:</span>
+                          <span className="ml-2 text-gray-900">{viewModal.user.assignedState}</span>
+                        </div>
+                      )}
+                      {viewModal.user.assignedLGA && (
+                        <div>
+                          <span className="text-gray-500">Assigned LGA:</span>
+                          <span className="ml-2 text-gray-900">{viewModal.user.assignedLGA}</span>
+                        </div>
+                      )}
+                      {viewModal.user.assignedWard && (
+                        <div>
+                          <span className="text-gray-500">Assigned Ward:</span>
+                          <span className="ml-2 text-gray-900">{viewModal.user.assignedWard}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Activity Information */}
+                <div className="bg-indigo-50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-indigo-900 mb-3">Activity Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Total Members in Owned Blocs:</span>
+                      <span className="ml-2 text-gray-900 font-medium">{viewModal.user.totalMembersInOwnedBlocs || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Owned Voting Blocs:</span>
+                      <span className="ml-2 text-gray-900 font-medium">{viewModal.user.ownedVotingBlocsCount || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Created At:</span>
+                      <span className="ml-2 text-gray-900">{new Date(viewModal.user.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Last Updated:</span>
+                      <span className="ml-2 text-gray-900">{new Date(viewModal.user.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={closeViewModal}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

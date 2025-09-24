@@ -16,6 +16,7 @@ import { useUser } from "../../../context/UserContext";
 import { getOwnedVotingBlocs, getJoinedVotingBlocs } from "../../../services/votingBlocService";
 import Loading from "../../../components/Loader";
 import ProfileCompletionModal from "../../../components/ProfileCompletionModal";
+import VotingLocationModal from "../../../components/VotingLocationModal";
 import EditProfileModal from "../../profile/EditProfileModal";
 import TwitterFollowModal from "../../../components/modals/TwitterFollowModal";
 
@@ -48,6 +49,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
   const [joinedVotingBlocs, setJoinedVotingBlocs] = useState<VotingBloc[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [votingLocationModalOpen, setVotingLocationModalOpen] = useState(false);
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const [twitterFollowModalOpen, setTwitterFollowModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -65,6 +67,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       { key: 'votingState', label: 'Voting State', getValue: (p: any) => p.votingState || p.personalInfo?.voting_engagement_state },
       { key: 'votingLGA', label: 'Voting LGA', getValue: (p: any) => p.votingLGA || p.personalInfo?.lga },
       { key: 'votingWard', label: 'Voting Ward', getValue: (p: any) => p.votingWard || p.personalInfo?.ward },
+      { key: 'votingPU', label: 'Voting Polling Unit', getValue: (p: any) => p.votingPU || p.personalInfo?.voting_pu },
       { key: 'citizenship', label: 'Citizenship', getValue: (p: any) => p.citizenship || p.personalInfo?.citizenship },
       { key: 'isVoter', label: 'Voter Status', getValue: (p: any) => p.isVoter || p.onboardingData?.votingBehavior?.is_registered },
       { key: 'willVote', label: 'Voting Intention', getValue: (p: any) => p.willVote || p.onboardingData?.votingBehavior?.likely_to_vote },
@@ -98,6 +101,34 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
     return completionScore;
   };
 
+  // Check if voting location is complete
+  const isVotingLocationComplete = (profile: any) => {
+    if (!profile) return false;
+
+    const votingFields = [
+      { key: 'votingState', getValue: (p: any) => p.votingState || p.personalInfo?.voting_engagement_state },
+      { key: 'votingLGA', getValue: (p: any) => p.votingLGA || p.personalInfo?.lga },
+      { key: 'votingWard', getValue: (p: any) => p.votingWard || p.personalInfo?.ward },
+      { key: 'votingPU', getValue: (p: any) => p.votingPU || p.personalInfo?.voting_pu }
+    ];
+
+    const missingFields = votingFields.filter(field => {
+      const value = field.getValue(profile);
+      return !value || value.toString().trim() === '';
+    });
+
+    console.log('🔍 Voting location check:', {
+      isComplete: missingFields.length === 0,
+      missingFields: missingFields.map(f => f.key),
+      votingState: votingFields[0].getValue(profile) || 'MISSING',
+      votingLGA: votingFields[1].getValue(profile) || 'MISSING',
+      votingWard: votingFields[2].getValue(profile) || 'MISSING',
+      votingPU: votingFields[3].getValue(profile) || 'MISSING'
+    });
+
+    return missingFields.length === 0;
+  };
+
   useEffect(() => {
     Promise.all([getOwnedVotingBlocs(), getJoinedVotingBlocs()])
       .then(([ownedData, joinedData]) => {
@@ -110,16 +141,23 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       .finally(() => setLoading(false));
   }, []);
 
-  // Modal logic: Show profile completion modal if profile is incomplete
+  // Modal logic: Prioritize voting location completion over general profile completion
   useEffect(() => {
     if (profile && !loading) {
-      // Check profile completion
+      const votingLocationComplete = isVotingLocationComplete(profile);
       const completionScore = calculateProfileCompletion(profile);
 
-      // Only show modal if profile is not 100% complete
-      if (completionScore < 100) {
-        console.log('🔍 Profile incomplete, showing modal in 1.5 seconds...');
-        // Show modal after a brief delay to let the dashboard load
+      // First priority: Voting location completion
+      if (!votingLocationComplete) {
+        console.log('�️ Voting location incomplete, showing voting location modal in 1.5 seconds...');
+        const timer = setTimeout(() => {
+          setVotingLocationModalOpen(true);
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+      // Second priority: General profile completion
+      else if (completionScore < 100) {
+        console.log('🔍 Profile incomplete, showing profile modal in 1.5 seconds...');
         const timer = setTimeout(() => {
           setProfileModalOpen(true);
         }, 1500);
@@ -130,9 +168,10 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
     }
   }, [profile, loading]);
 
-  // Twitter follow modal logic: Show after profile modal or if profile is complete
+  // Twitter follow modal logic: Show after completion modals
   useEffect(() => {
     if (profile && !loading) {
+      const votingLocationComplete = isVotingLocationComplete(profile);
       const completionScore = calculateProfileCompletion(profile);
       const lastDismissed = localStorage.getItem('twitter-follow-dismissed');
       const lastShown = localStorage.getItem('twitter-follow-last-shown');
@@ -145,7 +184,14 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       const shownRecently = lastShown && (currentTime - parseInt(lastShown)) < (24 * 60 * 60 * 1000);
 
       if (!dismissedRecently && !shownRecently) {
-        const delay = completionScore < 100 ? 4000 : 2000; // Show later if profile modal is shown first
+        // Calculate delay based on what modal is showing first
+        let delay = 2000; // Default delay
+        if (!votingLocationComplete) {
+          delay = 5000; // Show later if voting location modal is shown first
+        } else if (completionScore < 100) {
+          delay = 4000; // Show later if profile modal is shown first
+        }
+
         const timer = setTimeout(() => {
           setTwitterFollowModalOpen(true);
           localStorage.setItem('twitter-follow-last-shown', currentTime.toString());
@@ -646,6 +692,16 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
           </div>
         )}
       </div>
+
+      {/* Voting Location Modal */}
+      <VotingLocationModal
+        isOpen={votingLocationModalOpen}
+        onClose={() => setVotingLocationModalOpen(false)}
+        onCompleteProfile={() => {
+          setVotingLocationModalOpen(false);
+          setEditProfileModalOpen(true);
+        }}
+      />
 
       {/* Profile Completion Modal */}
       <ProfileCompletionModal
