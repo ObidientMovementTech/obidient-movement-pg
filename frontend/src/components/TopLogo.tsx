@@ -1,18 +1,26 @@
+import OptimizedImage from './OptimizedImage';
+
 const TopLogo = () => {
   return (
     <a href="/">
       {/* Light mode logo */}
-      <img
+      <OptimizedImage
         src="/obidientLogoGreen.svg"
-        alt="The People's Opposition Logo"
+        alt="Obidient Movement Logo"
         className="w-48 block dark:hidden"
+        width={192}
+        height={64}
+        loading="eager"
       />
 
       {/* Dark mode logo */}
-      <img
+      <OptimizedImage
         src="/obidientLogo.svg"
-        alt="The People's Opposition Logo"
+        alt="Obidient Movement Logo"
         className="w-48 hidden dark:block"
+        width={192}
+        height={64}
+        loading="eager"
       />
     </a>
   );
@@ -25,7 +33,7 @@ export const CardLogo = ({ className }: Props) => {
   return (
     <img
       src="/logo-black.png"
-      alt="The People's Opposition Logo"
+      alt="Obidient Movement Logo"
       className={className}
     />
   );

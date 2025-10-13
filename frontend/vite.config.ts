@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => {
       {
         name: 'html-transform',
         transformIndexHtml: {
-          enforce: 'pre',
-          transform(html) {
+          order: 'pre',
+          handler(html) {
             return html.replace(
               /%VITE_SMARTSUPP_KEY%/g,
               env.VITE_SMARTSUPP_KEY || ''

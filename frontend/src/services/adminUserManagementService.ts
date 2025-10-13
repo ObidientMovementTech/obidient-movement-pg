@@ -30,15 +30,41 @@ interface UserProfileUpdate {
 }
 
 interface UserCreation {
+  // Basic Information
   name: string;
   email: string;
   password: string;
   phone?: string;
-  role?: 'user' | 'admin';
-  emailVerified?: boolean;
-  countryOfResidence?: string;
+  countryCode?: string;
+
+  // Profile Information  
+  userName?: string;
+  gender?: string;
+  ageRange?: string;
+  citizenship?: string;
+  stateOfOrigin?: string;
+
+  // Voting Location
   votingState?: string;
   votingLGA?: string;
+  votingWard?: string;
+  votingPU?: string;
+
+  // Voter Status
+  isVoter?: string;
+  willVote?: string;
+
+  // Admin Assignment (removed designation for now)
+  assignedState?: string;
+  assignedLGA?: string;
+  assignedWard?: string;
+
+  // System flags
+  role?: 'user' | 'admin';
+  emailVerified?: boolean;
+  adminCreated?: boolean;
+  autoGenerateVotingBloc?: boolean;
+  countryOfResidence?: string; // Keep for backward compatibility
 }
 
 interface BulkActionData {

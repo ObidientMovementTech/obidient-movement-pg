@@ -1,66 +1,84 @@
 // src/main.tsx (or index.tsx)
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import "./index.css";
 
+// Only import essential components that are needed immediately
 import ErrorPage from "./pages/ErrorPage.tsx";
+import ProtectedRoute from "./components/ProtectedRoute.tsx";
 
-// Auth
-import AuthPage from "./pages/auth/page.tsx";
-import GetStartedPage from "./pages/auth/GetStartedPage.tsx";
-import AnambraSignupPage from "./pages/auth/AnambraSignupPage.tsx";
-import VerificationPage from "./pages/auth/VerificationPage.tsx";
-import LoginPage from "./pages/auth/LoginPage.tsx";
-import ResendVerification from "./pages/auth/ResendPage.tsx";
-import ForgotPassword from "./pages/auth/ForgotPasswordPage.tsx";
-import ChangePassword from "./pages/auth/ChangePasswordPage.tsx";
-import ConfirmEmailPage from "./pages/auth/ConfirmEmailPage.tsx";
-
-
-// Profile
-import ProfileLayout from "./pages/profile/page.tsx";
-import ProfilePage from "./pages/profile/ProfilePage.tsx";
-
-// Contexts
+// Contexts (these are lightweight)
 import { ThemeProvider } from "./context/ThemeContexts.tsx";
 import { UserProvider } from "./context/UserContext.tsx";
 import { ModalProvider } from "./context/ModalContext.tsx";
-import DashboardPage from "./pages/dashboard/DashboardPage.tsx";
 
+// Lazy load all page components
+const LandingPage2 = lazy(() => import("./pages/home/LandingPage2.tsx"));
 
-import EligibilityChecker from "./pages/dashboard/lead/eligibilityChecker/EligibilityChecker.tsx";
-import ProtectedRoute from "./components/ProtectedRoute.tsx";
+// Auth Pages
+const AuthPage = lazy(() => import("./pages/auth/page.tsx"));
+const GetStartedPage = lazy(() => import("./pages/auth/GetStartedPage.tsx"));
+const AnambraSignupPage = lazy(() => import("./pages/auth/AnambraSignupPage.tsx"));
+const VerificationPage = lazy(() => import("./pages/auth/VerificationPage.tsx"));
+const LoginPage = lazy(() => import("./pages/auth/LoginPage.tsx"));
+const ResendVerification = lazy(() => import("./pages/auth/ResendPage.tsx"));
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPasswordPage.tsx"));
+const ChangePassword = lazy(() => import("./pages/auth/ChangePasswordPage.tsx"));
+const ConfirmEmailPage = lazy(() => import("./pages/auth/ConfirmEmailPage.tsx"));
 
+// Profile Pages
+const ProfileLayout = lazy(() => import("./pages/profile/page.tsx"));
+const ProfilePage = lazy(() => import("./pages/profile/ProfilePage.tsx"));
 
+// Dashboard Pages
+const DashboardPage = lazy(() => import("./pages/dashboard/DashboardPage.tsx"));
+const EligibilityChecker = lazy(() => import("./pages/dashboard/lead/eligibilityChecker/EligibilityChecker.tsx"));
 
-import LandingPage2 from "./pages/home/LandingPage2.tsx";
-import VotingBlocDetail from "./pages/dashboard/votingBloc/VotingBlocDetail.tsx";
-import NewVotingBlocPage from "./pages/dashboard/votingBloc/NewVotingBlocPage.tsx";
-import EditVotingBlocPage from "./pages/dashboard/votingBloc/EditVotingBlocPage.tsx";
-import VotingBlocManagePage from "./pages/dashboard/votingBloc/VotingBlocManagePage.tsx";
-import MonitorDashboard from "./pages/dashboard/elections/monitor/index.tsx";
-import PUInfoPage from "./pages/dashboard/elections/monitor/pages/PUInfoPage.tsx";
-import OfficerVerificationPage from "./pages/dashboard/elections/monitor/pages/OfficerVerificationPage.tsx";
-import ResultTrackingPage from "./pages/dashboard/elections/monitor/pages/ResultTrackingPage.tsx";
-import IncidentReportingPage from "./pages/dashboard/elections/monitor/pages/IncidentReportingPage.tsx";
+// Voting Bloc Pages
+const VotingBlocDetail = lazy(() => import("./pages/dashboard/votingBloc/VotingBlocDetail.tsx"));
+const NewVotingBlocPage = lazy(() => import("./pages/dashboard/votingBloc/NewVotingBlocPage.tsx"));
+const EditVotingBlocPage = lazy(() => import("./pages/dashboard/votingBloc/EditVotingBlocPage.tsx"));
+const VotingBlocManagePage = lazy(() => import("./pages/dashboard/votingBloc/VotingBlocManagePage.tsx"));
+
+// Election Monitoring Pages
+const MonitorDashboard = lazy(() => import("./pages/dashboard/elections/monitor/index.tsx"));
+const PUInfoPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/PUInfoPage.tsx"));
+const OfficerVerificationPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/OfficerVerificationPage.tsx"));
+const ResultTrackingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/ResultTrackingPage.tsx"));
+const IncidentReportingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/IncidentReportingPage.tsx"));
+
+// Loading component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700"></div>
+  </div>
+);
+
+// Preload critical components after app loads
+const preloadComponents = () => {
+  // Preload commonly used components in the background
+  import("./pages/auth/GetStartedPage.tsx");
+  import("./pages/profile/ProfilePage.tsx");
+  import("./pages/dashboard/votingBloc/VotingBlocManagePage.tsx");
+};
+
+// Start preloading after a short delay
+setTimeout(preloadComponents, 2000);
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: (
-      <UserProvider>
-        <LandingPage2 />
-      </UserProvider>
+      <LandingPage2 />
     ),
     errorElement: <ErrorPage />,
   },
   {
     path: "/auth",
     element: (
-      <UserProvider>
-        <AuthPage />
-      </UserProvider>),
+      <AuthPage />
+    ),
     children: [
       { path: "sign-up", element: <GetStartedPage /> },
       { path: "verify", element: <VerificationPage /> },
@@ -74,9 +92,8 @@ const router = createBrowserRouter([
   {
     path: "/anambra",
     element: (
-      <UserProvider>
-        <AuthPage />
-      </UserProvider>),
+      <AuthPage />
+    ),
     children: [
       { path: "sign-up", element: <AnambraSignupPage /> },
     ],
@@ -84,9 +101,7 @@ const router = createBrowserRouter([
   {
     path: "/profile",
     element: (
-      <UserProvider>
-        <ProfileLayout />
-      </UserProvider>
+      <ProfileLayout />
     ),
     errorElement: <ErrorPage />,
     children: [{ index: true, element: <ProfilePage /> }],
@@ -94,20 +109,18 @@ const router = createBrowserRouter([
   {
     path: "/dashboard",
     element: (
-      <UserProvider>
+      <Suspense fallback={<PageLoader />}>
         <DashboardPage />
-      </UserProvider>
+      </Suspense>
     ),
   },
 
   {
     path: "/run-for-office/eligibility",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <EligibilityChecker />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <EligibilityChecker />
+      </ProtectedRoute>
     ),
   },
 
@@ -115,11 +128,9 @@ const router = createBrowserRouter([
   {
     path: "/dashboard/elections/monitor",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <MonitorDashboard />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <MonitorDashboard />
+      </ProtectedRoute>
     ),
   },
 
@@ -127,11 +138,9 @@ const router = createBrowserRouter([
   {
     path: "/dashboard/elections/monitoring",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <MonitorDashboard />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <MonitorDashboard />
+      </ProtectedRoute>
     ),
   },
 
@@ -139,44 +148,36 @@ const router = createBrowserRouter([
   {
     path: "/dashboard/elections/monitor/polling-unit",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <PUInfoPage />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <PUInfoPage />
+      </ProtectedRoute>
     ),
   },
 
   {
     path: "/dashboard/elections/monitor/officer-verification",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <OfficerVerificationPage />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <OfficerVerificationPage />
+      </ProtectedRoute>
     ),
   },
 
   {
     path: "/dashboard/elections/monitor/result-tracking",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <ResultTrackingPage />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <ResultTrackingPage />
+      </ProtectedRoute>
     ),
   },
 
   {
     path: "/dashboard/elections/monitor/incident-reporting",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <IncidentReportingPage />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <IncidentReportingPage />
+      </ProtectedRoute>
     ),
   },
 
@@ -184,31 +185,25 @@ const router = createBrowserRouter([
   {
     path: "/dashboard/new-voting-bloc",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <NewVotingBlocPage />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <NewVotingBlocPage />
+      </ProtectedRoute>
     ),
   },
   {
     path: "/dashboard/edit-voting-bloc/:id",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <EditVotingBlocPage />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <EditVotingBlocPage />
+      </ProtectedRoute>
     ),
   },
   {
     path: "/dashboard/manage-voting-bloc/:id",
     element: (
-      <UserProvider>
-        <ProtectedRoute>
-          <VotingBlocManagePage />
-        </ProtectedRoute>
-      </UserProvider>
+      <ProtectedRoute>
+        <VotingBlocManagePage />
+      </ProtectedRoute>
     ),
   },
 
@@ -216,9 +211,7 @@ const router = createBrowserRouter([
   {
     path: "/voting-bloc/:joinCode",
     element: (
-      <UserProvider>
-        <VotingBlocDetail />
-      </UserProvider>
+      <VotingBlocDetail />
     ),
     errorElement: <ErrorPage />
   },
@@ -230,7 +223,10 @@ root.render(
   <React.StrictMode>
     <ThemeProvider>
       <ModalProvider>
-        <RouterProvider router={router} />
+        <UserProvider>
+          <RouterProvider router={router} />
+
+        </UserProvider>
       </ModalProvider>
     </ThemeProvider>
   </React.StrictMode>

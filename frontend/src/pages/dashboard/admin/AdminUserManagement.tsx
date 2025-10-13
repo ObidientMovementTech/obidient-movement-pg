@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Users,
   Search,
-  // Plus, 
+  Plus,
   Trash2, Shield, ShieldOff,
   CheckCircle, XCircle, UserCheck, UserX, Loader2, X, AlertTriangle, Mail, Send,
   Edit3, Key, Download, Eye
@@ -11,6 +11,7 @@ import { adminUserManagementService } from '../../../services/adminUserManagemen
 import { adminMaintenanceService } from '../../../services/adminMaintenanceService';
 import { statesLGAWardList } from '../../../utils/StateLGAWard';
 import MonitorKeyAssignmentModal from '../../../components/MonitorKeyAssignmentModal';
+import AdminCreateUserModal from '../../../components/modals/AdminCreateUserModal';
 
 interface User {
   id: string;
@@ -178,6 +179,9 @@ export default function AdminUserManagement() {
     isOpen: boolean;
     user: User | null;
   }>({ isOpen: false, user: null });
+
+  // Create user modal state
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
 
   // Confirmation modal state
   const [confirmationModal, setConfirmationModal] = useState<ConfirmationModal>({
@@ -1042,6 +1046,16 @@ export default function AdminUserManagement() {
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-3">
+          {/* Create User Button */}
+          <button
+            onClick={() => setShowCreateUserModal(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+            title="Create new user for mass onboarding"
+          >
+            <Plus size={20} />
+            Create User
+          </button>
+
           {/* Cleanup Duplicate Auto Voting Blocs Button */}
           <button
             onClick={() => handleCleanupDuplicateAutoBlocs()}
@@ -2349,14 +2363,14 @@ export default function AdminUserManagement() {
                   <p className="text-sm text-gray-500">{viewModal.user.email}</p>
                   <div className="flex items-center mt-1">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.role === 'admin'
-                        ? 'bg-purple-100 text-purple-800'
-                        : 'bg-gray-100 text-gray-800'
+                      ? 'bg-purple-100 text-purple-800'
+                      : 'bg-gray-100 text-gray-800'
                       }`}>
                       {viewModal.user.role === 'admin' ? 'Admin' : 'User'}
                     </span>
                     <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.emailVerified
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
                       }`}>
                       {viewModal.user.emailVerified ? 'Verified' : 'Unverified'}
                     </span>
@@ -2436,8 +2450,8 @@ export default function AdminUserManagement() {
                       <span className="text-gray-500">Role:</span>
                       <span className="ml-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.role === 'admin'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-gray-100 text-gray-800'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-gray-100 text-gray-800'
                           }`}>
                           {viewModal.user.role === 'admin' ? 'Admin' : 'User'}
                         </span>
@@ -2447,8 +2461,8 @@ export default function AdminUserManagement() {
                       <span className="text-gray-500">Email Verified:</span>
                       <span className="ml-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.emailVerified
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
                           }`}>
                           {viewModal.user.emailVerified ? 'Verified' : 'Unverified'}
                         </span>
@@ -2458,12 +2472,12 @@ export default function AdminUserManagement() {
                       <span className="text-gray-500">KYC Status:</span>
                       <span className="ml-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.kycStatus === 'approved'
-                            ? 'bg-green-100 text-green-800'
-                            : viewModal.user.kycStatus === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : viewModal.user.kycStatus === 'rejected'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800'
+                          ? 'bg-green-100 text-green-800'
+                          : viewModal.user.kycStatus === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : viewModal.user.kycStatus === 'rejected'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
                           }`}>
                           {viewModal.user.kycStatus?.charAt(0).toUpperCase() + viewModal.user.kycStatus?.slice(1) || 'N/A'}
                         </span>
@@ -2477,8 +2491,8 @@ export default function AdminUserManagement() {
                       <span className="text-gray-500">Is Voter:</span>
                       <span className="ml-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${viewModal.user.isVoter
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
                           }`}>
                           {viewModal.user.isVoter ? 'Yes' : 'No'}
                         </span>
@@ -2573,6 +2587,17 @@ export default function AdminUserManagement() {
           onSuccess={handleMonitorKeySuccess}
         />
       )}
+
+      {/* Create User Modal */}
+      <AdminCreateUserModal
+        isOpen={showCreateUserModal}
+        onClose={() => setShowCreateUserModal(false)}
+        onUserCreated={() => {
+          setShowCreateUserModal(false);
+          // Refresh the users list
+          loadUsers();
+        }}
+      />
     </div>
   );
 }

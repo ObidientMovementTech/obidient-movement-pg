@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   Users,
@@ -84,6 +84,7 @@ export default function VotingBlocManagePage() {
   // Member management states
   const [membersWithMetadata, setMembersWithMetadata] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [decisionFilter, setDecisionFilter] = useState<string>('all');
   const [contactFilter, setContactFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
@@ -105,8 +106,16 @@ export default function VotingBlocManagePage() {
   // PU member management states
   const [puMemberSearch, setPuMemberSearch] = useState('');
 
+  // Pagination states for performance
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20); // Limit items to improve performance
+  const [puCurrentPage, setPuCurrentPage] = useState(1);
+  const [inecCurrentPage, setInecCurrentPage] = useState(1);
+
   // INEC voters mock data and states
   const [inecVoterSearch, setInecVoterSearch] = useState('');
+  const [debouncedInecSearch, setDebouncedInecSearch] = useState('');
+  const [debouncedPuSearch, setDebouncedPuSearch] = useState('');
   const [inecVoters] = useState([
     { id: 1, fullName: 'Adebayo Olumide', vin: 'VIN001234567890', age: 45, gender: 'Male', address: '15 Lagos Street, Ikeja', pvc: 'collected' },
     { id: 2, fullName: 'Chioma Nwosu', vin: 'VIN001234567891', age: 32, gender: 'Female', address: '22 Aba Road, Onitsha', pvc: 'collected' },
@@ -135,7 +144,51 @@ export default function VotingBlocManagePage() {
     if (activeTab === 'pollingUnit' && pollingUnitMembers.length === 0) {
       fetchPollingUnitMembers();
     }
-  }, [activeTab]);
+
+    // Lazy load member data only when members tab is active
+    if (activeTab === 'members' && membersWithMetadata.length === 0 && votingBloc) {
+      Promise.all([
+        fetchInvitations(),
+        fetchEngagement(),
+        fetchMemberMetadata()
+      ]).catch(error => console.error('Failed to load member data:', error));
+    }
+  }, [activeTab, votingBloc]);
+
+  // Debounce search queries for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedInecSearch(inecVoterSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [inecVoterSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPuSearch(puMemberSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [puMemberSearch]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, decisionFilter, contactFilter, engagementFilter, pvcStatusFilter, locationFilter]);
+
+  useEffect(() => {
+    setPuCurrentPage(1);
+  }, [debouncedPuSearch]);
+
+  useEffect(() => {
+    setInecCurrentPage(1);
+  }, [debouncedInecSearch]);
 
   const fetchVotingBloc = async () => {
     try {
@@ -152,12 +205,14 @@ export default function VotingBlocManagePage() {
 
       setVotingBloc(bloc);
 
-      // Load additional data for management
-      await Promise.all([
-        fetchInvitations(),
-        fetchEngagement(),
-        fetchMemberMetadata()
-      ]);
+      // Load additional data for management - ONLY load what we need initially
+      if (activeTab === 'members') {
+        await Promise.all([
+          fetchInvitations(),
+          fetchEngagement(),
+          fetchMemberMetadata()
+        ]);
+      }
     } catch (error) {
       setToast({ message: "Failed to load voting bloc", type: "error" });
       navigate("/dashboard?tab=VotingBloc");
@@ -334,40 +389,85 @@ export default function VotingBlocManagePage() {
     }
   };
 
-  // Filter members based on search and filters
-  const filteredMembers = membersWithMetadata.filter(member => {
-    const matchesSearch = member.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter members based on search and filters - MEMOIZED for performance
+  const filteredMembers = useMemo(() => {
+    if (!membersWithMetadata.length) return [];
 
-    const matchesDecision = decisionFilter === 'all' || member.metadata?.decisionTag === decisionFilter;
-    const matchesContact = contactFilter === 'all' || member.metadata?.contactTag === contactFilter;
-    const matchesEngagement = engagementFilter === 'all' || member.metadata?.engagementLevel === engagementFilter;
-    const matchesPvcStatus = pvcStatusFilter === 'all' || member.metadata?.pvcStatus === pvcStatusFilter;
+    const lowerSearchQuery = debouncedSearchQuery.toLowerCase();
+    const lowerLocationFilter = locationFilter.toLowerCase();
 
-    const matchesLocation = locationFilter === 'all' ||
-      member.metadata?.location?.state?.toLowerCase().includes(locationFilter.toLowerCase()) ||
-      member.metadata?.location?.lga?.toLowerCase().includes(locationFilter.toLowerCase()) ||
-      member.personalInfo?.currentLocation?.state?.toLowerCase().includes(locationFilter.toLowerCase()) ||
-      member.personalInfo?.currentLocation?.lga?.toLowerCase().includes(locationFilter.toLowerCase());
+    return membersWithMetadata.filter(member => {
+      // Early returns for performance
+      if (debouncedSearchQuery && !member.name?.toLowerCase().includes(lowerSearchQuery) &&
+        !member.email?.toLowerCase().includes(lowerSearchQuery)) {
+        return false;
+      }
 
-    return matchesSearch && matchesDecision && matchesContact && matchesEngagement && matchesPvcStatus && matchesLocation;
-  });
+      if (decisionFilter !== 'all' && member.metadata?.decisionTag !== decisionFilter) return false;
+      if (contactFilter !== 'all' && member.metadata?.contactTag !== contactFilter) return false;
+      if (engagementFilter !== 'all' && member.metadata?.engagementLevel !== engagementFilter) return false;
+      if (pvcStatusFilter !== 'all' && member.metadata?.pvcStatus !== pvcStatusFilter) return false;
 
-  // Filter INEC voters based on search
-  const filteredInecVoters = inecVoters.filter(voter => {
-    const matchesSearch = voter.fullName?.toLowerCase().includes(inecVoterSearch.toLowerCase()) ||
-      voter.vin?.toLowerCase().includes(inecVoterSearch.toLowerCase()) ||
-      voter.address?.toLowerCase().includes(inecVoterSearch.toLowerCase());
-    return matchesSearch;
-  });
+      if (locationFilter !== 'all') {
+        const matchesLocation =
+          member.metadata?.location?.state?.toLowerCase().includes(lowerLocationFilter) ||
+          member.metadata?.location?.lga?.toLowerCase().includes(lowerLocationFilter) ||
+          member.personalInfo?.currentLocation?.state?.toLowerCase().includes(lowerLocationFilter) ||
+          member.personalInfo?.currentLocation?.lga?.toLowerCase().includes(lowerLocationFilter);
+        if (!matchesLocation) return false;
+      }
 
-  // Filter polling unit members based on search
-  const filteredPuMembers = pollingUnitMembers.filter(member => {
-    const matchesSearch = member.fullName?.toLowerCase().includes(puMemberSearch.toLowerCase()) ||
-      member.email?.toLowerCase().includes(puMemberSearch.toLowerCase()) ||
-      member.phoneNumber?.toLowerCase().includes(puMemberSearch.toLowerCase());
-    return matchesSearch;
-  });
+      return true;
+    });
+  }, [membersWithMetadata, debouncedSearchQuery, decisionFilter, contactFilter, engagementFilter, pvcStatusFilter, locationFilter]);
+
+  // Paginated members for performance
+  const paginatedMembers = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredMembers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredMembers, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+
+  // Filter INEC voters based on search - MEMOIZED for performance
+  const filteredInecVoters = useMemo(() => {
+    if (!debouncedInecSearch) return inecVoters;
+
+    const lowerSearch = debouncedInecSearch.toLowerCase();
+    return inecVoters.filter(voter =>
+      voter.fullName?.toLowerCase().includes(lowerSearch) ||
+      voter.vin?.toLowerCase().includes(lowerSearch) ||
+      voter.address?.toLowerCase().includes(lowerSearch)
+    );
+  }, [inecVoters, debouncedInecSearch]);
+
+  // Filter polling unit members based on search - MEMOIZED for performance
+  const filteredPuMembers = useMemo(() => {
+    if (!debouncedPuSearch) return pollingUnitMembers;
+
+    const lowerSearch = debouncedPuSearch.toLowerCase();
+    return pollingUnitMembers.filter(member =>
+      member.fullName?.toLowerCase().includes(lowerSearch) ||
+      member.email?.toLowerCase().includes(lowerSearch) ||
+      member.phoneNumber?.toLowerCase().includes(lowerSearch)
+    );
+  }, [pollingUnitMembers, debouncedPuSearch]);
+
+  // Paginated PU members for performance
+  const paginatedPuMembers = useMemo(() => {
+    const startIndex = (puCurrentPage - 1) * itemsPerPage;
+    return filteredPuMembers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredPuMembers, puCurrentPage, itemsPerPage]);
+
+  const puTotalPages = Math.ceil(filteredPuMembers.length / itemsPerPage);
+
+  // Paginated INEC voters for performance  
+  const paginatedInecVoters = useMemo(() => {
+    const startIndex = (inecCurrentPage - 1) * itemsPerPage;
+    return filteredInecVoters.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredInecVoters, inecCurrentPage, itemsPerPage]);
+
+  const inecTotalPages = Math.ceil(filteredInecVoters.length / itemsPerPage);
 
   const copyBlocLink = () => {
     if (votingBloc) {
@@ -974,7 +1074,7 @@ export default function VotingBlocManagePage() {
 
                 {/* Members List */}
                 <div className="space-y-3">
-                  {filteredMembers.map((member) => (
+                  {paginatedMembers.map((member) => (
                     <div key={member._id} className="flex items-start gap-3 p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
                       <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
                         <Users size={16} className="sm:w-5 sm:h-5 text-gray-600" />
@@ -1156,6 +1256,31 @@ export default function VotingBlocManagePage() {
                     </div>
                   )}
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-6 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Previous
+                    </button>
+
+                    <span className="text-sm text-gray-600 px-3">
+                      Page {currentPage} of {totalPages} ({filteredMembers.length} members)
+                    </span>
+
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1260,7 +1385,7 @@ export default function VotingBlocManagePage() {
 
                   {/* Members List - Same style as Members tab */}
                   <div className="space-y-3">
-                    {filteredPuMembers.map((member) => (
+                    {paginatedPuMembers.map((member) => (
                       <div key={member.id} className="flex items-start gap-3 p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-300 rounded-full flex items-center justify-center flex-shrink-0">
                           <User size={16} className="sm:w-5 sm:h-5 text-green-600" />
@@ -1369,6 +1494,31 @@ export default function VotingBlocManagePage() {
                       </div>
                     )}
                   </div>
+
+                  {/* PU Pagination Controls */}
+                  {puTotalPages > 1 && (
+                    <div className="flex justify-center items-center gap-2 mt-6 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={() => setPuCurrentPage(Math.max(1, puCurrentPage - 1))}
+                        disabled={puCurrentPage === 1}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Previous
+                      </button>
+
+                      <span className="text-sm text-gray-600 px-3">
+                        Page {puCurrentPage} of {puTotalPages} ({filteredPuMembers.length} members)
+                      </span>
+
+                      <button
+                        onClick={() => setPuCurrentPage(Math.min(puTotalPages, puCurrentPage + 1))}
+                        disabled={puCurrentPage === puTotalPages}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1446,7 +1596,7 @@ export default function VotingBlocManagePage() {
 
               {/* Voters List */}
               <div className="space-y-3">
-                {filteredInecVoters.map((voter) => (
+                {paginatedInecVoters.map((voter) => (
                   <div key={voter.id} className="flex items-start gap-3 p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-300 rounded-full flex items-center justify-center flex-shrink-0">
                       <Target size={16} className="sm:w-5 sm:h-5 text-orange-600" />
@@ -1483,8 +1633,8 @@ export default function VotingBlocManagePage() {
                       {/* Voter Status Tags */}
                       <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-2">
                         <span className={`px-2 py-1 text-xs rounded-full ${voter.age >= 18 && voter.age <= 35 ? 'bg-blue-100 text-blue-800' :
-                            voter.age >= 36 && voter.age <= 55 ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
+                          voter.age >= 36 && voter.age <= 55 ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
                           }`}>
                           {voter.age >= 18 && voter.age <= 35 ? 'Youth' :
                             voter.age >= 36 && voter.age <= 55 ? 'Adult' : 'Senior'}
@@ -1541,6 +1691,31 @@ export default function VotingBlocManagePage() {
                   This is sample INEC voter registry data for demonstration purposes. In production, this will be populated with real INEC data.
                 </p>
               </div>
+
+              {/* INEC Pagination Controls */}
+              {inecTotalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setInecCurrentPage(Math.max(1, inecCurrentPage - 1))}
+                    disabled={inecCurrentPage === 1}
+                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Previous
+                  </button>
+
+                  <span className="text-sm text-gray-600 px-3">
+                    Page {inecCurrentPage} of {inecTotalPages} ({filteredInecVoters.length} voters)
+                  </span>
+
+                  <button
+                    onClick={() => setInecCurrentPage(Math.min(inecTotalPages, inecCurrentPage + 1))}
+                    disabled={inecCurrentPage === inecTotalPages}
+                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

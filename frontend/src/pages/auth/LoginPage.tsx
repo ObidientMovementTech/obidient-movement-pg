@@ -9,6 +9,7 @@ import { useUserContext } from "../../context/UserContext.js";
 export default function LoginPage() {
   const navigate = useNavigate();
   const { profile, isLoading, refreshProfile } = useUserContext();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -19,17 +20,16 @@ export default function LoginPage() {
   const [showResendVerification, setShowResendVerification] = useState(false);
   const [resendingVerification, setResendingVerification] = useState(false);
 
-  // 2FA States
-  const [loginToken, setLoginToken] = useState(""); // Temporary token for 2FA process
+  // 2FA
+  const [loginToken, setLoginToken] = useState("");
   const [show2FAModal, setShow2FAModal] = useState(false);
 
-  // Redirect to dashboard if user is already authenticated
+  // Redirect if already logged in
   useEffect(() => {
     if (!isLoading && profile) {
-      // Check if there's a cause code to redirect to
-      const causeCode = localStorage.getItem('support-cause-code');
+      const causeCode = localStorage.getItem("support-cause-code");
       if (causeCode) {
-        localStorage.removeItem('support-cause-code');
+        localStorage.removeItem("support-cause-code");
         navigate(`/cause/${causeCode}`);
       } else {
         navigate("/dashboard");
@@ -37,9 +37,7 @@ export default function LoginPage() {
     }
   }, [profile, isLoading, navigate]);
 
-  const togglePasswordVisibility = () => {
-    setPasswordVisible(!passwordVisible);
-  };
+  const togglePasswordVisibility = () => setPasswordVisible(!passwordVisible);
 
   const displayToast = (msg: string, type: "success" | "error") => {
     setMessage(msg);
@@ -51,10 +49,10 @@ export default function LoginPage() {
     setResendingVerification(true);
     try {
       await resendVerificationEmail(email);
-      displayToast('Verification email sent! Please check your inbox and spam folder.', 'success');
+      displayToast("Verification email sent. Check your inbox.", "success");
       setShowResendVerification(false);
     } catch (error: any) {
-      displayToast(error.message || 'Failed to resend verification email. Please try again.', 'error');
+      displayToast(error.message || "Failed to resend verification email.", "error");
     } finally {
       setResendingVerification(false);
     }
@@ -69,7 +67,6 @@ export default function LoginPage() {
     try {
       const res = await loginUser({ email, password });
 
-      // Check if 2FA is required
       if (res.requires2FA) {
         setLoginToken(res.tempToken);
         setShow2FAModal(true);
@@ -79,74 +76,55 @@ export default function LoginPage() {
 
       displayToast(res.message || "Login successful!", "success");
 
-      // Refresh user profile to update context
+      // Ensure user context updates before navigating
       await refreshProfile();
 
-      const causeCode = localStorage.getItem('support-cause-code');
-      if (causeCode) {
-        localStorage.removeItem('support-cause-code');
-        navigate(`/cause/${causeCode}`);
-      } else {
-        navigate("/dashboard");
-      }
+      // Wait a small moment to allow state propagation
+      setTimeout(() => {
+        const causeCode = localStorage.getItem("support-cause-code");
+        if (causeCode) {
+          localStorage.removeItem("support-cause-code");
+          navigate(`/cause/${causeCode}`);
+        } else {
+          navigate("/dashboard");
+        }
+      }, 200);
     } catch (error: any) {
-      console.log('Login error:', error);
+      let errorMessage = "Login failed. Please try again.";
 
-      let errorMessage = 'Login failed. Please try again.';
-
-      if (error.message) {
-        errorMessage = error.message;
-      }
-
-      // Handle specific error types with detailed messages
-      if (error.errorType === 'EMAIL_NOT_FOUND') {
-        errorMessage = 'No account found with this email address. Please check your email or sign up for a new account.';
-      } else if (error.errorType === 'EMAIL_NOT_VERIFIED') {
-        errorMessage = 'Please verify your email address before logging in. Check your inbox for a verification email.';
+      if (error.errorType === "EMAIL_NOT_FOUND")
+        errorMessage = "No account found with this email.";
+      else if (error.errorType === "EMAIL_NOT_VERIFIED") {
+        errorMessage = "Please verify your email before logging in.";
         setShowResendVerification(true);
-      } else if (error.errorType === 'INVALID_PASSWORD') {
-        errorMessage = 'Incorrect password. Please check your password and try again.';
-      } else if (error.errorType === 'NETWORK_ERROR') {
-        errorMessage = 'Connection error. Please check your internet connection and try again.';
-      } else if (error.errorType === 'SERVER_ERROR') {
-        errorMessage = 'Server error. Please try again later.';
-      }
+      } else if (error.errorType === "INVALID_PASSWORD")
+        errorMessage = "Incorrect password.";
+      else if (error.errorType === "NETWORK_ERROR")
+        errorMessage = "Network error. Check your connection.";
+      else if (error.errorType === "SERVER_ERROR")
+        errorMessage = "Server error. Please try again later.";
 
-      displayToast(errorMessage, "error");
+      displayToast(error.message || errorMessage, "error");
     } finally {
       setIsLoginLoading(false);
     }
   };
 
-  // Handle 2FA verification
   const handle2FAVerification = async (code: string) => {
     setIsLoginLoading(true);
-
     try {
       await verify2FALogin(loginToken, code);
-
       displayToast("Login successful!", "success");
       setShow2FAModal(false);
-
-      // Refresh user profile to update context
       await refreshProfile();
-
-      const causeCode = localStorage.getItem('support-cause-code');
-      if (causeCode) {
-        localStorage.removeItem('support-cause-code');
-        navigate(`/cause/${causeCode}`);
-      } else {
-        navigate("/dashboard");
-      }
+      setTimeout(() => navigate("/dashboard"), 200);
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.message || "Invalid verification code.";
+      const msg = err?.response?.data?.message || "Invalid verification code.";
       displayToast(msg, "error");
       setIsLoginLoading(false);
     }
   };
 
-  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="flex items-center justify-center px-4 py-8 max-w-[450px] w-full">
@@ -165,6 +143,7 @@ export default function LoginPage() {
     >
       <p className="text-gray-dark dark:text-gray-100 text-2xl">Welcome Back!</p>
 
+      {/* Email */}
       <div>
         <label className="block text-dark dark:text-gray-100 mb-2 text-sm">Email</label>
         <input
@@ -183,6 +162,7 @@ export default function LoginPage() {
         </p>
       </div>
 
+      {/* Password */}
       <div>
         <label className="block text-dark dark:text-gray-100 mb-2 text-sm">Password</label>
         <div className="relative">
@@ -213,6 +193,7 @@ export default function LoginPage() {
         </p>
       </div>
 
+      {/* Submit */}
       <button
         type="submit"
         className={`flex items-center justify-center bg-accent-green text-white w-full font-medium py-2 px-6 rounded-lg hover:scale-95 duration-300 ${isLoginLoading ? "opacity-50" : ""
@@ -226,7 +207,6 @@ export default function LoginPage() {
         <Toast message={message} type={toastType} onClose={() => setShowToast(false)} />
       )}
 
-      {/* Resend Verification Email Button */}
       {showResendVerification && (
         <div className="text-center mt-4">
           <button
@@ -235,12 +215,11 @@ export default function LoginPage() {
             disabled={resendingVerification}
             className="text-blue-600 hover:text-blue-800 underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {resendingVerification ? 'Sending...' : 'Resend verification email'}
+            {resendingVerification ? "Sending..." : "Resend verification email"}
           </button>
         </div>
       )}
 
-      {/* 2FA Verification Modal */}
       <Login2FAModal
         isOpen={show2FAModal}
         onClose={() => setShow2FAModal(false)}

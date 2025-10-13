@@ -1,10 +1,9 @@
-import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { createContext, useState, useEffect, useContext, useMemo, ReactNode } from 'react';
 import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 // ---- TYPES ---- //
-
 export interface PersonalInfo {
   first_name: string;
   middle_name?: string;
@@ -18,7 +17,6 @@ export interface PersonalInfo {
   age_range: string;
   state_of_origin: string;
   voting_engagement_state: string;
-  // Add survey fields
   citizenship?: string;
   isVoter?: string;
   willVote?: string;
@@ -31,9 +29,7 @@ export interface ValidID {
 }
 
 export interface OnboardingData {
-  securityValidation?: {
-    profile_picture_url?: string;
-  };
+  securityValidation?: { profile_picture_url?: string };
   demographics?: {
     ethnicity?: string;
     religion?: string;
@@ -62,12 +58,8 @@ export interface UserProfile {
   role: 'user' | 'admin';
   kycStatus: 'unsubmitted' | 'pending' | 'approved' | 'rejected';
   kycRejectionReason?: string;
-
-  // Legacy nested structure (for backward compatibility)
   personalInfo: PersonalInfo;
   onboardingData: OnboardingData;
-
-  // New flat structure (post-migration fields)
   userName?: string;
   gender?: string;
   ageRange?: string;
@@ -75,19 +67,15 @@ export interface UserProfile {
   votingState?: string;
   votingLGA?: string;
   votingWard?: string;
-  votingPU?: string; // Add polling unit field
+  votingPU?: string;
   citizenship?: string;
   isVoter?: string;
   willVote?: string;
   countryCode?: string;
-
-  // Coordinator designation fields
   designation?: string;
   assignedState?: string;
   assignedLGA?: string;
   assignedWard?: string;
-
-  // Existing fields
   selfieImageUrl?: string;
   validID: ValidID;
   joinedCauses: string[];
@@ -104,43 +92,32 @@ export interface UserProfile {
 }
 
 // ---- CONTEXT ---- //
-
 interface UserContextType {
   profile: UserProfile | null;
   isLoading: boolean;
   refreshProfile: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isLoggingOut: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 // ---- PROVIDER ---- //
-
 export function UserProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const refreshProfile = async () => {
-    // Don't attempt to refresh profile if user is logging out
     if (isLoggingOut) return;
-
     try {
       setIsLoading(true);
-      const res = await axios.get(`${API_BASE}/auth/me`, {
-        withCredentials: true,
-      });
-      console.log('👤 User profile loaded:', {
-        name: res.data.user.name,
-        designation: res.data.user.designation,
-        assignedState: res.data.user.assignedState,
-        role: res.data.user.role
-      });
+      const res = await axios.get(`${API_BASE}/auth/me`, { withCredentials: true });
       setProfile(res.data.user);
+      console.log('✅ Profile refreshed:', res.data.user.name);
     } catch (err) {
-      console.error('❌ Failed to load user:', err);
+      console.error('❌ Failed to refresh user profile:', err);
       setProfile(null);
     } finally {
       setIsLoading(false);
@@ -150,9 +127,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (data: Partial<UserProfile>) => {
     try {
       setIsLoading(true);
-      const res = await axios.patch(`${API_BASE}/users/me`, data, {
-        withCredentials: true,
-      });
+      const res = await axios.patch(`${API_BASE}/users/me`, data, { withCredentials: true });
       setProfile(res.data.user);
     } catch (err) {
       console.error('❌ Failed to update profile:', err);
@@ -162,21 +137,29 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     setIsLoggingOut(true);
-    setProfile(null);
-    setIsLoading(false);
+    try {
+      await axios.post(`${API_BASE}/auth/logout`, {}, { withCredentials: true });
+    } catch (err) {
+      console.error('Logout request failed:', err);
+    } finally {
+      setProfile(null);
+      setIsLoggingOut(false);
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     refreshProfile();
   }, []);
 
-  return (
-    <UserContext.Provider value={{ profile, isLoading, refreshProfile, updateProfile, logout, isLoggingOut }}>
-      {children}
-    </UserContext.Provider>
+  const value = useMemo(
+    () => ({ profile, isLoading, refreshProfile, updateProfile, logout, isLoggingOut }),
+    [profile, isLoading, isLoggingOut]
   );
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
 export function useUser() {
@@ -185,6 +168,4 @@ export function useUser() {
   return context;
 }
 
-export function useUserContext() {
-  return useUser();
-}
+export const useUserContext = useUser;
