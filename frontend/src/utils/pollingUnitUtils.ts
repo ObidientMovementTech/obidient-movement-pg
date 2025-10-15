@@ -37,7 +37,7 @@ export const getPollingUnitsForWard = (
     // Normalize inputs to handle case sensitivity and formatting
     const normalizedState = stateName?.toUpperCase().trim();
     const normalizedLGA = lgaName?.toUpperCase().trim();
-    const normalizedWard = wardName?.toUpperCase().trim();
+    let normalizedWard = wardName?.toUpperCase().trim();
 
     // Navigate the data structure
     const state = StateLGAWardPollingUnits[normalizedState];
@@ -52,14 +52,47 @@ export const getPollingUnitsForWard = (
       return [];
     }
 
-    const ward = lga.wards[normalizedWard];
+    let ward = lga.wards[normalizedWard];
+
+    // If ward not found, try alternative formatting patterns
     if (!ward) {
-      console.warn(`Ward not found: ${normalizedWard} in ${normalizedLGA}, ${normalizedState}`);
+      // Try with double spaces (common in the data)
+      const wardWithDoubleSpaces = normalizedWard.replace(/\s+/g, '  ');
+      ward = lga.wards[wardWithDoubleSpaces];
+
+      if (ward) {
+        normalizedWard = wardWithDoubleSpaces;
+      } else {
+        // Try with single spaces
+        const wardWithSingleSpaces = normalizedWard.replace(/\s+/g, ' ');
+        ward = lga.wards[wardWithSingleSpaces];
+
+        if (ward) {
+          normalizedWard = wardWithSingleSpaces;
+        } else {
+          // Try finding a partial match (fuzzy matching)
+          const wardKeys = Object.keys(lga.wards);
+          const fuzzyMatch = wardKeys.find(key =>
+            key.replace(/\s+/g, '').toLowerCase() === normalizedWard.replace(/\s+/g, '').toLowerCase()
+          );
+
+          if (fuzzyMatch) {
+            ward = lga.wards[fuzzyMatch];
+            normalizedWard = fuzzyMatch;
+            console.log(`Found ward using fuzzy match: ${wardName} -> ${fuzzyMatch}`);
+          }
+        }
+      }
+    }
+
+    if (!ward) {
+      console.warn(`Ward not found: ${wardName} (normalized: ${normalizedWard}) in ${normalizedLGA}, ${normalizedState}`);
+      console.warn(`Available wards:`, Object.keys(lga.wards));
       return [];
     }
 
     // Transform polling units to dropdown options
-    return ward.pollingUnits.map((pu: PollingUnit) => ({
+    const pollingUnits = ward.pollingUnits.map((pu: PollingUnit) => ({
       value: pu.name,
       label: pu.name,
       id: pu.id,
@@ -67,8 +100,15 @@ export const getPollingUnitsForWard = (
       delimitation: pu.delimitation
     }));
 
+    console.log(`Found ${pollingUnits.length} polling units for ${normalizedState}/${normalizedLGA}/${normalizedWard}`);
+    return pollingUnits;
+
   } catch (error) {
-    console.error('Error getting polling units:', error);
+    console.error('Error getting polling units:', error, {
+      stateName,
+      lgaName,
+      wardName
+    });
     return [];
   }
 };
@@ -105,7 +145,7 @@ export const getLGAsForState = (stateName: string): string[] => {
 /**
  * Get all wards for a specific state and LGA
  * @param stateName - The state name
- * @param lgaName - The LGA name
+ * @param lgaName - The LGA name  
  * @returns Array of ward names
  */
 export const getWardsForLGA = (stateName: string, lgaName: string): string[] => {
@@ -131,6 +171,49 @@ export const getWardsForLGA = (stateName: string, lgaName: string): string[] => 
 };
 
 /**
+ * Debug function to find ward name variations
+ * @param stateName - The state name
+ * @param lgaName - The LGA name
+ * @param searchTerm - The ward name to search for
+ * @returns Array of matching ward names with similarity score
+ */
+export const findWardVariations = (stateName: string, lgaName: string, searchTerm: string): string[] => {
+  try {
+    const normalizedState = stateName?.toUpperCase().trim();
+    const normalizedLGA = lgaName?.toUpperCase().trim();
+    const normalizedSearch = searchTerm?.toUpperCase().trim();
+
+    const state = StateLGAWardPollingUnits[normalizedState];
+    if (!state) {
+      return [];
+    }
+
+    const lga = state.lgas[normalizedLGA];
+    if (!lga) {
+      return [];
+    }
+
+    const wardKeys = Object.keys(lga.wards);
+
+    // Find exact matches first
+    const exactMatch = wardKeys.find(key => key === normalizedSearch);
+    if (exactMatch) {
+      return [exactMatch];
+    }
+
+    // Find partial matches (without spaces/special chars)
+    const cleanSearch = normalizedSearch.replace(/[^A-Z0-9]/g, '');
+    const partialMatches = wardKeys.filter(key => {
+      const cleanKey = key.replace(/[^A-Z0-9]/g, '');
+      return cleanKey.includes(cleanSearch) || cleanSearch.includes(cleanKey);
+    });
+
+    return partialMatches.sort();
+  } catch (error) {
+    console.error('Error finding ward variations:', error);
+    return [];
+  }
+};/**
  * Validate if a polling unit exists for the given location
  * @param location - The voting location object
  * @returns boolean indicating if the polling unit exists
