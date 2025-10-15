@@ -184,10 +184,60 @@ export default function EditProfileModal({
     try {
       // Convert to the uppercase format expected by the new data structure
       const stateUpper = votingState.toUpperCase().replace(/-/g, ' ');
-      const lgaUpper = votingLGA.toUpperCase().replace(/-/g, ' ');
-      const wardUpper = votingWard.toUpperCase().replace(/-/g, ' ');
+      let lgaUpper = votingLGA.toUpperCase().replace(/-/g, ' ');
+      let wardUpper = votingWard.toUpperCase().replace(/-/g, ' ');
 
-      const pollingUnits = getPollingUnitsForWard(stateUpper, lgaUpper, wardUpper);
+      // Handle specific ward name formatting patterns in polling data
+      // These conversions match the exact format in StateLGAWardPollingUnits
+      if (wardUpper.includes('IGBO UKWU')) {
+        if (wardUpper.includes(' I') && !wardUpper.includes(' II')) {
+          wardUpper = 'IGBO-UKWU  I'; // Note: double space before I
+        } else if (wardUpper.includes(' II')) {
+          wardUpper = 'IGBO - UKWU  II'; // Note: spaces around hyphen and double space before II
+        }
+      }
+
+      // Handle spelling inconsistencies between StateLGAWard and StateLGAWardPollingUnits
+      if (wardUpper === 'ORERI') {
+        wardUpper = 'ORAERI'; // StateLGAWard has "oreri" but polling data has "ORAERI"
+      }
+
+      // Handle other similar patterns that might have inconsistent formatting
+      // Add more specific conversions as we discover them      // Handle specific cases where the polling units data has double spaces
+      // This is a known issue with the data structure inconsistency
+      const lgaWithDoubleSpaces = lgaUpper.replace(/\s+/g, '  '); // Convert all spaces to double spaces
+
+      // Debug logging for Anambra cases
+      if (votingState.toLowerCase().includes('anambra') && (votingLGA.toLowerCase().includes('aguata') || votingWard.toLowerCase().includes('igbo') || votingWard.toLowerCase().includes('oreri'))) {
+        console.log('DEBUG - Anambra/Aguata Lookup:', {
+          originalState: votingState,
+          originalLGA: votingLGA,
+          originalWard: votingWard,
+          convertedState: stateUpper,
+          convertedLGA: lgaUpper,
+          convertedLGAWithDoubleSpaces: lgaWithDoubleSpaces,
+          convertedWard: wardUpper,
+          wardAfterSpecialFormatting: wardUpper
+        });
+      }
+
+      // Try with single spaces first, then double spaces if that fails
+      let pollingUnits = getPollingUnitsForWard(stateUpper, lgaUpper, wardUpper);
+
+      // If no results with single spaces, try with double spaces
+      if (pollingUnits.length === 0) {
+        pollingUnits = getPollingUnitsForWard(stateUpper, lgaWithDoubleSpaces, wardUpper);
+
+        // Debug for retry
+        if (votingState.toLowerCase().includes('anambra') && (votingLGA.toLowerCase().includes('aguata') || votingWard.toLowerCase().includes('igbo') || votingWard.toLowerCase().includes('oreri'))) {
+          console.log('DEBUG - Retry with double spaces:', pollingUnits);
+        }
+      }
+
+      // Final result debug
+      if (votingState.toLowerCase().includes('anambra') && (votingLGA.toLowerCase().includes('aguata') || votingWard.toLowerCase().includes('igbo') || votingWard.toLowerCase().includes('oreri'))) {
+        console.log('DEBUG - Final Result:', pollingUnits);
+      }
 
       return pollingUnits.map((pu, i) => ({
         id: i,

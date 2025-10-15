@@ -1127,7 +1127,7 @@ export const statesLGAWardList = [
           "ikenga",
           "isuofia",
           "nkpologwu",
-          "oreri",
+          "oraeri",
           "uga-i",
           "uga-ii",
           "umuchu-i",
