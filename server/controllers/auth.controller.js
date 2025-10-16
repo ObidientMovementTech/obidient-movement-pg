@@ -532,6 +532,11 @@ export const getCurrentUser = async (req, res) => {
       isVoter: user.isVoter,
       willVote: user.willVote,
 
+      // Bank account details
+      bankName: user.bankName,
+      bankAccountNumber: user.bankAccountNumber,
+      bankAccountName: user.bankAccountName,
+
       // Designation and assignment fields
       designation: user.designation,
       assignedState: user.assignedState,

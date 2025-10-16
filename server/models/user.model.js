@@ -29,7 +29,10 @@ class User {
       willVote = null,
       userName = null,
       countryCode = null,
-      stateOfOrigin = null
+      stateOfOrigin = null,
+      bankName = null,
+      bankAccountNumber = null,
+      bankAccountName = null
     } = userData;
 
     const client = await getClient();
@@ -43,12 +46,14 @@ class User {
           "emailVerified", role, "votingState", "votingLGA", "votingWard",
           designation, "assignedState", "assignedLGA", "assignedWard",
           gender, "ageRange", citizenship, "isVoter", "willVote",
-          "userName", "countryCode", "stateOfOrigin"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) 
+          "userName", "countryCode", "stateOfOrigin",
+          "bankName", "bankAccountNumber", "bankAccountName"
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) 
         RETURNING *`,
         [name, email, phone, passwordHash, profileImage, emailVerified, role,
           votingState, votingLGA, votingWard, designation, assignedState, assignedLGA, assignedWard,
-          gender, ageRange, citizenship, isVoter, willVote, userName, countryCode, stateOfOrigin]
+          gender, ageRange, citizenship, isVoter, willVote, userName, countryCode, stateOfOrigin,
+          bankName, bankAccountNumber, bankAccountName]
       );
 
       const user = userResult.rows[0];
@@ -139,7 +144,8 @@ class User {
                      "countryOfResidence", "createdAt", "updatedAt", "votingState", "votingLGA",
                      "votingWard", "votingPU", gender, "ageRange", citizenship, "isVoter", "willVote",
                      "userName", "countryCode", "stateOfOrigin", lga, ward, "votingEngagementState",
-                     "profileCompletionPercentage", designation, "assignedState", "assignedLGA", "assignedWard"`;
+                     "profileCompletionPercentage", designation, "assignedState", "assignedLGA", "assignedWard",
+                     "bankName", "bankAccountNumber", "bankAccountName"`;
     }
 
     const result = await query(`SELECT ${selectFields} FROM users WHERE id = $1`, [id]);
@@ -212,7 +218,7 @@ class User {
       }
 
       // Handle direct user fields
-      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA', 'designation', 'assignedState', 'assignedLGA', 'assignedWard'];
+      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA', 'designation', 'assignedState', 'assignedLGA', 'assignedWard', 'bankName', 'bankAccountNumber', 'bankAccountName'];
       directFields.forEach(field => {
         if (updateData[field] !== undefined) {
           fieldsToUpdate.push(`"${field}" = $${paramCount}`);
@@ -256,7 +262,9 @@ class User {
       'votingState', 'votingLGA', 'votingWard', 'votingPU', 'gender', 'ageRange', 'citizenship',
       'isVoter', 'willVote', 'userName', 'countryCode', 'stateOfOrigin',
       // Add designation fields
-      'designation', 'assignedState', 'assignedLGA', 'assignedWard'
+      'designation', 'assignedState', 'assignedLGA', 'assignedWard',
+      // Add bank account fields
+      'bankName', 'bankAccountNumber', 'bankAccountName'
     ];
 
     updatableFields.forEach(field => {

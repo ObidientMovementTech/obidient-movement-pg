@@ -3,6 +3,7 @@ import { X, Users, Loader2 } from 'lucide-react';
 import { statesLGAWardList } from '../../utils/StateLGAWard';
 import { getPollingUnitsForWard } from '../../utils/pollingUnitUtils';
 import { formatStateName, formatLocationName } from '../../utils/textUtils';
+import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import FormSelect from '../select/FormSelect';
 import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
 import { adminUserManagementService } from '../../services/adminUserManagementService';
@@ -43,6 +44,9 @@ interface User {
   assignedState?: string;
   assignedLGA?: string;
   assignedWard?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
 }
 
 // Edit modal state interface
@@ -71,6 +75,9 @@ interface EditModalState {
   assignedState: string;
   assignedLGA: string;
   assignedWard: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
 }
 
 
@@ -115,7 +122,10 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     designation: '',
     assignedState: '',
     assignedLGA: '',
-    assignedWard: ''
+    assignedWard: '',
+    bankName: '',
+    bankAccountNumber: '',
+    bankAccountName: ''
   });
 
   // For cascading dropdowns
@@ -235,7 +245,10 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
         designation: user.designation || '',
         assignedState: user.assignedState || '',
         assignedLGA: user.assignedLGA || '',
-        assignedWard: user.assignedWard || ''
+        assignedWard: user.assignedWard || '',
+        bankName: user.bankName || '',
+        bankAccountNumber: user.bankAccountNumber || '',
+        bankAccountName: user.bankAccountName || ''
       });
 
       // Update cascading dropdown states for voting location
@@ -281,7 +294,11 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
         stateOfOrigin: formData.stateOfOrigin ? formatStateName(formData.stateOfOrigin) : formData.stateOfOrigin,
         role: formData.role,
         emailVerified: formData.emailVerified,
-        kycStatus: formData.kycStatus
+        kycStatus: formData.kycStatus,
+        // Bank account details
+        bankName: formData.bankName || undefined,
+        bankAccountNumber: formData.bankAccountNumber || undefined,
+        bankAccountName: formData.bankAccountName || undefined
       });
 
       // Update user designation and assignments
@@ -630,6 +647,68 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                         Is Voter
                       </label>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Account Details Section */}
+              <div className="space-y-4 p-4 bg-purple-50 rounded-lg">
+                <h4 className="text-sm font-medium text-purple-900">Bank Account Details</h4>
+                <p className="text-xs text-gray-600 mb-3">
+                  Optional payment information for reimbursements
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Bank Name */}
+                  <div>
+                    <FormSelect
+                      label="Bank Name"
+                      options={NIGERIAN_BANKS.map((bank, index) => ({
+                        id: index,
+                        label: bank,
+                        value: bank
+                      }))}
+                      defaultSelected={formData.bankName}
+                      onChange={(opt) => setFormData(prev => ({ ...prev, bankName: opt?.value || '' }))}
+                      placeholder="Select bank"
+                    />
+                  </div>
+
+                  {/* Bank Account Number */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.bankAccountNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        if (value.length <= 10) {
+                          setFormData(prev => ({ ...prev, bankAccountNumber: value }));
+                        }
+                      }}
+                      placeholder="10-digit number"
+                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      maxLength={10}
+                    />
+                    {formData.bankAccountNumber && formData.bankAccountNumber.length !== 10 && (
+                      <p className="text-xs text-amber-600 mt-1">Must be 10 digits</p>
+                    )}
+                  </div>
+
+                  {/* Bank Account Name */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Account Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.bankAccountName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, bankAccountName: e.target.value }))}
+                      placeholder="Account holder name"
+                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
                 </div>
               </div>

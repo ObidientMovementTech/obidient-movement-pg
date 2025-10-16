@@ -130,7 +130,8 @@ export const updateMe = async (req, res) => {
     const allowedTopLevelFields = [
       'name', 'phone', 'profileImage', 'votingState', 'votingLGA', 'votingWard', 'votingPU',
       'gender', 'ageRange', 'citizenship', 'isVoter', 'willVote', 'userName',
-      'countryCode', 'stateOfOrigin', 'notificationPreferences', 'onboardingData'
+      'countryCode', 'stateOfOrigin', 'notificationPreferences', 'onboardingData',
+      'bankName', 'bankAccountNumber', 'bankAccountName'
     ];
 
     allowedTopLevelFields.forEach(field => {

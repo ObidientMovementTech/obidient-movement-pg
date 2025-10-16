@@ -27,6 +27,9 @@ interface UserProfileUpdate {
   emailVerified?: boolean;
   kycStatus?: 'unsubmitted' | 'draft' | 'pending' | 'approved' | 'rejected';
   personalInfo?: Record<string, any>;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
 }
 
 interface UserCreation {
@@ -53,6 +56,11 @@ interface UserCreation {
   // Voter Status
   isVoter?: string;
   willVote?: string;
+
+  // Bank Account Details
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
 
   // Admin Assignment (removed designation for now)
   assignedState?: string;

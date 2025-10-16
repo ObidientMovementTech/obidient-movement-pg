@@ -76,6 +76,9 @@ export interface UserProfile {
   assignedState?: string;
   assignedLGA?: string;
   assignedWard?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
   selfieImageUrl?: string;
   validID: ValidID;
   joinedCauses: string[];
