@@ -6,6 +6,7 @@ import { formatStateName, formatLocationName } from '../../utils/textUtils';
 import { formatPhoneForStorage } from '../../utils/phoneUtils';
 import { OptionType, genderOptions, ageRangeOptions } from '../../utils/lookups';
 import { getPollingUnitsForWard } from '../../utils/pollingUnitUtils';
+import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import ListBoxComp from '../select/ListBox';
 import Toast from '../Toast';
 
@@ -33,6 +34,11 @@ interface CreateUserData {
   // Voter Status
   isVoter?: string;
   willVote?: string;
+
+  // Bank Account Details
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
 
   // Admin Assignment (removed designation for now)
   assignedState?: string;
@@ -530,7 +536,69 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
               </div>
             </div>
 
+            {/* Bank Account Details */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Shield size={18} />
+                Bank Account Details (Optional)
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Bank details for future payments and reimbursements
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Bank Name */}
+                <div>
+                  <FormSelect
+                    label="Bank Name"
+                    options={NIGERIAN_BANKS.map((bank, index) => ({
+                      id: index,
+                      label: bank,
+                      value: bank
+                    }))}
+                    defaultSelected={formData.bankName}
+                    onChange={(opt) => setFormData(prev => ({ ...prev, bankName: opt?.value || '' }))}
+                    placeholder="Select bank"
+                  />
+                </div>
 
+                {/* Bank Account Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Account Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.bankAccountNumber || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, ''); // Only allow numbers
+                      if (value.length <= 10) {
+                        setFormData(prev => ({ ...prev, bankAccountNumber: value }));
+                      }
+                    }}
+                    placeholder="10-digit account number"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    maxLength={10}
+                  />
+                  {formData.bankAccountNumber && formData.bankAccountNumber.length !== 10 && (
+                    <p className="text-xs text-amber-600 mt-1">Account number must be 10 digits</p>
+                  )}
+                </div>
+
+                {/* Bank Account Name */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Account Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.bankAccountName || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, bankAccountName: e.target.value }))}
+                    placeholder="Enter account holder name"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+              </div>
+            </div>
 
             {/* Admin Options */}
             <div className="border-t pt-6">

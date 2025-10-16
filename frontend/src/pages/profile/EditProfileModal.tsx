@@ -11,6 +11,7 @@ import { statesLGAWardList } from '../../utils/StateLGAWard';
 import { getPollingUnitsForWard } from '../../utils/pollingUnitUtils';
 import { formatStateName, formatLocationName } from '../../utils/textUtils';
 import { validateUsernameFormat, debouncedUsernameCheck } from '../../services/profileService';
+import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import axios from 'axios';
 
 export default function EditProfileModal({
@@ -88,6 +89,11 @@ export default function EditProfileModal({
     }
     return existingCountry;
   });
+
+  // Bank account details state
+  const [bankName, setBankName] = useState(profile.bankName || '');
+  const [bankAccountNumber, setBankAccountNumber] = useState(profile.bankAccountNumber || '');
+  const [bankAccountName, setBankAccountName] = useState(profile.bankAccountName || '');
 
   // For cascading dropdowns
   const [selectedState, setSelectedState] = useState(profile.votingState || '');
@@ -209,16 +215,7 @@ export default function EditProfileModal({
 
       // Debug logging for Anambra cases
       if (votingState.toLowerCase().includes('anambra') && (votingLGA.toLowerCase().includes('aguata') || votingWard.toLowerCase().includes('igbo') || votingWard.toLowerCase().includes('oreri'))) {
-        console.log('DEBUG - Anambra/Aguata Lookup:', {
-          originalState: votingState,
-          originalLGA: votingLGA,
-          originalWard: votingWard,
-          convertedState: stateUpper,
-          convertedLGA: lgaUpper,
-          convertedLGAWithDoubleSpaces: lgaWithDoubleSpaces,
-          convertedWard: wardUpper,
-          wardAfterSpecialFormatting: wardUpper
-        });
+        
       }
 
       // Try with single spaces first, then double spaces if that fails
@@ -305,6 +302,11 @@ export default function EditProfileModal({
       setVotingPU(profile.votingPU || '');
       setIsVoter(newIsVoter);
       setWillVote(newWillVote);
+
+      // Set bank account details
+      setBankName(profile.bankName || '');
+      setBankAccountNumber(profile.bankAccountNumber || '');
+      setBankAccountName(profile.bankAccountName || '');
 
       // Update cascading dropdown states - convert to formats expected by StateLGAWard
       const originalLGA = convertToOriginalFormat(newVotingLGA, 'location'); // "Osisioma" -> "osisioma"
@@ -412,6 +414,10 @@ export default function EditProfileModal({
         votingPU: votingPU || '', // Add polling unit
         isVoter,
         willVote,
+        // Bank account details
+        bankName: bankName || undefined,
+        bankAccountNumber: bankAccountNumber || undefined,
+        bankAccountName: bankAccountName || undefined,
       };
 
       await updateProfile(updatedProfile);
@@ -736,6 +742,69 @@ export default function EditProfileModal({
                   disabled={!votingWard}
                   key={`votingPU-${votingWard}-${votingPU}`} // Force re-render when ward or PU changes
                   placeholder="Select your polling unit"
+                />
+              </div>
+
+              {/* Bank Account Details Section */}
+              <div className="col-span-2 pt-4 border-t border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Bank Account Details (Optional)</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Provide your bank details for future payments and reimbursements
+                </p>
+              </div>
+
+              {/* Bank Name */}
+              <div>
+                <FormSelect
+                  label="Bank Name"
+                  options={NIGERIAN_BANKS.map((bank, index) => ({
+                    id: index,
+                    label: bank,
+                    value: bank
+                  }))}
+                  defaultSelected={bankName}
+                  onChange={(opt) => {
+                    if (opt) setBankName(opt.value);
+                  }}
+                  key={`bankName-${bankName}`}
+                  placeholder="Select your bank"
+                />
+              </div>
+
+              {/* Bank Account Number */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Account Number
+                </label>
+                <input
+                  type="text"
+                  value={bankAccountNumber}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ''); // Only allow numbers
+                    if (value.length <= 10) { // Nigerian account numbers are 10 digits
+                      setBankAccountNumber(value);
+                    }
+                  }}
+                  placeholder="Enter 10-digit account number"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006837] focus:border-transparent"
+                  maxLength={10}
+                />
+                {bankAccountNumber && bankAccountNumber.length !== 10 && (
+                  <p className="text-xs text-amber-600 mt-1">Account number must be 10 digits</p>
+                )}
+              </div>
+
+              {/* Bank Account Name */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Account Name
+                </label>
+                <input
+                  type="text"
+                  value={bankAccountName}
+                  onChange={(e) => setBankAccountName(e.target.value)}
+                  placeholder="Enter account holder name"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006837] focus:border-transparent"
                 />
               </div>
 

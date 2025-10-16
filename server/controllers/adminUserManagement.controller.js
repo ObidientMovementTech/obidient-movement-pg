@@ -463,7 +463,10 @@ export const adminUserManagementController = {
         countryOfResidence,
         votingState,
         votingLGA,
-        personalInfo
+        personalInfo,
+        bankName,
+        bankAccountNumber,
+        bankAccountName
       } = req.body;
 
       const client = await getClient();
@@ -472,7 +475,7 @@ export const adminUserManagementController = {
         await client.query('BEGIN');
 
         // Update main user table
-        if (name || email || phone || countryOfResidence || votingState || votingLGA) {
+        if (name || email || phone || countryOfResidence || votingState || votingLGA || bankName !== undefined || bankAccountNumber !== undefined || bankAccountName !== undefined) {
           let updateFields = [];
           let queryParams = [];
           let paramIndex = 1;
@@ -510,6 +513,24 @@ export const adminUserManagementController = {
           if (votingLGA) {
             updateFields.push(`"votingLGA" = $${paramIndex}`);
             queryParams.push(votingLGA);
+            paramIndex++;
+          }
+
+          if (bankName !== undefined) {
+            updateFields.push(`"bankName" = $${paramIndex}`);
+            queryParams.push(bankName);
+            paramIndex++;
+          }
+
+          if (bankAccountNumber !== undefined) {
+            updateFields.push(`"bankAccountNumber" = $${paramIndex}`);
+            queryParams.push(bankAccountNumber);
+            paramIndex++;
+          }
+
+          if (bankAccountName !== undefined) {
+            updateFields.push(`"bankAccountName" = $${paramIndex}`);
+            queryParams.push(bankAccountName);
             paramIndex++;
           }
 
@@ -679,6 +700,11 @@ export const adminUserManagementController = {
         isVoter,
         willVote,
 
+        // Bank Account Details
+        bankName,
+        bankAccountNumber,
+        bankAccountName,
+
         // Admin Assignment (removed designation for now)
         assignedState,
         assignedLGA,
@@ -725,10 +751,12 @@ export const adminUserManagementController = {
           "countryOfResidence", "votingState", "votingLGA", "votingWard", "votingPU",
           "userName", gender, "ageRange", citizenship, "stateOfOrigin",
           "isVoter", "willVote", "assignedState", "assignedLGA", "assignedWard",
-          "countryCode", "adminCreated", "createdAt", "updatedAt"
+          "countryCode", "adminCreated", 
+          "bankName", "bankAccountNumber", "bankAccountName",
+          "createdAt", "updatedAt"
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 
-          $19, $20, $21, $22, $23, NOW(), NOW()
+          $19, $20, $21, $22, $23, $24, $25, $26, NOW(), NOW()
         )
         RETURNING id, name, email, phone, role, "emailVerified", "createdAt", "adminCreated"
       `;
@@ -738,7 +766,8 @@ export const adminUserManagementController = {
         countryOfResidence || null, votingState || null, votingLGA || null, votingWard || null, votingPU || null,
         userName || null, gender || null, ageRange || null, citizenship || null, stateOfOrigin || null,
         isVoter || null, willVote || null, assignedState || null, assignedLGA || null, assignedWard || null,
-        countryCode || null, adminCreated
+        countryCode || null, adminCreated,
+        bankName || null, bankAccountNumber || null, bankAccountName || null
       ]);
 
       const newUser = result.rows[0];
