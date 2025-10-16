@@ -787,7 +787,7 @@ const updateVoterInfo = async (req, res) => {
       });
     }
 
-    // Update voter information
+    // Update voter information and increment call_count
     const updateQuery = `
       UPDATE inec_voters SET
         full_name = COALESCE($2, full_name),
@@ -799,6 +799,8 @@ const updateVoterInfo = async (req, res) => {
         notes = COALESCE($8, notes),
         called_recently = true,
         last_called_date = CURRENT_TIMESTAMP,
+        call_count = COALESCE(call_count, 0) + 1,
+        last_updated_by = $9,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING *
@@ -812,25 +814,46 @@ const updateVoterInfo = async (req, res) => {
       ageGroup || null,
       confirmedToVote,
       demands || null,
-      notes || null
+      notes || null,
+      userId
     ]);
 
-    // Log the call
+    // Log the call with proper schema
     const logQuery = `
       INSERT INTO call_logs (
         voter_id,
         volunteer_id,
         call_date,
+        call_outcome,
         notes,
-        confirmed_to_vote
-      ) VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4)
+        data_collected
+      ) VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5)
     `;
+
+    // Determine call outcome based on whether voter confirmed
+    let callOutcome = 'answered';
+    if (confirmedToVote === true) {
+      callOutcome = 'confirmed';
+    } else if (confirmedToVote === false) {
+      callOutcome = 'declined';
+    }
+
+    // Store additional data in JSONB
+    const dataCollected = {
+      fullName: fullName || null,
+      emailAddress: emailAddress || null,
+      gender: gender || null,
+      ageGroup: ageGroup || null,
+      confirmedToVote: confirmedToVote,
+      demands: demands || null
+    };
 
     await query(logQuery, [
       voterId,
       userId,
+      callOutcome,
       notes || null,
-      confirmedToVote
+      JSON.stringify(dataCollected)
     ]);
 
     res.json({
