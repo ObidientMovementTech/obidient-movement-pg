@@ -14,6 +14,7 @@ import MonitorKeyAssignmentModal from '../../../components/MonitorKeyAssignmentM
 import AdminCreateUserModal from '../../../components/modals/AdminCreateUserModal';
 import AdminEditUserModal from '../../../components/modals/AdminEditUserModal';
 import AdminViewUserModal from '../../../components/modals/AdminViewUserModal';
+import EnhancedVolunteerAssignmentModal from '../../../components/callCenter/EnhancedVolunteerAssignmentModal';
 
 interface User {
   id: string;
@@ -172,6 +173,10 @@ export default function AdminUserManagement() {
     isOpen: false,
     user: null
   });
+
+  // Volunteer assignment modal state
+  const [showVolunteerAssignmentModal, setShowVolunteerAssignmentModal] = useState(false);
+  const [selectedUserForAssignment, setSelectedUserForAssignment] = useState<User | null>(null);
 
   // OPTIMIZED: Debounced search effect
   useEffect(() => {
@@ -510,6 +515,20 @@ export default function AdminUserManagement() {
       isOpen: false,
       user: null
     });
+  };
+
+  // Call Center assignment functions
+  const handleAssignToCallCenter = (user: User) => {
+    // Store the user we're assigning in a way that the VolunteerAssignmentModal can access
+    setSelectedUserForAssignment(user);
+    setShowVolunteerAssignmentModal(true);
+  };
+
+  const handleAssignmentComplete = () => {
+    setShowVolunteerAssignmentModal(false);
+    setSelectedUserForAssignment(null);
+    // Refresh users list to show updated assignments
+    loadUsers();
   };
 
   // View modal functions
@@ -1409,6 +1428,14 @@ export default function AdminUserManagement() {
                             <Edit3 size={16} />
                           </button>
 
+                          <button
+                            onClick={() => handleAssignToCallCenter(user)}
+                            className="text-green-600 hover:text-green-700"
+                            title="Assign to Call Center"
+                          >
+                            <Users size={16} />
+                          </button>
+
                           {user.role === 'admin' ? (
                             <button
                               onClick={() => handleRoleChange(user.id, 'user', user.name)}
@@ -1659,6 +1686,17 @@ export default function AdminUserManagement() {
           // Refresh the users list
           loadUsers();
         }}
+      />
+
+      {/* Volunteer Assignment Modal */}
+      <EnhancedVolunteerAssignmentModal
+        isOpen={showVolunteerAssignmentModal}
+        onClose={() => {
+          setShowVolunteerAssignmentModal(false);
+          setSelectedUserForAssignment(null);
+        }}
+        onAssignmentComplete={handleAssignmentComplete}
+        preselectedUser={selectedUserForAssignment}
       />
     </div>
   );

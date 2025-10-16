@@ -20,6 +20,7 @@ import {
   RefreshCw,
   MapPin,
   Smartphone,
+  Phone,
 } from "lucide-react";
 import TopLogo from "../../components/TopLogo";
 import Loading from "../../components/Loader";
@@ -48,6 +49,7 @@ import AdminMobileFeedsPage from "./admin/AdminMobileFeedsPage";
 import ElectionManagement from "./admin/ElectionManagement";
 import AllNotificationsPage from "./notifications/AllNotificationsPage";
 import StateDashboard from "./state/StateDashboard";
+import CallCenterAdminNavigator from "../../components/callCenter/CallCenterAdminNavigator";
 // Sidebar menu items type
 interface NavItem {
   title: string;
@@ -195,6 +197,7 @@ export default function DashboardPage() {
       title: "Admin",
       icon: <ShieldCheck size={24} />,
       children: [
+        { title: "Call Center Navigation", icon: <Phone size={20} />, component: <CallCenterAdminNavigator /> },
         { title: "Election Management", icon: <Landmark size={20} />, component: <ElectionManagement /> },
         { title: "User Management", icon: <Users size={20} />, component: <AdminUserManagement /> },
         { title: "KYC Management", icon: <UserCheck size={20} />, component: <KYCManagement /> },

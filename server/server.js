@@ -23,6 +23,8 @@ import electionRoutes from './routes/election.routes.js';
 import monitoringRoutes from './routes/monitoring.route.js';
 import mobileRoutes from './routes/mobile.route.js';
 import mobiliseDashboardRoutes from './routes/mobiliseDashboard.routes.js';
+import callCenterRoutes from './routes/callCenter.routes.js';
+import inecVotersRoutes from './routes/inecVoters.routes.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -84,6 +86,8 @@ app.use('/monitor-key', monitorKeyRoutes); // Monitor Key routes
 app.use('/elections', electionRoutes); // Election Management routes
 app.use('/monitoring', monitoringRoutes); // Vote Protection monitoring routes
 app.use('/mobile', mobileRoutes); // Mobile App API routes
+app.use('/call-center', callCenterRoutes); // Call Center routes
+app.use('/api/inec-voters', inecVotersRoutes); // INEC Voters API - Scalable data access
 
 // Placeholder route
 app.get('/', (req, res) => {
