@@ -48,6 +48,10 @@ const OfficerVerificationPage = lazy(() => import("./pages/dashboard/elections/m
 const ResultTrackingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/ResultTrackingPage.tsx"));
 const IncidentReportingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/IncidentReportingPage.tsx"));
 
+// Call Center Pages
+const CallCenterAdmin = lazy(() => import("./pages/callCenter/CallCenterAdmin.tsx"));
+const CallCenterVolunteer = lazy(() => import("./pages/callCenter/CallCenterVolunteer.tsx"));
+
 // Loading component
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -181,6 +185,25 @@ const router = createBrowserRouter([
     ),
   },
 
+  // Call Center Routes
+  {
+    path: "/dashboard/call-center/admin",
+    element: (
+      <ProtectedRoute>
+        <CallCenterAdmin />
+      </ProtectedRoute>
+    ),
+  },
+
+  {
+    path: "/dashboard/call-center/volunteer",
+    element: (
+      <ProtectedRoute>
+        <CallCenterVolunteer />
+      </ProtectedRoute>
+    ),
+  },
+
   // Voting Bloc Links
   {
     path: "/dashboard/new-voting-bloc",
@@ -218,16 +241,38 @@ const router = createBrowserRouter([
 
 ]);
 
-const root = ReactDOM.createRoot(document.getElementById("root")!);
-root.render(
+// Create root safely - this pattern prevents the warning in development
+const container = document.getElementById("root")!;
+
+// In development, React.StrictMode causes double rendering which can trigger the warning
+// This is expected behavior and the warning can be safely ignored, but we can improve it
+const renderApp = () => (
   <React.StrictMode>
     <ThemeProvider>
       <ModalProvider>
         <UserProvider>
           <RouterProvider router={router} />
-
         </UserProvider>
       </ModalProvider>
     </ThemeProvider>
   </React.StrictMode>
 );
+
+// Check if we're in development mode to handle hot reloading
+if (import.meta.hot) {
+  // In development with Vite HMR
+  let root: ReactDOM.Root;
+
+  if (!(container as any)._reactRoot) {
+    root = ReactDOM.createRoot(container);
+    (container as any)._reactRoot = root;
+  } else {
+    root = (container as any)._reactRoot;
+  }
+
+  root.render(renderApp());
+} else {
+  // In production
+  const root = ReactDOM.createRoot(container);
+  root.render(renderApp());
+}
