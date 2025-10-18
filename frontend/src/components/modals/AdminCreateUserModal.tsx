@@ -77,6 +77,61 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [states, setStates] = useState<OptionType[]>([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [quickOnboardingMode, setQuickOnboardingMode] = useState(false);
+
+  // Helper function to generate email from name
+  const generateEmailFromName = (name: string): string => {
+    if (!name.trim()) return '';
+
+    // Remove special characters and extra spaces, convert to lowercase
+    const cleanName = name
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, '') // Remove non-alphabetic characters except spaces
+      .trim()
+      .replace(/\s+/g, ''); // Remove all spaces
+
+    return `${cleanName}@obidients.com`;
+  };
+
+  // Watch for name changes in quick onboarding mode
+  const handleNameChange = (newName: string) => {
+    setFormData(prev => {
+      const updates: any = { name: newName };
+
+      // Auto-generate email if in quick onboarding mode and email field is empty or is an @obidients.com email
+      if (quickOnboardingMode) {
+        const isObidientsEmail = prev.email.endsWith('@obidients.com') || prev.email === '';
+        if (isObidientsEmail) {
+          updates.email = generateEmailFromName(newName);
+        }
+      }
+
+      return { ...prev, ...updates };
+    });
+  };
+
+  // Toggle quick onboarding mode
+  const handleQuickOnboardingToggle = (enabled: boolean) => {
+    setQuickOnboardingMode(enabled);
+
+    if (enabled) {
+      // Enable quick onboarding mode
+      setFormData(prev => ({
+        ...prev,
+        password: '123456',
+        votingState: 'anambra',
+        email: prev.name ? generateEmailFromName(prev.name) : ''
+      }));
+    } else {
+      // Disable quick onboarding mode - clear auto-filled values
+      setFormData(prev => ({
+        ...prev,
+        password: '',
+        votingState: '',
+        email: prev.email.endsWith('@obidients.com') ? '' : prev.email // Only clear if it's an auto-generated email
+      }));
+    }
+  };
 
 
 
@@ -269,6 +324,34 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
         {/* Form */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Quick Onboarding Mode Toggle */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="quickOnboardingMode"
+                  checked={quickOnboardingMode}
+                  onChange={(e) => handleQuickOnboardingToggle(e.target.checked)}
+                  className="mt-1 h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <div className="flex-1">
+                  <label htmlFor="quickOnboardingMode" className="text-sm font-medium text-gray-900 cursor-pointer">
+                    Quick Onboarding Mode (Anambra Bulk Registration)
+                  </label>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Automatically sets: Email (from name), Password (123456), and Voting State (Anambra).
+                    <span className="font-medium"> All fields remain editable.</span>
+                  </p>
+                  {quickOnboardingMode && (
+                    <div className="mt-2 text-xs text-green-700 font-medium flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      Quick mode active - Enter name to auto-generate email
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Basic Information */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -285,7 +368,7 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => handleNameChange(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     placeholder="Enter full name"
                     required
@@ -294,14 +377,20 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     Email Address *
+                    {quickOnboardingMode && formData.email.endsWith('@obidients.com') && (
+                      <span className="text-xs text-green-600 font-normal">(Auto-generated)</span>
+                    )}
                   </label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${quickOnboardingMode && formData.email.endsWith('@obidients.com')
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-300'
+                      }`}
                     placeholder="Enter email address"
                     required
                   />
@@ -339,15 +428,21 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
                 {/* Password */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     Password *
+                    {quickOnboardingMode && formData.password === '123456' && (
+                      <span className="text-xs text-green-600 font-normal">(Default: 123456)</span>
+                    )}
                   </label>
                   <div className="flex gap-2">
                     <input
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
                       onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className={`flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${quickOnboardingMode && formData.password === '123456'
+                          ? 'border-green-300 bg-green-50'
+                          : 'border-gray-300'
+                        }`}
                       placeholder="Enter password"
                       required
                     />
