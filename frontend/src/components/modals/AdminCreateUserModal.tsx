@@ -120,6 +120,9 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
         ...prev,
         password: '123456',
         votingState: 'anambra',
+        citizenship: 'Nigerian Citizen',
+        isVoter: 'Yes',
+        willVote: 'Yes',
         email: prev.name ? generateEmailFromName(prev.name) : ''
       }));
     } else {
@@ -128,6 +131,9 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
         ...prev,
         password: '',
         votingState: '',
+        citizenship: '',
+        isVoter: '',
+        willVote: '',
         email: prev.email.endsWith('@obidients.com') ? '' : prev.email // Only clear if it's an auto-generated email
       }));
     }
@@ -339,7 +345,8 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                     Quick Onboarding Mode (Anambra Bulk Registration)
                   </label>
                   <p className="text-xs text-gray-600 mt-1">
-                    Automatically sets: Email (from name), Password (123456), and Voting State (Anambra).
+                    Automatically sets: Email (from name), Password (123456), Voting State (Anambra),
+                    Citizenship (Nigerian Citizen), Registered Voter (Yes), Will Vote (Yes).
                     <span className="font-medium"> All fields remain editable.</span>
                   </p>
                   {quickOnboardingMode && (
@@ -388,8 +395,8 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                     value={formData.email}
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${quickOnboardingMode && formData.email.endsWith('@obidients.com')
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-gray-300'
+                      ? 'border-green-300 bg-green-50'
+                      : 'border-gray-300'
                       }`}
                     placeholder="Enter email address"
                     required
@@ -440,8 +447,8 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                       value={formData.password}
                       onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                       className={`flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${quickOnboardingMode && formData.password === '123456'
-                          ? 'border-green-300 bg-green-50'
-                          : 'border-gray-300'
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-300'
                         }`}
                       placeholder="Enter password"
                       required
@@ -516,8 +523,14 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
                 {/* Citizenship */}
                 <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-sm font-medium text-gray-700">Citizenship</label>
+                    {quickOnboardingMode && formData.citizenship === 'Nigerian Citizen' && (
+                      <span className="text-xs text-green-600 font-normal">(Default)</span>
+                    )}
+                  </div>
                   <FormSelect
-                    label="Citizenship"
+                    label=""
                     options={citizenshipOptions}
                     defaultSelected={formData.citizenship}
                     onChange={(opt) => setFormData(prev => ({ ...prev, citizenship: opt?.value || '' }))}
@@ -609,8 +622,14 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
                 {/* Voter Registration Status */}
                 <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-sm font-medium text-gray-700">Registered Voter?</label>
+                    {quickOnboardingMode && formData.isVoter === 'Yes' && (
+                      <span className="text-xs text-green-600 font-normal">(Default)</span>
+                    )}
+                  </div>
                   <FormSelect
-                    label="Registered Voter?"
+                    label=""
                     options={yesNoOptions}
                     defaultSelected={formData.isVoter}
                     onChange={(opt) => setFormData(prev => ({ ...prev, isVoter: opt?.value || '' }))}
@@ -620,8 +639,14 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
                 {/* Will Vote */}
                 <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-sm font-medium text-gray-700">Will vote in next election?</label>
+                    {quickOnboardingMode && formData.willVote === 'Yes' && (
+                      <span className="text-xs text-green-600 font-normal">(Default)</span>
+                    )}
+                  </div>
                   <FormSelect
-                    label="Will vote in next election?"
+                    label=""
                     options={yesNoOptions}
                     defaultSelected={formData.willVote}
                     onChange={(opt) => setFormData(prev => ({ ...prev, willVote: opt?.value || '' }))}
