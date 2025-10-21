@@ -16,6 +16,7 @@ export const NIGERIAN_BANKS = [
   'Jaiz Bank',
   'Keystone Bank',
   'Kuda Bank',
+  'Moniepoint MFB',
   'Opay',
   'Parallex Bank',
   'PalmPay',
