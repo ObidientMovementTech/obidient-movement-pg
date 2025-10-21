@@ -1,6 +1,7 @@
 import express from 'express';
 import { protect } from '../middlewares/auth.middleware.js';
 import { monitoringController } from '../controllers/monitoring.controller.js';
+import { parseFileUpload } from '../utils/s3Upload.js';
 
 const router = express.Router();
 
@@ -53,6 +54,9 @@ router.post('/result-tracking', monitoringController.submitResultTracking);
 
 // Submit incident report
 router.post('/incident-report', monitoringController.submitIncidentReport);
+
+// Upload evidence (photos/videos)
+router.post('/upload-evidence', parseFileUpload('evidence'), monitoringController.uploadEvidence);
 
 // ================================
 // DATA RETRIEVAL ROUTES

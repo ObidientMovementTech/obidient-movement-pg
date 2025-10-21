@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { monitoringService } from '../../../../../../../services/monitoringService';
+import CameraCapture from '../../../../../../../components/CameraCapture';
+import Toast from '../../../../../../../components/Toast';
 
 interface OfficerPhoto {
   name: string;
-  photo: File | null;
-  preview?: string;
+  photoUrl: string;  // Changed from File to string (S3 URL)
+  fileName?: string;
 }
 
 interface INECIdentityProps {
@@ -19,12 +22,16 @@ export default function INECIdentityVerification({
 }: INECIdentityProps) {
   const [data, setData] = useState<Record<string, OfficerPhoto>>(
     formData.officerArrival?.officerNames || {
-      po: { name: '', photo: null },
-      apo1: { name: '', photo: null },
-      apo2: { name: '', photo: null },
-      apo3: { name: '', photo: null },
+      po: { name: '', photoUrl: '' },
+      apo1: { name: '', photoUrl: '' },
+      apo2: { name: '', photoUrl: '' },
+      apo3: { name: '', photoUrl: '' },
     }
   );
+
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const handleNameChange = (role: string, name: string) => {
     const updated = {
@@ -44,27 +51,59 @@ export default function INECIdentityVerification({
     });
   };
 
-  const handlePhotoChange = (role: string, file: File | null) => {
-    const preview = file ? URL.createObjectURL(file) : undefined;
-    const updated = {
-      ...data,
-      [role]: {
-        ...data[role],
-        photo: file,
-        preview,
-      },
-    };
-    setData(updated);
-    setFormData({
-      ...formData,
-      officerArrival: {
-        ...formData.officerArrival,
-        officerNames: updated,
-      },
-    });
+  const handlePhotoCapture = async (role: string, file: File) => {
+    try {
+      setUploading({ ...uploading, [role]: true });
+      setUploadProgress({ ...uploadProgress, [role]: 0 });
+
+      // Upload to S3
+      const photoUrl = await monitoringService.uploadEvidence(
+        file,
+        {
+          type: 'officer_photo',
+          role: role,
+          description: `Photo of ${role.toUpperCase()}`
+        },
+        (progress) => {
+          setUploadProgress({ ...uploadProgress, [role]: progress });
+        }
+      );
+
+      // Update state with S3 URL
+      const updated = {
+        ...data,
+        [role]: {
+          ...data[role],
+          photoUrl: photoUrl,
+          fileName: file.name
+        },
+      };
+
+      setData(updated);
+      setFormData({
+        ...formData,
+        officerArrival: {
+          ...formData.officerArrival,
+          officerNames: updated,
+        },
+      });
+
+      setToast({ message: `${role.toUpperCase()} photo uploaded successfully`, type: 'success' });
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      setToast({ message: error.message || 'Failed to upload photo. Please try again.', type: 'error' });
+    } finally {
+      setUploading({ ...uploading, [role]: false });
+    }
   };
 
   const handleNext = () => {
+    // Validate that at least PO photo is uploaded
+    if (!data.po.photoUrl) {
+      setToast({ message: 'Please upload at least the Presiding Officer (PO) photo', type: 'error' });
+      return;
+    }
+
     onNext({
       officerArrival: {
         ...formData.officerArrival,
@@ -73,51 +112,69 @@ export default function INECIdentityVerification({
     });
   };
 
+  const getRoleLabel = (role: string) => {
+    const labels: Record<string, string> = {
+      po: 'Presiding Officer (PO)',
+      apo1: 'Assistant PO 1 (APO1)',
+      apo2: 'Assistant PO 2 (APO2)',
+      apo3: 'Assistant PO 3 (APO3)'
+    };
+    return labels[role] || role;
+  };
+
   return (
-    <div className="space-y-10">
-      <h2 className="text-2xl font-bold text-[#006837]">INEC Officer Verification</h2>
+    <div className="space-y-8">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      <div>
+        <h2 className="text-2xl font-bold text-[#006837]">INEC Officer Verification</h2>
+        <p className="text-sm text-gray-600 mt-2">
+          Capture or upload photos of INEC officers for verification. At minimum, PO photo is required.
+        </p>
+      </div>
 
       {['po', 'apo1', 'apo2', 'apo3'].map((role) => (
         <div
           key={role}
-          className="grid grid-cols-1 md:grid-cols-2 items-start gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100"
+          className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 space-y-4"
         >
-          {/* Officer Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 capitalize mb-1">
-              {role} Full Name
-            </label>
-            <input
-              type="text"
-              value={data[role].name}
-              onChange={(e) => handleNameChange(role, e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8cc63f]"
-              placeholder="e.g. John Doe"
-            />
-          </div>
+          <h3 className="text-lg font-semibold text-gray-800">
+            {getRoleLabel(role)}
+            {role === 'po' && <span className="text-red-500 ml-1">*</span>}
+          </h3>
 
-          {/* Photo Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 capitalize mb-1">
-              Upload {role} Photo
-            </label>
-            <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Officer Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name
+              </label>
               <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handlePhotoChange(role, e.target.files?.[0] || null)}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                type="text"
+                value={data[role].name}
+                onChange={(e) => handleNameChange(role, e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8cc63f]"
+                placeholder="e.g. John Doe"
               />
-              <p className="text-sm text-gray-500 text-center">
-                Click or drag to upload photo
-              </p>
-              {data[role].preview && (
-                <img
-                  src={data[role].preview}
-                  alt={`${role} preview`}
-                  className="mt-4 h-24 w-24 object-cover rounded-full border mx-auto"
-                />
-              )}
+            </div>
+
+            {/* Photo Capture/Upload */}
+            <div>
+              <CameraCapture
+                label="Officer Photo"
+                accept="image/*"
+                onCapture={(file) => handlePhotoCapture(role, file)}
+                currentPreview={data[role].photoUrl}
+                uploading={uploading[role]}
+                uploadProgress={uploadProgress[role]}
+                disabled={uploading[role]}
+              />
             </div>
           </div>
         </div>
@@ -127,7 +184,8 @@ export default function INECIdentityVerification({
         <button
           type="button"
           onClick={handleNext}
-          className="bg-[#006837] hover:bg-[#00552e] text-white px-6 py-3 rounded-xl font-medium transition-all duration-300"
+          disabled={Object.values(uploading).some(u => u)}
+          className="bg-[#006837] hover:bg-[#00552e] text-white px-8 py-3 rounded-xl font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Continue
         </button>

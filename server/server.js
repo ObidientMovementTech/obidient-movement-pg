@@ -20,6 +20,7 @@ import imageProxyRoutes from './routes/imageProxy.route.js';
 import stateDashboardRoutes from './routes/stateDashboard.routes.js';
 import monitorKeyRoutes from './routes/monitorKey.route.js';
 import electionRoutes from './routes/election.routes.js';
+import electionResultsRoutes from './routes/electionResults.routes.js';
 import monitoringRoutes from './routes/monitoring.route.js';
 import mobileRoutes from './routes/mobile.route.js';
 import mobiliseDashboardRoutes from './routes/mobiliseDashboard.routes.js';
@@ -84,6 +85,7 @@ app.use('/state-dashboard', stateDashboardRoutes); // State Dashboard routes
 app.use('/mobilise-dashboard', mobiliseDashboardRoutes); // Mobilise Dashboard routes
 app.use('/monitor-key', monitorKeyRoutes); // Monitor Key routes
 app.use('/elections', electionRoutes); // Election Management routes
+app.use('/election-results', electionResultsRoutes); // Election Results (Live) routes
 app.use('/monitoring', monitoringRoutes); // Vote Protection monitoring routes
 app.use('/mobile', mobileRoutes); // Mobile App API routes
 app.use('/call-center', callCenterRoutes); // Call Center routes

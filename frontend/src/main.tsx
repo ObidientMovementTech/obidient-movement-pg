@@ -47,6 +47,7 @@ const PUInfoPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/
 const OfficerVerificationPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/OfficerVerificationPage.tsx"));
 const ResultTrackingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/ResultTrackingPage.tsx"));
 const IncidentReportingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/IncidentReportingPage.tsx"));
+const LiveResultsPage = lazy(() => import("./pages/elections/LiveResults.tsx"));
 
 // Call Center Pages
 const CallCenterAdmin = lazy(() => import("./pages/callCenter/CallCenterAdmin.tsx"));
@@ -182,6 +183,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <IncidentReportingPage />
       </ProtectedRoute>
+    ),
+  },
+
+  // Public Live Results Page
+  {
+    path: "/elections/live-results",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <LiveResultsPage />
+      </Suspense>
     ),
   },
 

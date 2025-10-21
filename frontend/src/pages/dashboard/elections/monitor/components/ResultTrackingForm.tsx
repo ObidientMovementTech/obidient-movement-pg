@@ -32,6 +32,12 @@ export default function ResultTrackingForm({ formData, setFormData, onNext }: Re
     setStage(stage + 1);
   };
 
+  const handleBack = () => {
+    if (stage > 1) {
+      setStage(stage - 1);
+    }
+  };
+
   return (
     <div className="w-full">
       {/* Stepper */}
@@ -76,8 +82,8 @@ export default function ResultTrackingForm({ formData, setFormData, onNext }: Re
         {stage === 2 && (
           <PUResultDetails
             onNext={handleNext}
+            onBack={handleBack}
             formData={formData}
-            setFormData={setFormData}
           />
         )}
         {stage === 3 && (
@@ -94,36 +100,78 @@ export default function ResultTrackingForm({ formData, setFormData, onNext }: Re
               setFormData(updatedData);
 
               try {
-                // Create result tracking report object for API
+                // First, create polling unit submission if it doesn't exist
+                let submissionId = formData.submissionId;
+                
+                if (!submissionId) {
+                  console.log('📝 Creating polling unit submission first...');
+                  // We need to get election and PU details from somewhere
+                  // For now, use placeholder - this should come from a parent component
+                  const puSubmission = await monitoringService.submitPollingUnitInfo({
+                    electionId: formData.electionId || 1, // This should be passed from parent
+                    puCode: formData.puCode || 'TEMP-PU',
+                    puName: formData.puName || 'Polling Unit',
+                    ward: formData.ward || 'Ward',
+                    lga: formData.lga || 'LGA',
+                    state: formData.state || 'State',
+                    gpsCoordinates: formData.gpsCoordinates || null,
+                    locationType: formData.locationType || 'public',
+                    locationOther: formData.locationOther || ''
+                  });
+                  
+                  submissionId = puSubmission.data.submissionId;
+                  console.log('✅ Polling unit created with ID:', submissionId);
+                }
+
+                // Create result tracking report object for API - matching backend structure
                 const resultTrackingData = {
-                  submissionId: formData.submissionId || monitoringService.generateSubmissionId(),
-                  pollingInfo: updatedData.resultTracking.pollingInfo,
-                  registeredVoters: updatedData.resultTracking.registered,
-                  accreditedVoters: updatedData.resultTracking.accredited,
-                  validVotes: updatedData.resultTracking.valid,
-                  rejectedVotes: updatedData.resultTracking.rejected,
-                  totalVotesCast: updatedData.resultTracking.total,
-                  votesPerParty: updatedData.resultTracking.stats?.votesPerParty || [],
-                  ec8aPhotos: updatedData.resultTracking.ec8aPhotos || [],
-                  announcementVideos: updatedData.resultTracking.announcementVideos || [],
-                  resultSheetPhotos: updatedData.resultTracking.resultSheetPhotos || [],
-                  wallPostingPhotos: updatedData.resultTracking.wallPostingPhotos || [],
-                  resultAnnouncedBy: updatedData.resultTracking.resultAnnouncedBy,
-                  announcementTime: updatedData.resultTracking.announcementTime,
-                  partyAgentsPresent: updatedData.resultTracking.partyAgentsPresent,
-                  discrepanciesNoted: updatedData.resultTracking.discrepanciesNoted,
-                  resultUploadStatus: updatedData.resultTracking.resultUploadStatus,
-                  additionalNotes: updatedData.resultTracking.additionalNotes
+                  submissionId: submissionId,
+                  officerName: updatedData.resultTracking.pollingInfo?.officerName || '',
+                  resultAnnouncerPhoto: updatedData.resultTracking.pollingInfo?.officerPhotoUrl || '',
+                  partyAgents: updatedData.resultTracking.pollingInfo?.partyAgents || '',
+                  reporterName: updatedData.resultTracking.pollingInfo?.reporterName || '',
+                  reporterPhone: updatedData.resultTracking.pollingInfo?.reporterPhone || '',
+                  date: updatedData.resultTracking.pollingInfo?.electionDate || new Date().toISOString().split('T')[0],
+                  timeAnnounced: updatedData.resultTracking.pollingInfo?.resultTime || '',
+                  stats: {
+                    registered: updatedData.resultTracking.stats?.registered || 0,
+                    accredited: updatedData.resultTracking.stats?.accredited || 0,
+                    valid: updatedData.resultTracking.stats?.valid || 0,
+                    rejected: updatedData.resultTracking.stats?.rejected || 0,
+                    total: updatedData.resultTracking.stats?.total || 0,
+                    votesPerParty: updatedData.resultTracking.stats?.votesPerParty || []
+                  },
+                  discrepancies: updatedData.resultTracking.discrepancy || '',
+                  signedByAgents: updatedData.resultTracking.formSigned === 'Yes',
+                  agentsSignedCount: parseInt(updatedData.resultTracking.agentsSigned) || 0,
+                  resultPosted: updatedData.resultTracking.posted === 'Yes',
+                  bvasSeen: updatedData.resultTracking.bvasStatus || '',
+                  evidence: {
+                    ec8aPhoto: updatedData.resultTracking.ec8aPhoto || '',
+                    announcementVideo: updatedData.resultTracking.resultVideo || '',
+                    wallPhoto: updatedData.resultTracking.wallPhoto || '',
+                    reporterSelfie: updatedData.resultTracking.selfieProof || ''
+                  },
+                  notes: updatedData.resultTracking.notes || ''
                 };
 
+                console.log('📤 Submitting result tracking data:', resultTrackingData);
                 const response = await monitoringService.submitResultTracking(resultTrackingData);
                 console.log('✅ Result Tracking Data Saved:', response);
+                
+                // Save submissionId for future use
+                setFormData((prev: any) => ({
+                  ...prev,
+                  submissionId: submissionId
+                }));
+                
                 if (onNext) onNext();
               } catch (error: any) {
                 console.error('❌ Error:', error);
                 alert(error?.message || 'Submission failed. Try again.');
               }
             }}
+            onBack={handleBack}
             formData={formData}
             setFormData={setFormData}
           />

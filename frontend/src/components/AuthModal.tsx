@@ -109,8 +109,8 @@ export default function AuthModal({
       }
 
       // Handle specific error types
-      if (error.errorType === 'EMAIL_NOT_FOUND') {
-        errorMessage = 'No account found with this email address. Please check your email or sign up for a new account.';
+      if (error.errorType === 'EMAIL_NOT_FOUND' || error.errorType === 'PHONE_NOT_FOUND') {
+        errorMessage = error.message || 'No account found with these credentials. Please check your email/phone or sign up for a new account.';
       } else if (error.errorType === 'EMAIL_NOT_VERIFIED') {
         errorMessage = 'Please verify your email address before logging in. Check your inbox for a verification email.';
         setShowResendVerification(true);
@@ -310,17 +310,17 @@ export default function AuthModal({
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Email or Phone Number
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
-                    type="email"
+                    type="text"
                     required
                     value={loginData.email}
                     onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="Enter your email"
+                    placeholder="Enter your email or phone number"
                   />
                 </div>
               </div>

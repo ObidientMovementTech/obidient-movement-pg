@@ -70,7 +70,7 @@ export default function Login2FAModal({
 
                 <div className="mt-4">
                   <p className="text-sm text-gray-500 mb-4">
-                    Please enter the authentication code from your authenticator app for your account: <strong>{email}</strong>
+                    Please enter the authentication code from your authenticator app for: <strong>{email}</strong>
                   </p>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
@@ -101,8 +101,8 @@ export default function Login2FAModal({
                       <button
                         type="submit"
                         className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#006837] ${isLoading
-                            ? 'bg-gray-400 cursor-not-allowed'
-                            : 'bg-[#006837] hover:bg-[#005229]'
+                          ? 'bg-gray-400 cursor-not-allowed'
+                          : 'bg-[#006837] hover:bg-[#005229]'
                           }`}
                         disabled={isLoading}
                       >

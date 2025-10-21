@@ -1,6 +1,7 @@
 import { query, getClient } from '../config/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { monitoringService } from '../services/monitoringService.js';
+import { uploadToS3 } from '../utils/s3Upload.js';
 
 export const monitoringController = {
   // ================================
@@ -541,6 +542,85 @@ export const monitoringController = {
       res.status(500).json({
         success: false,
         message: 'Failed to get recent submissions',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  },
+
+  // ================================
+  // EVIDENCE UPLOAD
+  // ================================
+  async uploadEvidence(req, res) {
+    try {
+      // Check if user has active monitoring key
+      const userId = req.user.id;
+      const userCheck = await query(
+        `SELECT monitor_unique_key, key_status FROM users WHERE id = $1`,
+        [userId]
+      );
+
+      if (!userCheck.rows[0] || userCheck.rows[0].key_status !== 'active') {
+        return res.status(403).json({
+          success: false,
+          message: 'Active monitoring key required to upload evidence'
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No file provided'
+        });
+      }
+
+      // Validate file size (max 50MB for videos, 10MB for images)
+      const maxSize = req.file.mimetype.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (req.file.size > maxSize) {
+        return res.status(400).json({
+          success: false,
+          message: `File too large. Maximum size is ${maxSize / (1024 * 1024)}MB`
+        });
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'video/quicktime', 'video/x-msvideo'];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid file type. Only JPG, PNG, MP4, MOV allowed'
+        });
+      }
+
+      // Upload to S3
+      const fileUrl = await uploadToS3(req.file, {
+        folder: 'monitoring-evidence'
+      });
+
+      // Log the upload for audit trail
+      console.log(`✅ Evidence uploaded by user ${userId}:`, {
+        url: fileUrl,
+        fileName: req.file.originalname,
+        size: req.file.size,
+        type: req.file.mimetype
+      });
+
+      res.json({
+        success: true,
+        message: 'Evidence uploaded successfully',
+        data: {
+          url: fileUrl,
+          originalName: req.file.originalname,
+          size: req.file.size,
+          mimeType: req.file.mimetype,
+          uploadedAt: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      console.error('Error uploading evidence:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload evidence',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

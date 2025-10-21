@@ -386,6 +386,81 @@ class MonitoringService {
       throw new Error(error.response?.data?.message || 'Failed to get recent submissions');
     }
   }
+
+  // ================================
+  // EVIDENCE UPLOAD
+  // ================================
+
+  /**
+   * Upload evidence (photos/videos) to S3 storage
+   * Returns the S3 URL for the uploaded file
+   */
+  async uploadEvidence(
+    file: File,
+    metadata?: {
+      type?: string;
+      role?: string;
+      description?: string;
+    },
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    try {
+      const formData = new FormData();
+      formData.append('evidence', file);
+
+      if (metadata) {
+        formData.append('metadata', JSON.stringify(metadata));
+      }
+
+      const response = await axios.post(
+        `${API_BASE_URL}/monitoring/upload-evidence`,
+        formData,
+        {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              onProgress(percentCompleted);
+            }
+          }
+        }
+      );
+
+      if (response.data.success) {
+        return response.data.data.url;
+      } else {
+        throw new Error(response.data.message || 'Upload failed');
+      }
+    } catch (error: any) {
+      console.error('Error uploading evidence:', error);
+      throw new Error(error.response?.data?.message || 'Failed to upload evidence');
+    }
+  }
+
+  /**
+   * Upload multiple evidence files
+   * Returns array of S3 URLs
+   */
+  async uploadMultipleEvidence(
+    files: File[],
+    metadata?: { type?: string; description?: string },
+    onProgress?: (fileIndex: number, progress: number) => void
+  ): Promise<string[]> {
+    const uploadPromises = files.map((file, index) =>
+      this.uploadEvidence(
+        file,
+        metadata,
+        onProgress ? (progress) => onProgress(index, progress) : undefined
+      )
+    );
+
+    return Promise.all(uploadPromises);
+  }
 }
 
 export const monitoringService = new MonitoringService();

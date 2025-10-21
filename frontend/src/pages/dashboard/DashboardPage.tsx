@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense, type ReactNode } from "react";
 import {
   Home,
   BookOpen,
@@ -27,34 +27,32 @@ import Loading from "../../components/Loader";
 import { useUser } from "../../context/UserContext";
 import UserProfileCard from "../../components/UserProfileCard";
 
-import DashboardOverview from "./overview/DashboardOverview";
 import { getOwnedVotingBlocs } from "../../services/votingBlocService";
-
-// import VotingBlocPage from "./votingBloc/VotingBlocPage";
-import LeaderboardPage from "./votingBloc/LeaderboardPage";
-import RunForOffice from "./lead/RunForOffice";
-import ProfilePage from "../profile/ProfilePage";
 import DashboardHeader from "./components/DashboardHeader";
 import { useNavigate } from "react-router";
-import Vote from "./elections/Vote";
-import CitizensOrganizingSchool from "./organise/CitizensOrganizingSchool";
-// import Results from "./elections/Results";
-import Monitor from "./elections/Monitor";
-import KYCManagement from "./admin/KYCManagement";
-import AdminBroadcastPage from "./admin/AdminBroadcastPage";
-import AdminDefaultVotingBlocPage from "./admin/AdminDefaultVotingBlocPage";
-import AdminTemplateSyncPage from "./admin/AdminTemplateSyncPage";
-import AdminUserManagement from "./admin/AdminUserManagement";
-import AdminMobileFeedsPage from "./admin/AdminMobileFeedsPage";
-import ElectionManagement from "./admin/ElectionManagement";
-import AllNotificationsPage from "./notifications/AllNotificationsPage";
-import StateDashboard from "./state/StateDashboard";
-import CallCenterAdminNavigator from "../../components/callCenter/CallCenterAdminNavigator";
+
+const DashboardOverview = lazy(() => import("./overview/DashboardOverview"));
+const LeaderboardPage = lazy(() => import("./votingBloc/LeaderboardPage"));
+const RunForOffice = lazy(() => import("./lead/RunForOffice"));
+const ProfilePage = lazy(() => import("../profile/ProfilePage"));
+const Vote = lazy(() => import("./elections/Vote"));
+const CitizensOrganizingSchool = lazy(() => import("./organise/CitizensOrganizingSchool"));
+const Monitor = lazy(() => import("./elections/Monitor"));
+const KYCManagement = lazy(() => import("./admin/KYCManagement"));
+const AdminBroadcastPage = lazy(() => import("./admin/AdminBroadcastPage"));
+const AdminDefaultVotingBlocPage = lazy(() => import("./admin/AdminDefaultVotingBlocPage"));
+const AdminTemplateSyncPage = lazy(() => import("./admin/AdminTemplateSyncPage"));
+const AdminUserManagement = lazy(() => import("./admin/AdminUserManagement"));
+const AdminMobileFeedsPage = lazy(() => import("./admin/AdminMobileFeedsPage"));
+const ElectionManagement = lazy(() => import("./admin/ElectionManagement"));
+const AllNotificationsPage = lazy(() => import("./notifications/AllNotificationsPage"));
+const StateDashboard = lazy(() => import("./state/StateDashboard"));
+const CallCenterAdminNavigator = lazy(() => import("../../components/callCenter/CallCenterAdminNavigator"));
 // Sidebar menu items type
 interface NavItem {
   title: string;
-  icon: React.ReactNode;
-  component?: React.ReactNode;
+  icon: ReactNode;
+  component?: () => ReactNode;
   children?: NavItem[];
   onClick?: () => void;
 }
@@ -159,7 +157,7 @@ export default function DashboardPage() {
     {
       title: "Overview",
       icon: <Home size={24} />,
-      component: <DashboardOverview setActivePage={setActivePage} />,
+      component: () => <DashboardOverview setActivePage={setActivePage} />,
     },
 
     {
@@ -167,12 +165,12 @@ export default function DashboardPage() {
       icon: <Megaphone size={24} />,
       children: [
         { title: "Your Voting Bloc", icon: <Flag size={20} />, onClick: handleGoToAutoVotingBloc },
-        { title: "Leaderboard", icon: <BarChart3 size={20} />, component: <LeaderboardPage /> },
+        { title: "Leaderboard", icon: <BarChart3 size={20} />, component: () => <LeaderboardPage /> },
         // State Dashboard - only visible to admin and coordinators
         ...(profile?.role === 'admin' || isCoordinator ? [
-          { title: "State Dashboard", icon: <MapPin size={20} />, component: <StateDashboard /> }
+          { title: "State Dashboard", icon: <MapPin size={20} />, component: () => <StateDashboard /> }
         ] : []),
-        { title: "Citizens Organizing School", icon: <BookOpen size={20} />, component: <CitizensOrganizingSchool /> },
+        { title: "Citizens Organizing School", icon: <BookOpen size={20} />, component: () => <CitizensOrganizingSchool /> },
       ],
     },
 
@@ -180,15 +178,15 @@ export default function DashboardPage() {
       title: "Lead",
       icon: <Flag size={24} />,
       children: [
-        { title: "Run for Office Hub", icon: <Activity size={20} />, component: <RunForOffice /> },
+        { title: "Run for Office Hub", icon: <Activity size={20} />, component: () => <RunForOffice /> },
       ],
     },
     {
       title: "Elections",
       icon: <Landmark size={24} />,
       children: [
-        { title: "Vote", icon: <ScanLine size={20} />, component: <Vote /> },
-        { title: "Monitor", icon: <Eye size={20} />, component: <Monitor /> },
+        { title: "Vote", icon: <ScanLine size={20} />, component: () => <Vote /> },
+        { title: "Monitor", icon: <Eye size={20} />, component: () => <Monitor /> },
         // { title: "Results", icon: <BarChart3 size={20} />, component: <Results /> },
       ]
     },
@@ -197,14 +195,14 @@ export default function DashboardPage() {
       title: "Admin",
       icon: <ShieldCheck size={24} />,
       children: [
-        { title: "Call Center Navigation", icon: <Phone size={20} />, component: <CallCenterAdminNavigator /> },
-        { title: "Election Management", icon: <Landmark size={20} />, component: <ElectionManagement /> },
-        { title: "User Management", icon: <Users size={20} />, component: <AdminUserManagement /> },
-        { title: "KYC Management", icon: <UserCheck size={20} />, component: <KYCManagement /> },
-        { title: "Default Voting Bloc Settings", icon: <Flag size={20} />, component: <AdminDefaultVotingBlocPage /> },
-        { title: "Template Synchronization", icon: <RefreshCw size={20} />, component: <AdminTemplateSyncPage /> },
-        { title: "Broadcast Messages", icon: <Megaphone size={20} />, component: <AdminBroadcastPage /> },
-        { title: "Mobile Feeds Management", icon: <Smartphone size={20} />, component: <AdminMobileFeedsPage /> },
+        { title: "Call Center Navigation", icon: <Phone size={20} />, component: () => <CallCenterAdminNavigator /> },
+        { title: "Election Management", icon: <Landmark size={20} />, component: () => <ElectionManagement /> },
+        { title: "User Management", icon: <Users size={20} />, component: () => <AdminUserManagement /> },
+        { title: "KYC Management", icon: <UserCheck size={20} />, component: () => <KYCManagement /> },
+        { title: "Default Voting Bloc Settings", icon: <Flag size={20} />, component: () => <AdminDefaultVotingBlocPage /> },
+        { title: "Template Synchronization", icon: <RefreshCw size={20} />, component: () => <AdminTemplateSyncPage /> },
+        { title: "Broadcast Messages", icon: <Megaphone size={20} />, component: () => <AdminBroadcastPage /> },
+        { title: "Mobile Feeds Management", icon: <Smartphone size={20} />, component: () => <AdminMobileFeedsPage /> },
       ],
     }] : []),
 
@@ -212,12 +210,12 @@ export default function DashboardPage() {
     {
       title: "Notifications",
       icon: <Bell size={24} />,
-      component: <AllNotificationsPage setActivePage={setActivePage} />,
+      component: () => <AllNotificationsPage setActivePage={setActivePage} />,
     },
     {
       title: "My Profile",
       icon: <User size={24} />,
-      component: <ProfilePage />,
+      component: () => <ProfilePage />,
     },
   ];
 
@@ -245,12 +243,12 @@ export default function DashboardPage() {
     );
   }
 
-  const findComponent = (items: NavItem[]): React.ReactNode => {
+  const findComponent = (items: NavItem[]): ReactNode => {
     for (const item of items) {
-      if (item.title === activePage && item.component) return item.component;
+      if (item.title === activePage && item.component) return item.component();
       if (item.children) {
         const match = item.children.find((child) => child.title === activePage);
-        if (match && match.component) return match.component;
+        if (match && match.component) return match.component();
       }
     }
     return <div className="text-gray-500">Coming soon!</div>;
@@ -357,7 +355,11 @@ export default function DashboardPage() {
           toggleSidebar={toggleSidebar}
           setActivePage={setActivePage}
         />
-        <div className="animate-fade-in p-4">{findComponent(sidebarItems)}</div>
+        <div className="animate-fade-in p-4">
+          <Suspense fallback={<div className="py-10"><Loading /></div>}>
+            {findComponent(sidebarItems)}
+          </Suspense>
+        </div>
       </main>
     </div>
   );

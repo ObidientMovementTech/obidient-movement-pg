@@ -92,8 +92,8 @@ export default function LoginPage() {
     } catch (error: any) {
       let errorMessage = "Login failed. Please try again.";
 
-      if (error.errorType === "EMAIL_NOT_FOUND")
-        errorMessage = "No account found with this email.";
+      if (error.errorType === "EMAIL_NOT_FOUND" || error.errorType === "PHONE_NOT_FOUND")
+        errorMessage = error.message || "No account found with these credentials.";
       else if (error.errorType === "EMAIL_NOT_VERIFIED") {
         errorMessage = "Please verify your email before logging in.";
         setShowResendVerification(true);
@@ -143,12 +143,12 @@ export default function LoginPage() {
     >
       <p className="text-gray-dark dark:text-gray-100 text-2xl">Welcome Back!</p>
 
-      {/* Email */}
+      {/* Email or Phone */}
       <div>
-        <label className="block text-dark dark:text-gray-100 mb-2 text-sm">Email</label>
+        <label className="block text-dark dark:text-gray-100 mb-2 text-sm">Email or Phone Number</label>
         <input
-          type="email"
-          placeholder="Email"
+          type="text"
+          placeholder="Email or Phone Number"
           className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
           value={email}
           onChange={(e) => setEmail(e.target.value)}

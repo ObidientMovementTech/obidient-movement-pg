@@ -254,7 +254,7 @@ export const loginUser = async (req, res) => {
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Email address is required',
+        message: 'Email or phone number is required',
         field: 'email'
       });
     }
@@ -267,21 +267,19 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // Email format validation
+    // Determine if input is email or phone number
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please enter a valid email address',
-        field: 'email'
-      });
-    }
+    const isEmail = emailRegex.test(email);
+
+    // Build query to search by either email or phone
+    const query = isEmail ? { email } : { phone: email };
 
     // 1. Check if user exists
-    const user = await User.findOne({ email });
+    const user = await User.findOne(query);
     if (!user) {
-      logger.warn('Login attempt with non-existent email', {
-        email,
+      logger.warn('Login attempt with non-existent credentials', {
+        identifier: email,
+        isEmail,
         ip: req.ip,
         userAgent: req.get('User-Agent'),
         timestamp: new Date().toISOString()
@@ -289,9 +287,11 @@ export const loginUser = async (req, res) => {
 
       return res.status(401).json({
         success: false,
-        message: "No account found with this email address. Please check your email or sign up for a new account.",
+        message: isEmail
+          ? "No account found with this email address. Please check your email or sign up for a new account."
+          : "No account found with this phone number. Please check your phone number or sign up for a new account.",
         field: 'email',
-        errorType: 'EMAIL_NOT_FOUND'
+        errorType: isEmail ? 'EMAIL_NOT_FOUND' : 'PHONE_NOT_FOUND'
       });
     }
 
