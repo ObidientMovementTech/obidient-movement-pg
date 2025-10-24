@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Upload, Users, Phone, BarChart3, CheckCircle, Clock, AlertCircle, Navigation } from 'lucide-react';
 import Toast from '../../components/Toast';
 import ColumnMappingModal from '../../components/callCenter/ColumnMappingModal';
+import ImportProgressModal from '../../components/callCenter/ImportProgressModal';
 import VoterStatisticsTable from '../../components/callCenter/VoterStatisticsTable';
 import CallCenterAdminNavigator from '../../components/callCenter/CallCenterAdminNavigator';
 import { callCenterService, type ImportStats, type RecentImport, type Volunteer } from '../../services/callCenterService';
@@ -20,6 +21,10 @@ const CallCenterAdmin: React.FC = () => {
   const [showColumnMapping, setShowColumnMapping] = useState(false);
   const [excelPreview, setExcelPreview] = useState<any>(null);
   const [uploadedFilePath, setUploadedFilePath] = useState<string>('');
+
+  // Import progress tracking
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [importProgress, setImportProgress] = useState<any>(null);
 
   const [toastInfo, setToastInfo] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -66,12 +71,12 @@ const CallCenterAdmin: React.FC = () => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
-      const allowedTypes = ['.xlsx', '.xls'];
+      const allowedTypes = ['.xlsx', '.xls', '.csv'];
       const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
 
       if (!allowedTypes.includes(fileExtension)) {
         setToastInfo({
-          message: 'Please select an Excel file (.xlsx or .xls)',
+          message: 'Please select an Excel (.xlsx, .xls) or CSV (.csv) file',
           type: 'error'
         });
         return;
@@ -129,41 +134,87 @@ const CallCenterAdmin: React.FC = () => {
       return;
     }
 
+    const sessionId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setImporting(true);
+    setShowColumnMapping(false);
+
+    // Initialize progress
+    setImportProgress({
+      stage: 'uploading',
+      currentRow: 0,
+      totalRows: 0,
+      inserted: 0,
+      updated: 0,
+      duplicates: 0,
+      errors: 0,
+      message: 'Starting import...'
+    });
+    setShowProgressModal(true);
+
     try {
-      const response = await callCenterService.importVotersWithMapping(uploadedFilePath, columnMapping);
+      // Start the import (returns immediately with sessionId)
+      const response = await callCenterService.importVotersWithMapping(uploadedFilePath, columnMapping, sessionId);
 
       if (response.success) {
-        const { results } = response;
+        // Poll for progress updates
+        const pollInterval = setInterval(async () => {
+          try {
+            const progressResponse = await callCenterService.getImportProgress(sessionId);
+
+            if (progressResponse.success && progressResponse.progress) {
+              setImportProgress(progressResponse.progress);
+
+              // Stop polling if completed or error
+              if (progressResponse.progress.stage === 'completed' || progressResponse.progress.stage === 'error') {
+                clearInterval(pollInterval);
+                setImporting(false);
+
+                if (progressResponse.progress.stage === 'completed') {
+                  setToastInfo({
+                    message: `Import completed! ${progressResponse.progress.inserted} new, ${progressResponse.progress.updated} updated`,
+                    type: 'success'
+                  });
+
+                  // Refresh stats
+                  await fetchStats();
+
+                  // Reset form
+                  setImportFile(null);
+                  const fileInput = document.getElementById('excel-file') as HTMLInputElement;
+                  if (fileInput) fileInput.value = '';
+                  setExcelPreview(null);
+                  setUploadedFilePath('');
+                }
+              }
+            }
+          } catch (pollError) {
+            console.error('Progress poll error:', pollError);
+          }
+        }, 2000); // Poll every 2 seconds
+
+        // Safety timeout - stop polling after 30 minutes
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          setImporting(false);
+        }, 30 * 60 * 1000);
+
+      } else {
         setToastInfo({
-          message: `Import completed! ${results.inserted} records imported, ${results.duplicatesSkipped} duplicates skipped`,
-          type: 'success'
+          message: response.message || 'Failed to start import',
+          type: 'error'
         });
-
-        // Reset form and refresh data
-        setImportFile(null);
-        const fileInput = document.getElementById('excel-file') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
-
-        // Close modals and clear state
-        setShowColumnMapping(false);
-        setExcelPreview(null);
-        setUploadedFilePath('');
-
-        // Refresh stats
-        await fetchStats();
-
-        // Show detailed results
-        console.log('Import results:', results);
+        setImporting(false);
+        setShowProgressModal(false);
       }
+
     } catch (error: any) {
       console.error('Import failed:', error);
       setToastInfo({
         message: error.response?.data?.message || 'Import failed',
         type: 'error'
       });
-    } finally {
       setImporting(false);
+      setShowProgressModal(false);
     }
   };
 
@@ -340,9 +391,9 @@ const CallCenterAdmin: React.FC = () => {
                 <div className="flex items-start">
                   <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
                   <div>
-                    <h4 className="text-sm font-medium text-blue-800">Excel File Requirements</h4>
+                    <h4 className="text-sm font-medium text-blue-800">File Requirements</h4>
                     <ul className="mt-1 text-sm text-blue-700 list-disc list-inside">
-                      <li>File must be in .xlsx or .xls format</li>
+                      <li>File must be in .xlsx, .xls, or .csv format</li>
                       <li>Required columns: STATE, LGA, WARD, POLLING UNIT, PHONE NUMBER</li>
                       <li>Optional: POLLING UNIT CODE</li>
                       <li>Phone numbers should be in Nigerian format</li>
@@ -356,16 +407,19 @@ const CallCenterAdmin: React.FC = () => {
 
                 <div className="space-y-4">
                   <div>
-                    <label htmlFor="excel-file" className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Excel File
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select File (Excel or CSV)
                     </label>
                     <input
                       id="excel-file"
                       type="file"
-                      accept=".xlsx,.xls"
+                      accept=".xlsx,.xls,.csv"
                       onChange={handleFileSelect}
                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#006837] file:text-white hover:file:bg-[#00592e] cursor-pointer"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Supports Excel (.xlsx, .xls) and CSV (.csv) files up to 1GB
+                    </p>
                   </div>
 
                   {importFile && (
@@ -512,7 +566,13 @@ const CallCenterAdmin: React.FC = () => {
         />
       )}
 
-
+      {/* Import Progress Modal */}
+      {showProgressModal && importProgress && (
+        <ImportProgressModal
+          progress={importProgress}
+          onClose={() => setShowProgressModal(false)}
+        />
+      )}
 
       {/* Toast */}
       {toastInfo && (

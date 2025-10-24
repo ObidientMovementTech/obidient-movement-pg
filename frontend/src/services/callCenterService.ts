@@ -197,11 +197,19 @@ export const callCenterService = {
   /**
    * Import voter data with column mapping
    */
-  async importVotersWithMapping(filePath: string, columnMapping: Record<string, number>) {
+  async importVotersWithMapping(filePath: string, columnMapping: Record<string, number>, sessionId?: string) {
     const response = await axios.post(`${API_BASE}/call-center/import-voters-with-mapping`, {
       filePath,
-      columnMapping
+      columnMapping,
+      sessionId: sessionId || `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     }, {
+      withCredentials: true
+    });
+    return response.data;
+  },
+
+  async getImportProgress(sessionId: string) {
+    const response = await axios.get(`${API_BASE}/call-center/import-progress/${sessionId}`, {
       withCredentials: true
     });
     return response.data;

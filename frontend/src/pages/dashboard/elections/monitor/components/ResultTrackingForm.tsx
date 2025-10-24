@@ -102,7 +102,7 @@ export default function ResultTrackingForm({ formData, setFormData, onNext }: Re
               try {
                 // First, create polling unit submission if it doesn't exist
                 let submissionId = formData.submissionId;
-                
+
                 if (!submissionId) {
                   console.log('📝 Creating polling unit submission first...');
                   // We need to get election and PU details from somewhere
@@ -118,7 +118,7 @@ export default function ResultTrackingForm({ formData, setFormData, onNext }: Re
                     locationType: formData.locationType || 'public',
                     locationOther: formData.locationOther || ''
                   });
-                  
+
                   submissionId = puSubmission.data.submissionId;
                   console.log('✅ Polling unit created with ID:', submissionId);
                 }
@@ -158,13 +158,13 @@ export default function ResultTrackingForm({ formData, setFormData, onNext }: Re
                 console.log('📤 Submitting result tracking data:', resultTrackingData);
                 const response = await monitoringService.submitResultTracking(resultTrackingData);
                 console.log('✅ Result Tracking Data Saved:', response);
-                
+
                 // Save submissionId for future use
                 setFormData((prev: any) => ({
                   ...prev,
                   submissionId: submissionId
                 }));
-                
+
                 if (onNext) onNext();
               } catch (error: any) {
                 console.error('❌ Error:', error);

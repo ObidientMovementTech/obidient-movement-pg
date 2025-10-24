@@ -3,6 +3,7 @@ import {
   previewExcelUpload,
   importVotersWithMapping,
   importVoters,
+  getImportProgress,
   getImportStats,
   getVoterStatistics,
   assignVolunteer,
@@ -24,6 +25,7 @@ const router = express.Router();
 // Admin routes - for importing and managing data
 router.post('/preview-excel', authenticateUser, upload.single('excelFile'), previewExcelUpload);
 router.post('/import-voters-with-mapping', authenticateUser, importVotersWithMapping);
+router.get('/import-progress/:sessionId', authenticateUser, getImportProgress);
 router.post('/import-voters', authenticateUser, upload.single('excelFile'), importVoters); // Legacy endpoint
 router.get('/import-stats', authenticateUser, getImportStats);
 router.get('/voter-statistics', authenticateUser, getVoterStatistics);

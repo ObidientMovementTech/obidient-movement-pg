@@ -25,10 +25,34 @@ interface FieldRequirement {
 
 const REQUIRED_FIELDS: FieldRequirement[] = [
   {
+    key: 'vin',
+    label: 'VIN (Voter ID Number)',
+    required: false,
+    description: 'Voter Identification Number from INEC'
+  },
+  {
+    key: 'firstName',
+    label: 'First Name',
+    required: false,
+    description: 'Voter first name'
+  },
+  {
+    key: 'lastName',
+    label: 'Last Name / Surname',
+    required: false,
+    description: 'Voter surname or last name'
+  },
+  {
+    key: 'fullName',
+    label: 'Full Name',
+    required: false,
+    description: 'Complete voter name (if first/last not separate)'
+  },
+  {
     key: 'state',
     label: 'State',
     required: true,
-    description: 'State name (e.g., Anambra)'
+    description: 'State name (e.g., Anambra, Adamawa)'
   },
   {
     key: 'lga',
@@ -49,22 +73,16 @@ const REQUIRED_FIELDS: FieldRequirement[] = [
     description: 'Polling unit name'
   },
   {
+    key: 'pollingUnitCode',
+    label: 'Polling Unit Code',
+    required: false,
+    description: 'Polling unit code (e.g., 02-01-01-001)'
+  },
+  {
     key: 'phoneNumber',
     label: 'Phone Number',
     required: true,
     description: 'Voter phone number'
-  },
-  {
-    key: 'pollingUnitCode',
-    label: 'Polling Unit Code',
-    required: false,
-    description: 'Optional polling unit code'
-  },
-  {
-    key: 'fullName',
-    label: 'Full Name',
-    required: false,
-    description: 'Voter full name'
   },
   {
     key: 'emailAddress',
@@ -211,8 +229,8 @@ const ColumnMappingModal: React.FC<ColumnMappingProps> = ({
                     <div
                       key={index}
                       className={`p-3 border rounded-lg transition-colors ${isColumnMapped(index)
-                          ? 'border-[#006837] bg-green-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-[#006837] bg-green-50'
+                        : 'border-gray-200 hover:border-gray-300'
                         }`}
                     >
                       <div className="flex items-start justify-between">

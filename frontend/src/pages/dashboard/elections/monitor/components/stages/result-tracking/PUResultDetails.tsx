@@ -171,7 +171,7 @@ export default function PUResultDetails({ onNext, onBack, formData }: PUResultDe
         <p className="text-sm text-gray-600 mb-4">
           Enter the party name/initials and the number of votes they received.
         </p>
-        
+
         <div className="space-y-3">
           {votesPerParty.map((entry: { party: string; votes: number }, i: number) => (
             <div key={i} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">

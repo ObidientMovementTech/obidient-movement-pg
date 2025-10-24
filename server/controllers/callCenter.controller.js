@@ -2,6 +2,39 @@ import { query } from '../config/db.js';
 import { parseExcelFile, parseExcelFileWithMapping, previewExcelFile, batchInsertVoters } from '../services/excelImportService.js';
 import fs from 'fs';
 
+// In-memory progress tracking for imports
+const importProgress = new Map();
+
+/**
+ * Get import progress by session ID
+ * GET /api/call-center/import-progress/:sessionId
+ */
+const getImportProgress = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const progress = importProgress.get(sessionId);
+
+    if (!progress) {
+      return res.status(404).json({
+        success: false,
+        message: 'Progress not found for this session'
+      });
+    }
+
+    res.json({
+      success: true,
+      progress
+    });
+  } catch (error) {
+    console.error('Get progress error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get import progress',
+      error: error.message
+    });
+  }
+};
+
 /**
  * Preview Excel file structure and return headers with sample data
  * POST /api/call-center/preview-excel
@@ -28,7 +61,7 @@ const previewExcelUpload = async (req, res) => {
     try {
       // Preview Excel file structure
       console.log('Previewing Excel file:', filePath);
-      const previewResult = previewExcelFile(filePath);
+      const previewResult = await previewExcelFile(filePath);
 
       if (!previewResult.success) {
         return res.status(400).json({
@@ -82,7 +115,7 @@ const importVotersWithMapping = async (req, res) => {
       });
     }
 
-    const { filePath, columnMapping } = req.body;
+    const { filePath, columnMapping, sessionId } = req.body;
 
     if (!filePath) {
       return res.status(400).json({
@@ -106,51 +139,106 @@ const importVotersWithMapping = async (req, res) => {
       });
     }
 
-    try {
-      // Parse Excel file with mapping
-      console.log('Parsing Excel file with mapping:', filePath);
-      const { voters, errors, totalRows } = parseExcelFileWithMapping(filePath, columnMapping);
+    // Generate session ID if not provided
+    const importSessionId = sessionId || `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      if (voters.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'No valid voter data found in Excel file',
-          parseErrors: errors
+    // Initialize progress tracking
+    importProgress.set(importSessionId, {
+      stage: 'parsing',
+      currentRow: 0,
+      totalRows: 0,
+      inserted: 0,
+      updated: 0,
+      duplicates: 0,
+      errors: 0,
+      message: 'Reading file...'
+    });
+
+    // Start processing asynchronously
+    (async () => {
+      try {
+        // Parse Excel file with mapping
+        console.log('Parsing file with mapping:', filePath);
+        importProgress.set(importSessionId, {
+          ...importProgress.get(importSessionId),
+          stage: 'validating',
+          message: 'Validating data...'
         });
-      }
 
-      // Insert voters into database
-      console.log(`Inserting ${voters.length} voters into database...`);
-      const insertResults = await batchInsertVoters(voters, req.user.id, query);
+        const { voters, errors, totalRows } = await parseExcelFileWithMapping(filePath, columnMapping);
 
-      // Clean up uploaded file
-      fs.unlinkSync(filePath);
-
-      res.json({
-        success: true,
-        message: 'Voter data imported successfully',
-        results: {
-          totalRows,
-          parsed: voters.length,
-          inserted: insertResults.inserted,
-          duplicatesSkipped: insertResults.duplicates,
-          errors: [...errors, ...insertResults.errors]
+        if (voters.length === 0) {
+          importProgress.set(importSessionId, {
+            ...importProgress.get(importSessionId),
+            stage: 'error',
+            message: 'No valid voter data found',
+            errorMessage: 'No valid voter data found in file'
+          });
+          return;
         }
-      });
 
-    } catch (error) {
-      console.error('Import error:', error);
-      // Clean up uploaded file on error
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+        // Update progress with total rows
+        importProgress.set(importSessionId, {
+          ...importProgress.get(importSessionId),
+          stage: 'importing',
+          totalRows,
+          message: `Importing ${voters.length} records...`
+        });
+
+        // Insert voters with progress callback
+        console.log(`Importing ${voters.length} voters into database...`);
+        const insertResults = await batchInsertVoters(voters, req.user.id, query, (progress) => {
+          // Update import progress
+          importProgress.set(importSessionId, {
+            ...progress,
+            message: `Processing batch ${progress.currentBatch}/${progress.totalBatches}...`
+          });
+        });
+
+        // Mark as completed
+        importProgress.set(importSessionId, {
+          stage: 'completed',
+          currentRow: totalRows,
+          totalRows,
+          inserted: insertResults.inserted,
+          updated: insertResults.updated,
+          duplicates: insertResults.duplicates,
+          errors: errors.length + insertResults.errors.length,
+          message: 'Import completed successfully!'
+        });
+
+        // Clean up uploaded file
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+
+        // Clean up progress after 5 minutes
+        setTimeout(() => {
+          importProgress.delete(importSessionId);
+        }, 5 * 60 * 1000);
+
+      } catch (error) {
+        console.error('Import error:', error);
+        importProgress.set(importSessionId, {
+          ...importProgress.get(importSessionId),
+          stage: 'error',
+          message: 'Import failed',
+          errorMessage: error.message
+        });
+
+        // Clean up uploaded file on error
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
       }
+    })();
 
-      res.status(500).json({
-        success: false,
-        message: 'Failed to import voter data',
-        error: error.message
-      });
-    }
+    // Respond immediately with session ID
+    res.json({
+      success: true,
+      message: 'Import started',
+      sessionId: importSessionId
+    });
 
   } catch (error) {
     console.error('Import with mapping error:', error);
@@ -1057,6 +1145,7 @@ export {
   previewExcelUpload,
   importVotersWithMapping,
   importVoters,
+  getImportProgress,
   getImportStats,
   getVoterStatistics,
   assignVolunteer,
