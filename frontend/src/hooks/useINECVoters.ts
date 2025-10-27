@@ -12,6 +12,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 export interface INECVoter {
   id: string;
   vin: string;
+  full_name?: string;
   first_name: string;
   last_name: string;
   other_names?: string;
@@ -133,8 +134,9 @@ export const useINECVoters = (
 ) => {
   const [voters, setVoters] = useState<INECVoter[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   // Use ref to prevent unnecessary re-renders
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -151,16 +153,21 @@ export const useINECVoters = (
     // Create cache key
     const cacheKey = `voters_${JSON.stringify({ filters, page, pageSize, sortBy, sortOrder })}`;
 
+    setLoading(true);
+    setError(null);
+    setHasLoaded(false);
+
     // Try cache first
     const cachedData = cache.get(cacheKey);
     if (cachedData) {
       setVoters(cachedData.voters);
       setPagination(cachedData.pagination);
+      setHasLoaded(true);
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    let wasCancelled = false;
 
     try {
       // Build query parameters
@@ -187,19 +194,27 @@ export const useINECVoters = (
 
         setVoters(voterData);
         setPagination(paginationData);
+        setHasLoaded(true);
 
         // Cache the results
         cache.set(cacheKey, { voters: voterData, pagination: paginationData }, 3);
       } else {
         setError(response.data.message || 'Failed to fetch voters');
+        setHasLoaded(true);
       }
     } catch (err: any) {
-      if (err.name !== 'AbortError') {
+      const cancelled = err?.name === 'AbortError' || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED';
+      wasCancelled = cancelled;
+
+      if (!cancelled) {
         console.error('Error fetching INEC voters:', err);
         setError(err.response?.data?.message || 'Failed to fetch voter data');
+        setHasLoaded(true);
       }
     } finally {
-      setLoading(false);
+      if (!wasCancelled) {
+        setLoading(false);
+      }
     }
   }, [filters, page, pageSize, sortBy, sortOrder]);
 
@@ -224,7 +239,8 @@ export const useINECVoters = (
     pagination,
     loading,
     error,
-    refetch
+    refetch,
+    hasLoaded
   };
 };
 
@@ -288,6 +304,21 @@ export const useLocationHierarchy = (
   const [error, setError] = useState<string | null>(null);
 
   const fetchLocations = useCallback(async () => {
+    // Ensure required parent selections exist before querying the API
+    if (level === 'ward' && !parentLga) {
+      setLocations([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    if (level === 'polling_unit' && (!parentLga || !parentWard)) {
+      setLocations([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     const cacheKey = `locations_${level}_${parentLga || ''}_${parentWard || ''}`;
     const cachedLocations = cache.get(cacheKey);
 

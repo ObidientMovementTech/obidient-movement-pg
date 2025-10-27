@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronRight, MapPin, Users, Phone, ArrowLeft, Search, TrendingUp, CheckCircle, Database } from 'lucide-react';
 import INECVotersTable from '../inec/INECVotersTable';
-import { useLocationHierarchy, useINECVotersStats } from '../../hooks/useINECVoters';
+import { useLocationHierarchy, useINECVotersStats, type VoterFilters } from '../../hooks/useINECVoters';
 
 type NavigationLevel = 'overview' | 'state' | 'lga' | 'ward' | 'polling_unit' | 'voters';
 
@@ -40,6 +40,18 @@ const CallCenterAdminNavigator: React.FC = () => {
   } = useLocationHierarchy('polling_unit', currentPath.lga, currentPath.ward);
 
   const isLoading = lgasLoading || wardsLoading || pollingUnitsLoading || statsLoading;
+
+  const lockedVoterFilters = useMemo<Partial<VoterFilters>>(() => {
+    const base: Partial<VoterFilters> = { has_phone: true };
+    if (currentPath.lga) base.lga = currentPath.lga;
+    if (currentPath.ward) base.ward = currentPath.ward;
+    if (currentPath.polling_unit) base.polling_unit = currentPath.polling_unit;
+    return base;
+  }, [currentPath.lga, currentPath.ward, currentPath.polling_unit]);
+
+  const selectedLocationParts = useMemo(() => (
+    [currentPath.polling_unit, currentPath.ward, currentPath.lga].filter(Boolean) as string[]
+  ), [currentPath.polling_unit, currentPath.ward, currentPath.lga]);
 
   // Navigation functions
   const navigateToState = () => {
@@ -438,7 +450,7 @@ const CallCenterAdminNavigator: React.FC = () => {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           {currentPath.polling_unit} - Voter Actions
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <button
             onClick={navigateToVoters}
             className="p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
@@ -452,7 +464,7 @@ const CallCenterAdminNavigator: React.FC = () => {
             </div>
           </button>
 
-          <button className="p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
+          {/* <button className="p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
             <div className="flex items-center">
               <Phone className="w-6 h-6 text-green-600 mr-3" />
               <div className="text-left">
@@ -460,7 +472,7 @@ const CallCenterAdminNavigator: React.FC = () => {
                 <p className="text-sm text-green-700">Assign volunteers and start calling voters</p>
               </div>
             </div>
-          </button>
+          </button> */}
         </div>
       </div>
     </div>
@@ -468,9 +480,22 @@ const CallCenterAdminNavigator: React.FC = () => {
 
   // Voters Level - Use INECVotersTable
   const renderVotersLevel = () => {
+    const tableTitle = currentPath.polling_unit
+      ? `${currentPath.polling_unit} - Polling Unit Voters`
+      : 'Polling Unit Voters';
+    const subtitle = selectedLocationParts.length
+      ? `Showing voters for ${selectedLocationParts.join(', ')} (phone numbers only)`
+      : 'Filtered to the selected polling unit (phone numbers only)';
+
     return (
       <div className="space-y-6">
-        <INECVotersTable showStats={false} />
+        <INECVotersTable
+          showStats={false}
+          lockedFilters={lockedVoterFilters}
+          title={tableTitle}
+          subtitle={subtitle}
+          minimalView
+        />
       </div>
     );
   };
