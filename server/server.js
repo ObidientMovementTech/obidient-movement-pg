@@ -26,6 +26,8 @@ import mobileRoutes from './routes/mobile.route.js';
 import mobiliseDashboardRoutes from './routes/mobiliseDashboard.routes.js';
 import callCenterRoutes from './routes/callCenter.routes.js';
 import inecVotersRoutes from './routes/inecVoters.routes.js';
+import communicationsRoutes from './routes/communications.routes.js';
+import locationRoutes from './routes/location.routes.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -90,6 +92,8 @@ app.use('/monitoring', monitoringRoutes); // Vote Protection monitoring routes
 app.use('/mobile', mobileRoutes); // Mobile App API routes
 app.use('/call-center', callCenterRoutes); // Call Center routes
 app.use('/api/inec-voters', inecVotersRoutes); // INEC Voters API - Scalable data access
+app.use('/api/communications', communicationsRoutes); // Bulk communications (SMS & Voice)
+app.use('/api/locations', locationRoutes); // Location data (States & LGAs)
 
 // Placeholder route
 app.get('/', (req, res) => {

@@ -21,6 +21,7 @@ import {
   MapPin,
   Smartphone,
   Phone,
+  MessageSquare,
 } from "lucide-react";
 import TopLogo from "../../components/TopLogo";
 import Loading from "../../components/Loader";
@@ -45,6 +46,7 @@ const AdminTemplateSyncPage = lazy(() => import("./admin/AdminTemplateSyncPage")
 const AdminUserManagement = lazy(() => import("./admin/AdminUserManagement"));
 const AdminMobileFeedsPage = lazy(() => import("./admin/AdminMobileFeedsPage"));
 const ElectionManagement = lazy(() => import("./admin/ElectionManagement"));
+const CommunicationsPage = lazy(() => import("./admin/CommunicationsPage"));
 const AllNotificationsPage = lazy(() => import("./notifications/AllNotificationsPage"));
 const StateDashboard = lazy(() => import("./state/StateDashboard"));
 const CallCenterAdminNavigator = lazy(() => import("../../components/callCenter/CallCenterAdminNavigator"));
@@ -196,6 +198,7 @@ export default function DashboardPage() {
       icon: <ShieldCheck size={24} />,
       children: [
         { title: "Call Center Navigation", icon: <Phone size={20} />, component: () => <CallCenterAdminNavigator /> },
+        { title: "Bulk Communications", icon: <MessageSquare size={20} />, component: () => <CommunicationsPage /> },
         { title: "Election Management", icon: <Landmark size={20} />, component: () => <ElectionManagement /> },
         { title: "User Management", icon: <Users size={20} />, component: () => <AdminUserManagement /> },
         { title: "KYC Management", icon: <UserCheck size={20} />, component: () => <KYCManagement /> },

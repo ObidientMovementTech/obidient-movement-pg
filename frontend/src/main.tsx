@@ -7,6 +7,7 @@ import "./index.css";
 // Only import essential components that are needed immediately
 import ErrorPage from "./pages/ErrorPage.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
+import AdminRoute from "./components/AdminRoute.tsx";
 
 // Contexts (these are lightweight)
 import { ThemeProvider } from "./context/ThemeContexts.tsx";
@@ -52,6 +53,7 @@ const LiveResultsPage = lazy(() => import("./pages/elections/LiveResults.tsx"));
 // Call Center Pages
 const CallCenterAdmin = lazy(() => import("./pages/callCenter/CallCenterAdmin.tsx"));
 const CallCenterVolunteer = lazy(() => import("./pages/callCenter/CallCenterVolunteer.tsx"));
+const CommunicationsPage = lazy(() => import("./pages/dashboard/admin/CommunicationsPage.tsx"));
 
 // Loading component
 const PageLoader = () => (
@@ -112,7 +114,7 @@ const router = createBrowserRouter([
     children: [{ index: true, element: <ProfilePage /> }],
   },
   {
-    path: "/dashboard",
+    path: "/dashboard/*",
     element: (
       <Suspense fallback={<PageLoader />}>
         <DashboardPage />
@@ -203,6 +205,15 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <CallCenterAdmin />
       </ProtectedRoute>
+    ),
+  },
+
+  {
+    path: "/dashboard/admin/communications/*",
+    element: (
+      <AdminRoute>
+        <CommunicationsPage />
+      </AdminRoute>
     ),
   },
 
