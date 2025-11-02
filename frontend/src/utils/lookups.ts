@@ -558,4 +558,7 @@ export const electionConcernOptions: OptionType[] = [
   { id: 10, label: "Counting and Collation Errors", value: "Counting and Collation Errors" },
 ];
 
-export { statesLGAWardList } from "./StateLGAWard";
+export { StateLGAWardPollingUnits, getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from "./StateLGAWardPollingUnits";
+
+// Legacy export for backward compatibility (deprecated - use StateLGAWardPollingUnits instead)
+export { StateLGAWardPollingUnits as statesLGAWardList } from "./StateLGAWardPollingUnits";
