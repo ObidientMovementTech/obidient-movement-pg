@@ -4,19 +4,19 @@ export type OptionType = { id: number; label: string; value: string };
 
 // gender
 export const genderOptions: OptionType[] = [
-  { id: 1, label: "Male",   value: "Male"   },
+  { id: 1, label: "Male", value: "Male" },
   { id: 2, label: "Female", value: "Female" },
 ];
 
 // age ranges
 export const ageRangeOptions: OptionType[] = [
-  { id: 1, label: "13-17 (Teenager)",  value: "13-17 (Teenager)"  },
-  { id: 2, label: "18-24 (Young Adult)",  value: "18-24 (Young Adult)"  },
-  { id: 3, label: "25-34 (Adult)",  value: "25-34 (Adult)"  },
-  { id: 4, label: "35-44 (Middle-Aged Adult)",  value: "35-44 (Middle-Aged Adult)"  },
-  { id: 5, label: "45-54 (Older Adult)",    value: "45-54 (Older Adult)"    },
-  { id: 6, label: "55-64 (Senior Adult)",    value: "55-64 (Senior Adult)"    },
-  { id: 7, label: "65+ (Elderly)",    value: "65+ (Elderly)"    },
+  { id: 1, label: "13-17 (Teenager)", value: "13-17 (Teenager)" },
+  { id: 2, label: "18-24 (Young Adult)", value: "18-24 (Young Adult)" },
+  { id: 3, label: "25-34 (Adult)", value: "25-34 (Adult)" },
+  { id: 4, label: "35-44 (Middle-Aged Adult)", value: "35-44 (Middle-Aged Adult)" },
+  { id: 5, label: "45-54 (Older Adult)", value: "45-54 (Older Adult)" },
+  { id: 6, label: "55-64 (Senior Adult)", value: "55-64 (Senior Adult)" },
+  { id: 7, label: "65+ (Elderly)", value: "65+ (Elderly)" },
 ];
 
 // political parties
