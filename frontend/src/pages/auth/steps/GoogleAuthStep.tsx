@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldCheck, ArrowRight, User } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 interface Props {
   data: any;

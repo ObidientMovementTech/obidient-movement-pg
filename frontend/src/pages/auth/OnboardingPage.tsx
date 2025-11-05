@@ -13,7 +13,7 @@ const BankDetailsStep = lazy(() => import('./steps/BankDetailsStep'));
 const SupportGroupStep = lazy(() => import('./steps/SupportGroupStep'));
 const CompletionStep = lazy(() => import('./steps/CompletionStep'));
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 interface OnboardingData {
   token: string;

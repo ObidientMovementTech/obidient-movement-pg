@@ -46,7 +46,7 @@
 
 - [ ] **2.1 Environment Variables**
   - [ ] Create `frontend/.env`
-  - [ ] Set `VITE_API_URL=http://localhost:5000`
+  - [ ] Set `VITE_API_BASE_URL=http://localhost:5000`
 
 - [ ] **2.2 Install Dependencies**
   ```bash

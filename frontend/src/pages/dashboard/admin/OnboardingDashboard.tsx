@@ -4,7 +4,7 @@ import {
   Users, TrendingUp, MapPin, RefreshCw, Download,
   Calendar, Award, Building2, Loader2, Filter, Search,
   Plus, Link2, Copy, CheckCircle2, ExternalLink
-} from 'lucide-react'; const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+} from 'lucide-react'; const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 interface OnboardingStats {
   overview: {

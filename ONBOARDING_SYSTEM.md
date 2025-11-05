@@ -114,7 +114,7 @@ npm install
 Create `frontend/.env`:
 
 ```bash
-VITE_API_URL=http://localhost:5000
+VITE_API_BASE_URL=http://localhost:5000
 ```
 
 #### Install Dependencies
@@ -414,7 +414,7 @@ NODE_ENV=production
 
 1. Set production API URL:
 ```bash
-VITE_API_URL=https://api.yourdomain.com
+VITE_API_BASE_URL=https://api.yourdomain.com
 ```
 
 2. Build production bundle:
