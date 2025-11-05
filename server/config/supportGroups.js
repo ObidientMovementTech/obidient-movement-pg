@@ -8,6 +8,7 @@
  */
 export const ANAMBRA_SUPPORT_GROUPS = [
   'Obidient Movement',
+  'Labour Party',
   'Odinani Group',
   'Grassroots Believers Initiative (GBI)',
   'Moghalu Youths Group',
