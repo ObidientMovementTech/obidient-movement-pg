@@ -965,7 +965,19 @@ export const adminUserManagementController = {
           [userId]
         );
 
-        // 11. Finally delete the main user record
+        // 11. Delete call center assignments
+        await client.query(
+          'DELETE FROM call_center_assignments WHERE user_id = $1',
+          [userId]
+        );
+
+        // 12. Delete monitor submissions (monitoring activity)
+        await client.query(
+          'DELETE FROM monitor_submissions WHERE user_id = $1',
+          [userId]
+        );
+
+        // 13. Finally delete the main user record
         await client.query(
           'DELETE FROM users WHERE id = $1',
           [userId]
