@@ -70,84 +70,6 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
     return first || "Friend";
   }, [profile?.name]);
 
-  // Calculate profile completion using the same logic as ProfileCompletionModal
-  const calculateProfileCompletion = (profile: any) => {
-    if (!profile) return 0;
-
-    // Use the same field logic as ProfileCompletionModal
-    const requiredFields = [
-      { key: 'userName', label: 'Username', getValue: (p: any) => p.userName || p.personalInfo?.user_name },
-      { key: 'gender', label: 'Gender', getValue: (p: any) => p.gender || p.personalInfo?.gender },
-      { key: 'ageRange', label: 'Age Range', getValue: (p: any) => p.ageRange || p.personalInfo?.age_range },
-      { key: 'stateOfOrigin', label: 'State of Origin', getValue: (p: any) => p.stateOfOrigin || p.personalInfo?.state_of_origin },
-      { key: 'votingState', label: 'Voting State', getValue: (p: any) => p.votingState || p.personalInfo?.voting_engagement_state },
-      { key: 'votingLGA', label: 'Voting LGA', getValue: (p: any) => p.votingLGA || p.personalInfo?.lga },
-      { key: 'votingWard', label: 'Voting Ward', getValue: (p: any) => p.votingWard || p.personalInfo?.ward },
-      { key: 'votingPU', label: 'Voting Polling Unit', getValue: (p: any) => p.votingPU || p.personalInfo?.voting_pu },
-      { key: 'citizenship', label: 'Citizenship', getValue: (p: any) => p.citizenship || p.personalInfo?.citizenship },
-      { key: 'isVoter', label: 'Voter Status', getValue: (p: any) => p.isVoter || p.onboardingData?.votingBehavior?.is_registered },
-      { key: 'willVote', label: 'Voting Intention', getValue: (p: any) => p.willVote || p.onboardingData?.votingBehavior?.likely_to_vote },
-      { key: 'profileImage', label: 'Profile Image', getValue: (p: any) => p.profileImage }
-    ];
-
-    const completedFields = requiredFields.filter(field => {
-      const value = field.getValue(profile);
-      return value && value.toString().trim() !== '';
-    });
-
-    const missingFields = requiredFields.filter(field => {
-      const value = field.getValue(profile);
-      return !value || value.toString().trim() === '';
-    });
-
-    const completionScore = (completedFields.length / requiredFields.length) * 100;
-
-    if (import.meta.env.DEV) {
-      console.log('🔍 Profile completion calculation (frontend):', {
-        completionScore: completionScore.toFixed(1),
-        completedFields: completedFields.length,
-        totalFields: requiredFields.length,
-        missingFields: missingFields.map(f => f.label),
-        fieldValues: requiredFields.map(field => ({
-          key: field.key,
-          value: field.getValue(profile) || 'MISSING'
-        }))
-      });
-    }
-
-    return completionScore;
-  };
-
-  // Check if voting location is complete
-  const isVotingLocationComplete = (profile: any) => {
-    if (!profile) return false;
-
-    const votingFields = [
-      { key: 'votingState', getValue: (p: any) => p.votingState || p.personalInfo?.voting_engagement_state },
-      { key: 'votingLGA', getValue: (p: any) => p.votingLGA || p.personalInfo?.lga },
-      { key: 'votingWard', getValue: (p: any) => p.votingWard || p.personalInfo?.ward },
-      { key: 'votingPU', getValue: (p: any) => p.votingPU || p.personalInfo?.voting_pu }
-    ];
-
-    const missingFields = votingFields.filter(field => {
-      const value = field.getValue(profile);
-      return !value || value.toString().trim() === '';
-    });
-
-    if (import.meta.env.DEV) {
-      console.log('🔍 Voting location check:', {
-        isComplete: missingFields.length === 0,
-        missingFields: missingFields.map(f => f.key),
-        votingState: votingFields[0].getValue(profile) || 'MISSING',
-        votingLGA: votingFields[1].getValue(profile) || 'MISSING',
-        votingWard: votingFields[2].getValue(profile) || 'MISSING',
-        votingPU: votingFields[3].getValue(profile) || 'MISSING'
-      });
-    }
-
-    return missingFields.length === 0;
-  };
-
   useEffect(() => {
     let isMounted = true;
     setIsFetchingBlocs(true);
@@ -174,65 +96,8 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
     };
   }, []);
 
-  // Modal logic: Prioritize voting location completion over general profile completion
-  useEffect(() => {
-    if (profile && !isFetchingBlocs) {
-      const votingLocationComplete = isVotingLocationComplete(profile);
-      const completionScore = calculateProfileCompletion(profile);
-
-      // First priority: Voting location completion
-      if (!votingLocationComplete) {
-        console.log('�️ Voting location incomplete, showing voting location modal in 1.5 seconds...');
-        const timer = setTimeout(() => {
-          setVotingLocationModalOpen(true);
-        }, 1500);
-        return () => clearTimeout(timer);
-      }
-      // Second priority: General profile completion
-      else if (completionScore < 100) {
-        console.log('🔍 Profile incomplete, showing profile modal in 1.5 seconds...');
-        const timer = setTimeout(() => {
-          setProfileModalOpen(true);
-        }, 1500);
-        return () => clearTimeout(timer);
-      } else {
-        console.log('✅ Profile is 100% complete, not showing modal');
-      }
-    }
-  }, [profile, isFetchingBlocs]);
-
-  // Twitter follow modal logic: Show after completion modals
-  useEffect(() => {
-    if (profile && !isFetchingBlocs) {
-      const votingLocationComplete = isVotingLocationComplete(profile);
-      const completionScore = calculateProfileCompletion(profile);
-      const lastDismissed = localStorage.getItem('twitter-follow-dismissed');
-      const lastShown = localStorage.getItem('twitter-follow-last-shown');
-      const currentTime = Date.now();
-
-      // Don't show if dismissed in the last 7 days
-      const dismissedRecently = lastDismissed && (currentTime - parseInt(lastDismissed)) < (7 * 24 * 60 * 60 * 1000);
-
-      // Don't show if already shown in the last 24 hours
-      const shownRecently = lastShown && (currentTime - parseInt(lastShown)) < (24 * 60 * 60 * 1000);
-
-      if (!dismissedRecently && !shownRecently) {
-        // Calculate delay based on what modal is showing first
-        let delay = 2000; // Default delay
-        if (!votingLocationComplete) {
-          delay = 5000; // Show later if voting location modal is shown first
-        } else if (completionScore < 100) {
-          delay = 4000; // Show later if profile modal is shown first
-        }
-
-        const timer = setTimeout(() => {
-          setTwitterFollowModalOpen(true);
-          localStorage.setItem('twitter-follow-last-shown', currentTime.toString());
-        }, delay);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [profile, isFetchingBlocs]);
+  // Removed auto-popup modals - modals now only open via explicit user action
+  // User feedback: automatic popups were distracting on dashboard load
 
   // Handler to navigate to auto voting bloc
   function handleVisitAutoVotingBloc() {
