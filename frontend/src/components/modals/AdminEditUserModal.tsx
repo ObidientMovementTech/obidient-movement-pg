@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Loader2 } from 'lucide-react';
-import { statesLGAWardList } from '../../utils/StateLGAWard';
-import { getPollingUnitsForWard } from '../../utils/pollingUnitUtils';
-import { formatStateName, formatLocationName } from '../../utils/textUtils';
+import { getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from '../../utils/StateLGAWardPollingUnits';
 import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import FormSelect from '../select/FormSelect';
 import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
@@ -128,46 +126,40 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     bankAccountName: ''
   });
 
-  // For cascading dropdowns
-  const [selectedState, setSelectedState] = useState('');
-  const [selectedLGA, setSelectedLGA] = useState('');
-  const [assignedSelectedState, setAssignedSelectedState] = useState('');
-  const [assignedSelectedLGA, setAssignedSelectedLGA] = useState('');
-
   // Dropdown options state
   const [states, setStates] = useState<OptionType[]>([]);
 
   // Initialize states dropdown
+  // Initialize states list
   useEffect(() => {
-    const stateOptions = statesLGAWardList.map((s, i) => ({
+    const stateNames = getStateNames();
+    const stateOptions = stateNames.map((stateName, i) => ({
       id: i,
-      label: formatStateName(s.state), // Display formatted name
-      value: s.state, // Keep original value for backend
+      label: stateName,
+      value: stateName,
     }));
     setStates(stateOptions);
   }, []);
 
   // Helper functions for cascading dropdowns
   const getLgas = (stateName: string): OptionType[] => {
-    const found = statesLGAWardList.find(s => s.state === stateName);
-    return found ? found.lgas.map((l, i) => ({
+    if (!stateName) return [];
+    const formattedLGAs = getFormattedLGAs(stateName);
+    return formattedLGAs.map((lga, i) => ({
       id: i,
-      label: formatLocationName(l.lga), // Display formatted name
-      value: l.lga // Keep original value for backend
-    })) : [];
+      label: lga.label,
+      value: lga.value
+    }));
   };
 
-  const getWards = (lga: string, state: string): OptionType[] => {
-    const stateData = statesLGAWardList.find(s => s.state === state);
-    const lgaData = stateData?.lgas.find(l => l.lga === lga);
-
-    const wards = lgaData ? lgaData.wards.map((w, i) => ({
+  const getWards = (stateName: string, lgaName: string): OptionType[] => {
+    if (!stateName || !lgaName) return [];
+    const formattedWards = getFormattedWards(stateName, lgaName);
+    return formattedWards.map((ward, i) => ({
       id: i,
-      label: formatLocationName(w), // Display formatted name
-      value: w // Keep original value for backend
-    })) : [];
-
-    return wards;
+      label: ward.label,
+      value: ward.value
+    }));
   };
 
   // Get polling units for the selected location
@@ -176,36 +168,12 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
       return [];
     }
 
-    try {
-      // Convert to the uppercase format expected by the new data structure
-      const stateUpper = formData.votingState.toUpperCase().replace(/-/g, ' ');
-      const lgaUpper = formData.votingLGA.toUpperCase().replace(/-/g, ' ');
-      const wardUpper = formData.votingWard.toUpperCase().replace(/-/g, ' ');
-
-      const pollingUnits = getPollingUnitsForWard(stateUpper, lgaUpper, wardUpper);
-
-      return pollingUnits.map((pu, i) => ({
-        id: i,
-        label: pu.label,
-        value: pu.value
-      }));
-    } catch (error) {
-      console.error('Error getting polling units:', error);
-      return [];
-    }
-  };
-
-  // Helper function to convert formatted data back to original format for dropdowns
-  const convertToOriginalFormat = (formattedValue: string, type: 'state' | 'location'): string => {
-    if (!formattedValue) return '';
-
-    if (type === 'state') {
-      // Convert "Abia" back to "abia"
-      return formattedValue.toLowerCase();
-    } else {
-      // Convert "Aba North" back to "aba-north"
-      return formattedValue.toLowerCase().replace(/\s+/g, '-');
-    }
+    const formattedPollingUnits = getFormattedPollingUnits(formData.votingState, formData.votingLGA, formData.votingWard);
+    return formattedPollingUnits.map((pu, i) => ({
+      id: i,
+      label: pu.label,
+      value: pu.value
+    }));
   };
 
   // Dropdown options
@@ -250,22 +218,6 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
         bankAccountNumber: user.bankAccountNumber || '',
         bankAccountName: user.bankAccountName || ''
       });
-
-      // Update cascading dropdown states for voting location
-      const newVotingState = user.votingState || '';
-      const newVotingLGA = user.votingLGA || '';
-      const originalLGA = convertToOriginalFormat(newVotingLGA, 'location');
-
-      setSelectedState(newVotingState);
-      setSelectedLGA(originalLGA);
-
-      // Update cascading dropdown states for assignment location
-      const newAssignedState = user.assignedState || '';
-      const newAssignedLGA = user.assignedLGA || '';
-      const originalAssignedLGA = convertToOriginalFormat(newAssignedLGA, 'location');
-
-      setAssignedSelectedState(newAssignedState);
-      setAssignedSelectedLGA(originalAssignedLGA);
     }
   }, [editModal.isOpen, editModal.user]);
 
@@ -282,16 +234,16 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
         email: formData.email,
         phone: formData.phone,
         countryOfResidence: formData.countryOfResidence,
-        // Format location data as Title Case before sending to backend
-        votingState: formData.votingState ? formatStateName(formData.votingState) : formData.votingState,
-        votingLGA: formData.votingLGA ? formatLocationName(formData.votingLGA) : formData.votingLGA,
-        votingWard: formData.votingWard ? formatLocationName(formData.votingWard) : formData.votingWard,
+        // Send location data as-is (UPPERCASE format)
+        votingState: formData.votingState || undefined,
+        votingLGA: formData.votingLGA || undefined,
+        votingWard: formData.votingWard || undefined,
         votingPU: formData.votingPU || '',
         gender: formData.gender,
         ageRange: formData.ageRange,
         citizenship: formData.citizenship,
         isVoter: formData.isVoter,
-        stateOfOrigin: formData.stateOfOrigin ? formatStateName(formData.stateOfOrigin) : formData.stateOfOrigin,
+        stateOfOrigin: formData.stateOfOrigin || undefined,
         role: formData.role,
         emailVerified: formData.emailVerified,
         kycStatus: formData.kycStatus,
@@ -304,9 +256,9 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
       // Update user designation and assignments
       await adminUserManagementService.updateUserDesignation(formData.user.id, {
         designation: formData.designation,
-        assignedState: formData.assignedState ? formatStateName(formData.assignedState) : null,
-        assignedLGA: formData.assignedLGA ? formatLocationName(formData.assignedLGA) : null,
-        assignedWard: formData.assignedWard ? formatLocationName(formData.assignedWard) : null
+        assignedState: formData.assignedState || null, // Send raw UPPERCASE value
+        assignedLGA: formData.assignedLGA || null, // Send raw UPPERCASE value
+        assignedWard: formData.assignedWard || null // Send raw UPPERCASE value
       });
 
       onUserUpdated();
@@ -492,66 +444,54 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                     <FormSelect
                       label="Voting State"
                       options={states}
-                      defaultSelected={selectedState}
+                      defaultSelected={formData.votingState}
                       onChange={(opt) => {
                         const newState = opt?.value || '';
-                        setSelectedState(newState);
                         setFormData(prev => ({
                           ...prev,
                           votingState: newState,
-                          votingLGA: '', // Reset LGA when state changes
-                          votingWard: '', // Reset ward when state changes
-                          votingPU: '' // Reset PU when state changes
+                          votingLGA: '',
+                          votingWard: '',
+                          votingPU: ''
                         }));
-                        // Reset dependent fields
-                        setSelectedLGA('');
                       }}
-                      key={`votingState-${selectedState}`}
+                      key={`votingState-${formData.votingState}`}
                     />
                   </div>
 
                   <div>
                     <FormSelect
                       label="Voting LGA"
-                      options={getLgas(selectedState)}
-                      defaultSelected={selectedLGA}
+                      options={getLgas(formData.votingState)}
+                      defaultSelected={formData.votingLGA}
                       onChange={(opt) => {
                         const newLGA = opt?.value || '';
-                        setSelectedLGA(newLGA);
                         setFormData(prev => ({
                           ...prev,
                           votingLGA: newLGA,
-                          votingWard: '', // Reset ward when LGA changes
-                          votingPU: '' // Reset PU when LGA changes
+                          votingWard: '',
+                          votingPU: ''
                         }));
                       }}
-                      disabled={!selectedState}
-                      key={`votingLGA-${selectedLGA}`}
+                      disabled={!formData.votingState}
+                      key={`votingLGA-${formData.votingLGA}`}
                     />
                   </div>
 
                   <div>
                     <FormSelect
                       label="Voting Ward"
-                      options={getWards(selectedLGA, selectedState)}
-                      defaultSelected={convertToOriginalFormat(formData.votingWard, 'location')}
+                      options={getWards(formData.votingState, formData.votingLGA)}
+                      defaultSelected={formData.votingWard}
                       onChange={(opt) => {
-                        if (opt) {
-                          setFormData(prev => ({
-                            ...prev,
-                            votingWard: opt.value,
-                            votingPU: '' // Reset PU when ward changes
-                          }));
-                        } else {
-                          setFormData(prev => ({
-                            ...prev,
-                            votingWard: '',
-                            votingPU: ''
-                          }));
-                        }
+                        setFormData(prev => ({
+                          ...prev,
+                          votingWard: opt?.value || '',
+                          votingPU: ''
+                        }));
                       }}
-                      disabled={!selectedLGA}
-                      key={`votingWard-${formData.votingWard}-${selectedLGA}`}
+                      disabled={!formData.votingLGA}
+                      key={`votingWard-${formData.votingWard}`}
                     />
                   </div>
 
@@ -561,12 +501,10 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                       options={getPollingUnits()}
                       defaultSelected={formData.votingPU}
                       onChange={(opt) => {
-                        if (opt) {
-                          setFormData(prev => ({ ...prev, votingPU: opt.value }));
-                        }
+                        setFormData(prev => ({ ...prev, votingPU: opt?.value || '' }));
                       }}
                       disabled={!formData.votingWard}
-                      key={`votingPU-${formData.votingWard}-${formData.votingPU}`}
+                      key={`votingPU-${formData.votingPU}`}
                       placeholder="Select your polling unit"
                     />
                   </div>
@@ -733,9 +671,6 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                         assignedLGA: '',
                         assignedWard: ''
                       }));
-                      // Clear cascading dropdown states for assignments
-                      setAssignedSelectedState('');
-                      setAssignedSelectedLGA('');
                     }}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
@@ -759,20 +694,17 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                         <FormSelect
                           label="Assigned State"
                           options={states}
-                          defaultSelected={assignedSelectedState}
+                          defaultSelected={formData.assignedState}
                           onChange={(opt) => {
                             const newState = opt?.value || '';
-                            setAssignedSelectedState(newState);
                             setFormData(prev => ({
                               ...prev,
                               assignedState: newState,
-                              assignedLGA: '', // Reset LGA when state changes
-                              assignedWard: '' // Reset ward when state changes
+                              assignedLGA: '',
+                              assignedWard: ''
                             }));
-                            // Reset dependent fields
-                            setAssignedSelectedLGA('');
                           }}
-                          key={`assignedState-${assignedSelectedState}`}
+                          key={`assignedState-${formData.assignedState}`}
                         />
                       </div>
 
@@ -782,19 +714,18 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                           <div>
                             <FormSelect
                               label="Assigned LGA"
-                              options={getLgas(assignedSelectedState)}
-                              defaultSelected={assignedSelectedLGA}
+                              options={getLgas(formData.assignedState)}
+                              defaultSelected={formData.assignedLGA}
                               onChange={(opt) => {
                                 const newLGA = opt?.value || '';
-                                setAssignedSelectedLGA(newLGA);
                                 setFormData(prev => ({
                                   ...prev,
                                   assignedLGA: newLGA,
-                                  assignedWard: '' // Reset ward when LGA changes
+                                  assignedWard: ''
                                 }));
                               }}
-                              disabled={!assignedSelectedState}
-                              key={`assignedLGA-${assignedSelectedLGA}`}
+                              disabled={!formData.assignedState}
+                              key={`assignedLGA-${formData.assignedLGA}`}
                             />
                           </div>
                         )}
@@ -804,23 +735,16 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                         <div>
                           <FormSelect
                             label="Assigned Ward"
-                            options={getWards(assignedSelectedLGA, assignedSelectedState)}
-                            defaultSelected={convertToOriginalFormat(formData.assignedWard, 'location')}
+                            options={getWards(formData.assignedState, formData.assignedLGA)}
+                            defaultSelected={formData.assignedWard}
                             onChange={(opt) => {
-                              if (opt) {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  assignedWard: opt.value
-                                }));
-                              } else {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  assignedWard: ''
-                                }));
-                              }
+                              setFormData(prev => ({
+                                ...prev,
+                                assignedWard: opt?.value || ''
+                              }));
                             }}
-                            disabled={!assignedSelectedLGA}
-                            key={`assignedWard-${formData.assignedWard}-${assignedSelectedLGA}`}
+                            disabled={!formData.assignedLGA}
+                            key={`assignedWard-${formData.assignedWard}`}
                           />
                         </div>
                       )}

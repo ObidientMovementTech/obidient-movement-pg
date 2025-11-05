@@ -50,7 +50,7 @@ import PrivateMessageModal from "../../../components/modals/PrivateMessageModal"
 import FlyerModal from "../../../components/modals/FlyerModal";
 
 import { formatPhoneForWhatsApp } from "../../../utils/phoneUtils";
-import { statesLGAWardList } from "../../../utils/StateLGAWard";
+import { getStateNames, getFormattedLGAs } from "../../../utils/StateLGAWardPollingUnits";
 import { getPollingUnitMembers } from "../../../services/userService";
 
 export default function VotingBlocManagePage() {
@@ -2390,12 +2390,11 @@ function ManualMemberModal({ isOpen, onClose, onAdd, loading }: ManualMemberModa
   // Update LGAs when state changes
   useEffect(() => {
     if (formData.state) {
-      const selectedState = statesLGAWardList.find(s => s.state === formData.state);
-      if (selectedState) {
-        setAvailableLGAs(selectedState.lgas);
-        setFormData(prev => ({ ...prev, lga: '', ward: '' }));
-        setAvailableWards([]);
-      }
+      const formattedLGAs = getFormattedLGAs(formData.state);
+      const lgaList = formattedLGAs.map(lga => ({ lga: lga.value }));
+      setAvailableLGAs(lgaList);
+      setFormData(prev => ({ ...prev, lga: '', ward: '' }));
+      setAvailableWards([]);
     }
   }, [formData.state]);
 
@@ -2508,9 +2507,9 @@ function ManualMemberModal({ isOpen, onClose, onAdd, loading }: ManualMemberModa
                   disabled={loading}
                 >
                   <option value="">Select State</option>
-                  {statesLGAWardList.map((state) => (
-                    <option key={state.state} value={state.state}>
-                      {state.state}
+                  {getStateNames().map((state) => (
+                    <option key={state} value={state}>
+                      {state}
                     </option>
                   ))}
                 </select>

@@ -53,7 +53,7 @@ const CallCenterAdminNavigator: React.FC = () => {
   const navigateToLGA = (lga: string) => {
     setCurrentPath({
       level: 'lga',
-      state: 'Anambra',
+      state: 'ANAMBRA',
       lga
     });
   };

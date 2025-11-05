@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Save, Plus, Trash2, Settings, Upload, Link, X } from "lucide-react";
 import { useUserContext } from "../../../context/UserContext";
-import { statesLGAWardList } from "../../../utils/StateLGAWard";
+import { getStateNames, getFormattedLGAs, getFormattedWards } from "../../../utils/StateLGAWardPollingUnits";
 import RichTextEditor from "../../../components/inputs/RichTextEditor";
 import Toast from "../../../components/Toast";
 import Loading from "../../../components/Loader";
@@ -81,8 +81,8 @@ export default function AdminDefaultVotingBlocPage() {
   // Update LGA options when state changes
   useEffect(() => {
     if (settings.locationDefaults.defaultState) {
-      const stateData = statesLGAWardList.find(s => s.state === settings.locationDefaults.defaultState);
-      setLgaOptions(stateData ? stateData.lgas.map(lga => lga.lga) : []);
+      const formattedLGAs = getFormattedLGAs(settings.locationDefaults.defaultState);
+      setLgaOptions(formattedLGAs.map(lga => lga.value));
 
       // Reset LGA and Ward if state changed
       if (settings.locationDefaults.defaultLga) {
@@ -104,9 +104,8 @@ export default function AdminDefaultVotingBlocPage() {
   // Update Ward options when LGA changes
   useEffect(() => {
     if (settings.locationDefaults.defaultState && settings.locationDefaults.defaultLga) {
-      const stateData = statesLGAWardList.find(s => s.state === settings.locationDefaults.defaultState);
-      const lgaData = stateData?.lgas.find(lga => lga.lga === settings.locationDefaults.defaultLga);
-      setWardOptions(lgaData ? lgaData.wards : []);
+      const formattedWards = getFormattedWards(settings.locationDefaults.defaultState, settings.locationDefaults.defaultLga);
+      setWardOptions(formattedWards.map(ward => ward.value));
 
       // Reset Ward if LGA changed
       if (settings.locationDefaults.defaultWard) {
@@ -477,9 +476,9 @@ export default function AdminDefaultVotingBlocPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="">Select State</option>
-                    {statesLGAWardList.map((state) => (
-                      <option key={state.state} value={state.state}>
-                        {state.state}
+                    {getStateNames().map((state) => (
+                      <option key={state} value={state}>
+                        {state}
                       </option>
                     ))}
                   </select>

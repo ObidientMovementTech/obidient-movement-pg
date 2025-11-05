@@ -11,9 +11,8 @@ import validatePassword from "../../utils/validatePassword.js";
 import { registerUser } from "../../services/authService.js";
 import { useUserContext } from "../../context/UserContext.js";
 import FormSelect from "../../components/select/FormSelect.js";
-import { statesLGAWardList } from "../../utils/StateLGAWard.js";
+import { getFormattedLGAs, getFormattedWards } from "../../utils/StateLGAWardPollingUnits";
 import { OptionType } from "../../utils/lookups.js";
-import { formatStateName, formatLocationName } from "../../utils/textUtils.js";
 import { formatPhoneForStorage } from "../../utils/phoneUtils.js";
 import ListBoxComp from "../../components/select/ListBox.js";
 
@@ -27,7 +26,7 @@ const AnambraSignupPage = () => {
   const [phone, setPhone] = useState("");
   const [countryCode, setCountryCode] = useState("+234"); // Default to Nigeria
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [votingState] = useState("Anambra"); // Fixed to Anambra
+  const [votingState] = useState("ANAMBRA"); // Fixed to ANAMBRA (uppercase)
   const [votingLGA, setVotingLGA] = useState("");
   const [votingWard, setVotingWard] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -43,25 +42,23 @@ const AnambraSignupPage = () => {
     }
   }, [profile, isAuthLoading, navigate]);
 
-  // Get Anambra state data
-  const anambraState = statesLGAWardList.find(s => s.state === "Anambra");
-
+  // Get Anambra LGAs and Wards using the new helper functions
   const getLgas = (): OptionType[] => {
-    return anambraState ? anambraState.lgas.map((l, i) => ({
+    const formattedLGAs = getFormattedLGAs("ANAMBRA");
+    return formattedLGAs.map((lga, i) => ({
       id: i,
-      label: formatLocationName(l.lga), // Display formatted name
-      value: l.lga // Keep original value for backend
-    })) : [];
+      label: lga.label, // Display with abbreviation (e.g., "01 - AGUATA")
+      value: lga.value // Send only name to backend (e.g., "AGUATA")
+    }));
   };
 
   const getWards = (lgaName: string): OptionType[] => {
-    if (!anambraState) return [];
-    const foundLga = anambraState.lgas.find(l => l.lga === lgaName);
-    return foundLga ? foundLga.wards.map((w, i) => ({
+    const formattedWards = getFormattedWards("ANAMBRA", lgaName);
+    return formattedWards.map((ward, i) => ({
       id: i,
-      label: formatLocationName(w), // Display formatted name
-      value: w // Keep original value for backend
-    })) : [];
+      label: ward.label, // Display with abbreviation (e.g., "01 - ACHINA I")
+      value: ward.value // Send only name to backend (e.g., "ACHINA I")
+    }));
   };
 
   const validateEmail = (email: string): boolean => {
@@ -132,9 +129,9 @@ const AnambraSignupPage = () => {
         phone: formattedPhone,
         countryCode,
         password: validPassword,
-        votingState: formatStateName(votingState),
-        votingLGA: formatLocationName(votingLGA),
-        votingWard: formatLocationName(votingWard),
+        votingState: votingState, // Send raw UPPERCASE value
+        votingLGA: votingLGA, // Send raw UPPERCASE value
+        votingWard: votingWard, // Send raw UPPERCASE value
         isDiaspora: false,
       });
 

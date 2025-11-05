@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, MapPin, Shield, AlertCircle, Loader2 } from 'lucide-react';
 import FormSelect from '../select/FormSelect';
-import { statesLGAWardList } from '../../utils/StateLGAWard';
-import { formatStateName, formatLocationName } from '../../utils/textUtils';
+import { getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from '../../utils/StateLGAWardPollingUnits';
 import { formatPhoneForStorage } from '../../utils/phoneUtils';
 import { OptionType, genderOptions, ageRangeOptions } from '../../utils/lookups';
-import { getPollingUnitsForWard } from '../../utils/pollingUnitUtils';
 import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import ListBoxComp from '../select/ListBox';
 import Toast from '../Toast';
@@ -119,7 +117,7 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
       setFormData(prev => ({
         ...prev,
         password: '123456',
-        votingState: 'anambra',
+        votingState: 'ANAMBRA',
         citizenship: 'Nigerian Citizen',
         isVoter: 'Yes',
         willVote: 'Yes',
@@ -154,56 +152,43 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
   // Initialize states list
   useEffect(() => {
-    const stateOptions = statesLGAWardList.map((s: any, i: number) => ({
+    const stateNames = getStateNames();
+    const stateOptions = stateNames.map((stateName, i) => ({
       id: i,
-      label: formatStateName(s.state),
-      value: s.state,
+      label: stateName,
+      value: stateName,
     }));
     setStates(stateOptions);
   }, []);
 
   const getLgas = (stateName: string): OptionType[] => {
-    const found = statesLGAWardList.find((s: any) => s.state === stateName);
-    return found ? found.lgas.map((l: any, i: number) => ({
+    if (!stateName) return [];
+    const formattedLGAs = getFormattedLGAs(stateName);
+    return formattedLGAs.map((lga, i) => ({
       id: i,
-      label: formatLocationName(l.lga),
-      value: l.lga
-    })) : [];
+      label: lga.label,
+      value: lga.value
+    }));
   };
 
-  const getWards = (lga: string, state: string): OptionType[] => {
-    const stateData = statesLGAWardList.find((s: any) => s.state === state);
-    const lgaData = stateData?.lgas.find((l: any) => l.lga === lga);
-    return lgaData ? lgaData.wards.map((w: any, i: number) => ({
+  const getWards = (stateName: string, lgaName: string): OptionType[] => {
+    if (!stateName || !lgaName) return [];
+    const formattedWards = getFormattedWards(stateName, lgaName);
+    return formattedWards.map((ward, i) => ({
       id: i,
-      label: formatLocationName(w),
-      value: w
-    })) : [];
+      label: ward.label,
+      value: ward.value
+    }));
   };
 
-  // Get polling units for the selected location
-  const getPollingUnits = (): OptionType[] => {
-    if (!formData.votingState || !formData.votingLGA || !formData.votingWard) {
-      return [];
-    }
-
-    try {
-      // Convert to the uppercase format expected by the new data structure
-      const stateUpper = formData.votingState.toUpperCase().replace(/-/g, ' ');
-      const lgaUpper = formData.votingLGA.toUpperCase().replace(/-/g, ' ');
-      const wardUpper = formData.votingWard.toUpperCase().replace(/-/g, ' ');
-
-      const pollingUnits = getPollingUnitsForWard(stateUpper, lgaUpper, wardUpper);
-
-      return pollingUnits.map((pu, i) => ({
-        id: i,
-        label: pu.label,
-        value: pu.value
-      }));
-    } catch (error) {
-      console.error('Error getting polling units:', error);
-      return [];
-    }
+  const getPollingUnits = (stateName: string, lgaName: string, wardName: string): OptionType[] => {
+    if (!stateName || !lgaName || !wardName) return [];
+    const formattedPollingUnits = getFormattedPollingUnits(stateName, lgaName, wardName);
+    return formattedPollingUnits.map((pu, i) => ({
+      id: i,
+      label: pu.label,
+      value: pu.value
+    }));
   };
 
   const validateEmail = (email: string): boolean => {
@@ -260,9 +245,9 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
       const userData = {
         ...formData,
         phone: formattedPhone,
-        votingState: formData.votingState ? formatStateName(formData.votingState) : undefined,
-        votingLGA: formData.votingLGA ? formatLocationName(formData.votingLGA) : undefined,
-        votingWard: formData.votingWard ? formatLocationName(formData.votingWard) : undefined,
+        votingState: formData.votingState || undefined, // Send raw UPPERCASE value
+        votingLGA: formData.votingLGA || undefined, // Send raw UPPERCASE value
+        votingWard: formData.votingWard || undefined, // Send raw UPPERCASE value
       };
 
       // Use the admin user management service
@@ -600,7 +585,7 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                 <div>
                   <FormSelect
                     label="Voting Ward"
-                    options={getWards(formData.votingLGA || '', formData.votingState || '')}
+                    options={getWards(formData.votingState || '', formData.votingLGA || '')}
                     defaultSelected={formData.votingWard}
                     onChange={(opt) => setFormData(prev => ({ ...prev, votingWard: opt?.value || '', votingPU: '' }))}
                     disabled={!formData.votingLGA}
@@ -612,7 +597,7 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                 <div>
                   <FormSelect
                     label="Voting Polling Unit"
-                    options={getPollingUnits()}
+                    options={getPollingUnits(formData.votingState || '', formData.votingLGA || '', formData.votingWard || '')}
                     defaultSelected={formData.votingPU}
                     onChange={(opt) => setFormData(prev => ({ ...prev, votingPU: opt?.value || '' }))}
                     disabled={!formData.votingWard}

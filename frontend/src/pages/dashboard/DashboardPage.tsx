@@ -22,6 +22,7 @@ import {
   Smartphone,
   Phone,
   MessageSquare,
+  UserPlus,
 } from "lucide-react";
 import TopLogo from "../../components/TopLogo";
 import Loading from "../../components/Loader";
@@ -46,7 +47,10 @@ const AdminTemplateSyncPage = lazy(() => import("./admin/AdminTemplateSyncPage")
 const AdminUserManagement = lazy(() => import("./admin/AdminUserManagement"));
 const AdminMobileFeedsPage = lazy(() => import("./admin/AdminMobileFeedsPage"));
 const ElectionManagement = lazy(() => import("./admin/ElectionManagement"));
+const PartyManagement = lazy(() => import("./admin/PartyManagement"));
 const CommunicationsPage = lazy(() => import("./admin/CommunicationsPage"));
+const OnboardingDashboard = lazy(() => import("./admin/OnboardingDashboard"));
+const SituationRoomPage = lazy(() => import("./admin/SituationRoomPage"));
 const AllNotificationsPage = lazy(() => import("./notifications/AllNotificationsPage"));
 const StateDashboard = lazy(() => import("./state/StateDashboard"));
 const CallCenterAdminNavigator = lazy(() => import("../../components/callCenter/CallCenterAdminNavigator"));
@@ -197,9 +201,12 @@ export default function DashboardPage() {
       title: "Admin",
       icon: <ShieldCheck size={24} />,
       children: [
+        { title: "Situation Room", icon: <Activity size={20} />, component: () => <SituationRoomPage /> },
+        { title: "Agent Onboarding", icon: <UserPlus size={20} />, component: () => <OnboardingDashboard /> },
         { title: "Call Center Navigation", icon: <Phone size={20} />, component: () => <CallCenterAdminNavigator /> },
         { title: "Bulk Communications", icon: <MessageSquare size={20} />, component: () => <CommunicationsPage /> },
         { title: "Election Management", icon: <Landmark size={20} />, component: () => <ElectionManagement /> },
+        { title: "Party Management", icon: <Flag size={20} />, component: () => <PartyManagement /> },
         { title: "User Management", icon: <Users size={20} />, component: () => <AdminUserManagement /> },
         { title: "KYC Management", icon: <UserCheck size={20} />, component: () => <KYCManagement /> },
         { title: "Default Voting Bloc Settings", icon: <Flag size={20} />, component: () => <AdminDefaultVotingBlocPage /> },

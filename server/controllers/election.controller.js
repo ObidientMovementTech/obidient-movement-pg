@@ -1,61 +1,272 @@
 import { query, getClient } from '../config/db.js';
 import { logger } from '../middlewares/security.middleware.js';
+import { MONITOR_SUBMISSION_TYPES } from '../services/monitoringService.js';
+
+const normalizePartyDefinitions = (partiesInput, { requireNonEmpty = true } = {}) => {
+  if (partiesInput === undefined || partiesInput === null) {
+    if (requireNonEmpty) {
+      throw new Error('Parties definition is required');
+    }
+    return [];
+  }
+
+  if (!Array.isArray(partiesInput)) {
+    throw new Error('Parties must be provided as an array');
+  }
+
+  const normalized = [];
+  const seenCodes = new Set();
+
+  partiesInput.forEach((raw, index) => {
+    if (!raw || typeof raw !== 'object') {
+      throw new Error(`Party definition at index ${index} is invalid`);
+    }
+
+    const codeSource = raw.code ?? raw.partyCode ?? raw.abbreviation ?? raw.name ?? '';
+    const nameSource = raw.name ?? raw.partyName ?? raw.displayName ?? codeSource;
+
+    const code = String(codeSource || '').trim().toUpperCase();
+    if (!code) {
+      throw new Error(`Party code is required (index ${index})`);
+    }
+
+    if (seenCodes.has(code)) {
+      throw new Error(`Duplicate party code detected: ${code}`);
+    }
+    seenCodes.add(code);
+
+    const name = String(nameSource || '').trim();
+    if (!name) {
+      throw new Error(`Party name is required (index ${index})`);
+    }
+
+    const displayName = raw.displayName ? String(raw.displayName).trim() || null : null;
+    const color = raw.color ? String(raw.color).trim() || null : null;
+    const metadata = (raw.metadata && typeof raw.metadata === 'object' && !Array.isArray(raw.metadata)) ? raw.metadata : {};
+
+    let aliases = [];
+    if (Array.isArray(raw.aliases)) {
+      aliases = raw.aliases;
+    } else if (raw.alias) {
+      aliases = [raw.alias];
+    }
+
+    aliases = aliases
+      .map((alias) => (alias == null ? null : String(alias).trim()))
+      .filter((alias) => alias && alias.toUpperCase() !== code)
+      .map((alias) => alias);
+
+    const uniqueAliases = [];
+    const aliasSeen = new Set();
+    aliases.forEach((alias) => {
+      const key = alias.toUpperCase();
+      if (!aliasSeen.has(key)) {
+        aliasSeen.add(key);
+        uniqueAliases.push(alias);
+      }
+    });
+
+    normalized.push({
+      code: code.slice(0, 32),
+      name,
+      displayName,
+      color,
+      metadata,
+      aliases: uniqueAliases,
+    });
+  });
+
+  if (requireNonEmpty && normalized.length === 0) {
+    throw new Error('At least one party definition must be provided');
+  }
+
+  return normalized;
+};
+
+const insertElectionParties = async (dbClient, electionId, partyDefinitions) => {
+  if (!partyDefinitions || partyDefinitions.length === 0) {
+    return [];
+  }
+
+  const valueClauses = [];
+  const values = [];
+
+  partyDefinitions.forEach((party, index) => {
+    const base = index * 6;
+    valueClauses.push(
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, COALESCE($${base + 6}::jsonb, '{}'::jsonb))`
+    );
+    values.push(
+      electionId,
+      party.code,
+      party.name,
+      party.displayName,
+      party.color,
+      JSON.stringify(party.metadata ?? {})
+    );
+  });
+
+  const insertQuery = `
+    INSERT INTO election_parties (
+      election_id,
+      party_code,
+      party_name,
+      display_name,
+      color,
+      metadata
+    ) VALUES ${valueClauses.join(', ')}
+    ON CONFLICT (election_id, party_code) DO UPDATE SET
+      party_name = EXCLUDED.party_name,
+      display_name = EXCLUDED.display_name,
+      color = EXCLUDED.color,
+      metadata = EXCLUDED.metadata,
+      updated_at = NOW()
+    RETURNING *
+  `;
+
+  const { rows } = await dbClient.query(insertQuery, values);
+
+  const rowsByCode = new Map(rows.map((row) => [row.party_code, row]));
+
+  const aliasPlaceholders = [];
+  const aliasValues = [];
+  let aliasParam = 0;
+
+  partyDefinitions.forEach((party) => {
+    const row = rowsByCode.get(party.code);
+    if (!row) {
+      return;
+    }
+
+    (party.aliases || []).forEach((alias) => {
+      aliasParam += 1;
+      aliasPlaceholders.push(`($${aliasParam * 2 - 1}, $${aliasParam * 2})`);
+      aliasValues.push(row.id, alias);
+    });
+  });
+
+  if (aliasPlaceholders.length > 0) {
+    await dbClient.query(
+      `INSERT INTO election_party_aliases (party_id, alias)
+       VALUES ${aliasPlaceholders.join(', ')}
+       ON CONFLICT (party_id, alias) DO NOTHING`,
+      aliasValues
+    );
+  }
+
+  return partyDefinitions.map((party) => {
+    const row = rowsByCode.get(party.code);
+    return row
+      ? {
+        ...row,
+        aliases: party.aliases || [],
+      }
+      : {
+        election_id: electionId,
+        party_code: party.code,
+        party_name: party.name,
+        display_name: party.displayName,
+        color: party.color,
+        metadata: party.metadata,
+        aliases: party.aliases || [],
+      };
+  });
+};
+
+const fetchElectionParties = async (dbClient, electionId) => {
+  const { rows } = await dbClient.query(
+    `SELECT 
+       ep.id,
+       ep.election_id,
+       ep.party_code,
+       ep.party_name,
+       ep.display_name,
+       ep.color,
+       ep.metadata,
+       ep.created_at,
+       ep.updated_at,
+       COALESCE(array_remove(array_agg(DISTINCT alias.alias), NULL), ARRAY[]::text[]) AS aliases
+     FROM election_parties ep
+     LEFT JOIN election_party_aliases alias ON alias.party_id = ep.id
+     WHERE ep.election_id = $1
+     GROUP BY ep.id
+     ORDER BY ep.party_code ASC`,
+    [electionId]
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    metadata: row.metadata || {},
+    aliases: row.aliases || [],
+  }));
+};
 
 class ElectionController {
   // Create a new election
   async createElection(req, res) {
-    try {
-      const {
-        election_name,
-        election_type,
-        state,
-        lga,
-        election_date
-      } = req.body;
+    const {
+      election_name,
+      election_type,
+      state,
+      lga,
+      election_date,
+      parties
+    } = req.body;
 
-      // Validate required fields
-      if (!election_name || !election_type || !state || !election_date) {
-        return res.status(400).json({
-          success: false,
-          message: 'Missing required fields: election_name, election_type, state, election_date'
-        });
-      }
+    // Validate required fields
+    if (!election_name || !election_type || !state || !election_date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: election_name, election_type, state, election_date'
+      });
+    }
+
+    let normalizedParties;
+    try {
+      normalizedParties = normalizePartyDefinitions(parties, { requireNonEmpty: true });
+    } catch (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError.message
+      });
+    }
+
+    const client = await getClient();
+
+    try {
+      await client.query('BEGIN');
 
       // Generate unique election ID
       const stateCode = state.substring(0, 3).toUpperCase();
-      const typeCode = election_type === 'gubernatorial' ? 'GOV' :
-        election_type === 'presidential' ? 'PRES' :
-          election_type === 'senatorial' ? 'SEN' :
-            election_type === 'house_of_reps' ? 'HOR' :
-              election_type === 'state_assembly' ? 'SHA' :
-                election_type === 'local_government' ? 'LG' :
-                  election_type === 'council' ? 'COU' : 'ELECT';
+      const typeCode = election_type === 'gubernatorial' ? 'GOV'
+        : election_type === 'presidential' ? 'PRES'
+          : election_type === 'senatorial' ? 'SEN'
+            : election_type === 'house_of_reps' ? 'HOR'
+              : election_type === 'state_assembly' ? 'SHA'
+                : election_type === 'local_government' ? 'LG'
+                  : election_type === 'council' ? 'COU'
+                    : 'ELECT';
       const year = new Date(election_date).getFullYear();
       let election_id = `${stateCode}-${typeCode}-${year}`;
 
-      // Check if election_id already exists and modify if needed
+      // Ensure election_id uniqueness
       let counter = 1;
-      let baseElectionId = election_id;
+      const baseElectionId = election_id;
+      // eslint-disable-next-line no-constant-condition
       while (true) {
-        try {
-          const existingElection = await query(
-            'SELECT id FROM elections WHERE election_id = $1',
-            [election_id]
-          );
+        const existingElection = await client.query(
+          'SELECT id FROM elections WHERE election_id = $1',
+          [election_id]
+        );
 
-          if (existingElection.rows.length === 0) {
-            break; // ID is unique
-          }
-
-          // ID exists, modify it
-          election_id = `${baseElectionId}-${counter}`;
-          counter++;
-        } catch (error) {
-          break; // If query fails, assume ID is unique
+        if (existingElection.rows.length === 0) {
+          break;
         }
+
+        election_id = `${baseElectionId}-${counter}`;
+        counter++;
       }
 
-      // Determine election status based on date
       const today = new Date();
       const electionDateObj = new Date(election_date);
       let status = 'upcoming';
@@ -66,39 +277,45 @@ class ElectionController {
         status = 'completed';
       }
 
-      // Insert election into database
-      const result = await query(
+      const electionResult = await client.query(
         `INSERT INTO elections (
-          election_id, 
-          election_name, 
-          election_type, 
-          state, 
-          lga, 
-          election_date, 
+          election_id,
+          election_name,
+          election_type,
+          state,
+          lga,
+          election_date,
           status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [election_id, election_name, election_type, state, lga || null, election_date, status]
       );
 
-      const newElection = result.rows[0];
+      const newElection = electionResult.rows[0];
+      const persistedParties = await insertElectionParties(client, newElection.election_id, normalizedParties);
 
-      logger.info(`Election created: ${election_id} by admin ${req.user?.id}`);
+      await client.query('COMMIT');
+
+      logger.info(`Election created: ${newElection.election_id} by admin ${req.user?.id}`);
 
       res.status(201).json({
         success: true,
         message: 'Election created successfully',
         data: {
-          election: newElection
+          election: newElection,
+          parties: persistedParties,
         }
       });
 
     } catch (error) {
+      await client.query('ROLLBACK');
       logger.error('Error creating election:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to create election',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
+    } finally {
+      client.release();
     }
   }
 
@@ -114,7 +331,12 @@ class ElectionController {
         limit = 50
       } = req.query;
 
-      let sqlQuery = 'SELECT * FROM elections WHERE 1=1';
+      let sqlQuery = `
+        SELECT e.*, (
+          SELECT COUNT(*)::int FROM election_parties ep WHERE ep.election_id = e.election_id
+        ) AS party_count
+        FROM elections e
+        WHERE 1=1`;
       const queryParams = [];
       let paramCount = 0;
 
@@ -230,10 +452,14 @@ class ElectionController {
         });
       }
 
+      const election = result.rows[0];
+      const parties = await fetchElectionParties({ query }, election.election_id);
+
       res.json({
         success: true,
         data: {
-          election: result.rows[0]
+          election,
+          parties
         }
       });
 
@@ -249,71 +475,80 @@ class ElectionController {
 
   // Update an election
   async updateElection(req, res) {
-    try {
-      const { id } = req.params;
-      const {
-        election_name,
-        election_type,
-        state,
-        lga,
-        election_date
-      } = req.body;
+    const { id } = req.params;
+    const {
+      election_name,
+      election_type,
+      state,
+      lga,
+      election_date,
+      parties
+    } = req.body;
 
-      // Check if election exists
-      const existingElection = await query(
-        'SELECT * FROM elections WHERE id = $1',
+    let normalizedParties = null;
+    if (parties !== undefined) {
+      try {
+        normalizedParties = normalizePartyDefinitions(parties, { requireNonEmpty: true });
+      } catch (validationError) {
+        return res.status(400).json({
+          success: false,
+          message: validationError.message
+        });
+      }
+    }
+
+    const client = await getClient();
+
+    try {
+      await client.query('BEGIN');
+
+      const existingElection = await client.query(
+        'SELECT * FROM elections WHERE id = $1 FOR UPDATE',
         [id]
       );
 
       if (existingElection.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({
           success: false,
           message: 'Election not found'
         });
       }
 
-      // Check if election is active or completed (might want to restrict updates)
-      const election = existingElection.rows[0];
+      let election = existingElection.rows[0];
+
       if (election.status === 'active') {
-        // You might want to restrict certain updates for active elections
         logger.warn(`Attempt to update active election ${id} by admin ${req.user?.id}`);
       }
 
-      // Build update query dynamically
       const updateFields = [];
       const updateValues = [];
-      let paramCount = 0;
+      const makePlaceholder = () => `$${updateValues.length + 1}`;
 
       if (election_name !== undefined) {
-        paramCount++;
-        updateFields.push(`election_name = $${paramCount}`);
+        updateFields.push(`election_name = ${makePlaceholder()}`);
         updateValues.push(election_name);
       }
 
       if (election_type !== undefined) {
-        paramCount++;
-        updateFields.push(`election_type = $${paramCount}`);
+        updateFields.push(`election_type = ${makePlaceholder()}`);
         updateValues.push(election_type);
       }
 
       if (state !== undefined) {
-        paramCount++;
-        updateFields.push(`state = $${paramCount}`);
+        updateFields.push(`state = ${makePlaceholder()}`);
         updateValues.push(state);
       }
 
       if (lga !== undefined) {
-        paramCount++;
-        updateFields.push(`lga = $${paramCount}`);
+        updateFields.push(`lga = ${makePlaceholder()}`);
         updateValues.push(lga || null);
       }
 
       if (election_date !== undefined) {
-        paramCount++;
-        updateFields.push(`election_date = $${paramCount}`);
+        updateFields.push(`election_date = ${makePlaceholder()}`);
         updateValues.push(election_date);
 
-        // Update status based on new date if provided
         const today = new Date();
         const electionDateObj = new Date(election_date);
         let newStatus = 'upcoming';
@@ -324,54 +559,78 @@ class ElectionController {
           newStatus = 'completed';
         }
 
-        paramCount++;
-        updateFields.push(`status = $${paramCount}`);
+        updateFields.push(`status = ${makePlaceholder()}`);
         updateValues.push(newStatus);
       }
 
-      if (updateFields.length === 0) {
+      if (updateFields.length === 0 && !normalizedParties) {
+        await client.query('ROLLBACK');
         return res.status(400).json({
           success: false,
-          message: 'No fields to update'
+          message: 'No changes to apply'
         });
       }
 
-      // Add updated_at
-      paramCount++;
-      updateFields.push(`updated_at = $${paramCount}`);
-      updateValues.push(new Date());
+      if (updateFields.length > 0) {
+        updateFields.push('updated_at = NOW()');
+        const wherePlaceholder = `$${updateValues.length + 1}`;
+        updateValues.push(id);
+        const updateQuery = `
+          UPDATE elections
+          SET ${updateFields.join(', ')}
+          WHERE id = ${wherePlaceholder}
+          RETURNING *
+        `;
 
-      // Add ID for WHERE clause
-      paramCount++;
-      updateValues.push(id);
+        const updateResult = await client.query(updateQuery, updateValues);
+        election = updateResult.rows[0];
+      }
 
-      const updateQuery = `
-        UPDATE elections 
-        SET ${updateFields.join(', ')} 
-        WHERE id = $${paramCount} 
-        RETURNING *
-      `;
+      let partiesResponse = null;
+      if (normalizedParties) {
+        await client.query(
+          `DELETE FROM election_party_aliases
+           WHERE party_id IN (
+             SELECT id FROM election_parties WHERE election_id = $1
+           )`,
+          [election.election_id]
+        );
 
-      const result = await query(updateQuery, updateValues);
-      const updatedElection = result.rows[0];
+        await client.query(
+          `DELETE FROM election_parties
+           WHERE election_id = $1
+             AND NOT (party_code = ANY($2::text[]))`,
+          [election.election_id, normalizedParties.map((party) => party.code)]
+        );
 
-      logger.info(`Election updated: ${updatedElection.election_id} by admin ${req.user?.id}`);
+        partiesResponse = await insertElectionParties(client, election.election_id, normalizedParties);
+      }
+
+      await client.query('COMMIT');
+
+      const responseParties = partiesResponse || await fetchElectionParties(client, election.election_id);
+
+      logger.info(`Election updated: ${election.election_id} by admin ${req.user?.id}`);
 
       res.json({
         success: true,
         message: 'Election updated successfully',
         data: {
-          election: updatedElection
+          election,
+          parties: responseParties
         }
       });
 
     } catch (error) {
+      await client.query('ROLLBACK');
       logger.error('Error updating election:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to update election',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
+    } finally {
+      client.release();
     }
   }
 
@@ -403,8 +662,8 @@ class ElectionController {
       }
 
       const result = await query(
-        'UPDATE elections SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *',
-        [status, new Date(), id]
+        'UPDATE elections SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [status, id]
       );
 
       const updatedElection = result.rows[0];
@@ -518,6 +777,7 @@ class ElectionController {
       }
 
       const election = existingElection.rows[0];
+      const parties = await fetchElectionParties({ query }, election.election_id);
 
       // Get monitor key statistics
       const monitorKeysStats = await query(`
@@ -542,36 +802,54 @@ class ElectionController {
       `, [election.election_id]);
 
       // Get location distribution
-      const locationStats = await query(`
-        SELECT 
-          polling_unit_location,
-          COUNT(*) as submission_count
-        FROM monitor_submissions 
-        WHERE election_id = $1 
-        GROUP BY polling_unit_location
-        ORDER BY submission_count DESC
-        LIMIT 10
-      `, [election.election_id]);
+      const locationStats = await query(
+        `SELECT 
+           COALESCE(
+             scope_snapshot->>'pollingUnitName',
+             scope_snapshot->>'pollingUnitCode',
+             scope_snapshot->>'ward',
+             'Unknown Location'
+           ) AS polling_unit_location,
+           scope_snapshot->>'state' AS state,
+           scope_snapshot->>'lga' AS lga,
+           COUNT(*) AS submission_count
+         FROM monitor_submissions 
+         WHERE election_id = $1
+           AND submission_type = $2
+         GROUP BY polling_unit_location, state, lga
+         ORDER BY submission_count DESC
+         LIMIT 10`,
+        [election.election_id, MONITOR_SUBMISSION_TYPES.POLLING_UNIT_INFO]
+      );
 
       // Get recent activity
-      const recentActivity = await query(`
-        SELECT 
-          ms.created_at,
-          ms.status,
-          ms.polling_unit_location,
-          u.first_name,
-          u.last_name
-        FROM monitor_submissions ms
-        JOIN users u ON ms.user_id = u.id
-        WHERE ms.election_id = $1
-        ORDER BY ms.created_at DESC
-        LIMIT 10
-      `, [election.election_id]);
+      const recentActivity = await query(
+        `SELECT 
+           ms.created_at,
+           ms.status,
+           ms.submission_type,
+           COALESCE(
+             ms.scope_snapshot->>'pollingUnitName',
+             ms.scope_snapshot->>'pollingUnitCode',
+             ms.scope_snapshot->>'ward',
+             'Unknown Location'
+           ) AS polling_unit_location,
+           SPLIT_PART(COALESCE(u.name, ''), ' ', 1) AS first_name,
+           SPLIT_PART(COALESCE(u.name, ''), ' ', 2) AS last_name,
+           u."userName" AS username
+         FROM monitor_submissions ms
+         LEFT JOIN users u ON ms.user_id = u.id
+         WHERE ms.election_id = $1
+         ORDER BY ms.created_at DESC
+         LIMIT 10`,
+        [election.election_id]
+      );
 
       res.json({
         success: true,
         data: {
           election,
+          parties,
           stats: {
             monitorKeys: monitorKeysStats.rows[0],
             submissions: submissionStats.rows[0],

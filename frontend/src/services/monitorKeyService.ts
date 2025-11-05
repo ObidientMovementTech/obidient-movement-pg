@@ -5,18 +5,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 export const monitorKeyService = {
   // Admin functions
   async assignMonitorKey(userId: string, data: {
-    userId: string;
     electionIds: string[];
-    monitoring_location: {
-      state: string;
-      lga: string | null;
-      ward: string | null;
-    };
-    assignedState: string;
-    assignedLGA: string | null;
-    assignedWard: string | null;
-    key_status: 'active' | 'inactive';
-    election_access_level: string;
+    key_status?: 'active' | 'inactive';
+    election_access_level?: string;
   }) {
     if (!userId || !data.electionIds || !data.electionIds.length) {
       throw new Error('User ID and election IDs are required');

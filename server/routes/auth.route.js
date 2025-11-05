@@ -1,4 +1,5 @@
 import express from 'express';
+import passport from '../config/passport.js';
 import {
   registerUser,
   loginUser,
@@ -24,6 +25,57 @@ import {
 } from '../middlewares/security.middleware.js';
 
 const router = express.Router();
+
+const DEFAULT_REDIRECT = '/dashboard';
+
+const sanitizeRedirectPath = (rawPath) => {
+  if (!rawPath || typeof rawPath !== 'string') {
+    return DEFAULT_REDIRECT;
+  }
+
+  try {
+    const decoded = decodeURIComponent(rawPath);
+    if (!decoded.startsWith('/') || decoded.startsWith('//')) {
+      return DEFAULT_REDIRECT;
+    }
+    return decoded;
+  } catch {
+    return DEFAULT_REDIRECT;
+  }
+};
+
+const getFrontendBaseUrl = () =>
+  (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+
+const encodeState = (payload) => Buffer.from(JSON.stringify(payload)).toString('base64');
+
+const getLoginCallbackUrl = (req) => {
+  const explicit = process.env.GOOGLE_LOGIN_CALLBACK_URL || process.env.GOOGLE_AUTH_CALLBACK_URL;
+  if (explicit) {
+    return explicit;
+  }
+
+  if (process.env.GOOGLE_CALLBACK_URL) {
+    try {
+      const url = new URL(process.env.GOOGLE_CALLBACK_URL);
+      url.pathname = '/auth/onboarding/google/callback';
+      return url.toString();
+    } catch {
+      return process.env.GOOGLE_CALLBACK_URL;
+    }
+  }
+
+  const envUrl = process.env.API_BASE_URL || process.env.API_URL || process.env.SERVER_PUBLIC_URL;
+  if (envUrl) {
+    return `${envUrl.replace(/\/$/, '')}/auth/onboarding/google/callback`;
+  }
+
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const protocol = forwardedProto ? forwardedProto.split(',')[0] : (req.protocol || 'http');
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+
+  return `${protocol}://${host}`.replace(/\/$/, '') + '/auth/onboarding/google/callback';
+};
 
 // Authentication routes with rate limiting and validation
 router.post('/register',
@@ -78,6 +130,24 @@ router.get("/auth-status", authenticateUser, (req, res) => {
     authenticated: true,
     emailVerified: req.emailVerified
   });
+});
+
+router.get('/google', (req, res, next) => {
+  const redirectParam = Array.isArray(req.query.redirect)
+    ? req.query.redirect[0]
+    : req.query.redirect;
+
+  const redirectPath = sanitizeRedirectPath(redirectParam);
+  const callbackUrl = getLoginCallbackUrl(req);
+  const statePayload = encodeState({ action: 'login', redirectTo: redirectPath });
+
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false,
+    prompt: 'select_account',
+    state: statePayload,
+    callbackURL: callbackUrl,
+  })(req, res, next);
 });
 
 export default router;

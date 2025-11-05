@@ -1,5 +1,24 @@
 import { query } from '../config/db.js';
 import { logger } from '../middlewares/security.middleware.js';
+import { MONITOR_SUBMISSION_TYPES } from './monitoringService.js';
+
+const toNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const ensureArray = (value) => {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'object') {
+    return Object.values(value);
+  }
+  return [];
+};
 
 export const electionResultsService = {
   /**
@@ -24,99 +43,222 @@ export const electionResultsService = {
    */
   async aggregateElectionResults(electionId) {
     try {
-      // Get all result submissions for this election
       const resultsQuery = `
         SELECT 
-          rtr.id,
-          rtr.submission_id,
-          rtr.registered_voters,
-          rtr.accredited_voters,
-          rtr.valid_votes,
-          rtr.rejected_votes,
-          rtr.total_votes_cast,
-          rtr.votes_per_party,
-          rtr.announcement_time,
-          rtr.created_at,
-          pus.polling_unit_code,
-          pus.polling_unit_name,
-          pus.ward_name,
-          pus.lga_name,
-          pus.state_name,
-          pus.monitor_name
-        FROM result_tracking_reports rtr
-        JOIN polling_unit_submissions pus ON rtr.submission_id = pus.submission_id
-        WHERE pus.election_id = $1
-        ORDER BY rtr.created_at DESC
+          result.submission_id,
+          result.submission_data AS result_data,
+          result.scope_snapshot AS result_scope,
+          result.attachments AS result_attachments,
+          result.created_at AS result_created_at,
+          base.submission_data AS base_data,
+          base.scope_snapshot AS base_scope,
+          base.created_at AS base_created_at,
+          u.name AS monitor_name,
+          u."userName" AS monitor_username
+        FROM monitor_submissions result
+        LEFT JOIN monitor_submissions base
+          ON base.submission_id = result.submission_id
+         AND base.submission_type = $2
+        LEFT JOIN users u
+          ON u.id = result.user_id
+        WHERE result.election_id = $1
+          AND result.submission_type = $3
+        ORDER BY result.created_at DESC
       `;
 
-      const results = await query(resultsQuery, [electionId]);
+      const results = await query(resultsQuery, [
+        electionId,
+        MONITOR_SUBMISSION_TYPES.POLLING_UNIT_INFO,
+        MONITOR_SUBMISSION_TYPES.RESULT_TRACKING,
+      ]);
+
+      const partiesResult = await query(
+        `SELECT 
+           ep.party_code,
+           ep.party_name,
+           ep.display_name,
+           ep.color,
+           ep.metadata,
+           COALESCE(array_remove(array_agg(DISTINCT alias.alias), NULL), ARRAY[]::text[]) AS aliases
+         FROM election_parties ep
+         LEFT JOIN election_party_aliases alias ON alias.party_id = ep.id
+         WHERE ep.election_id = $1
+         GROUP BY ep.id
+         ORDER BY ep.party_code ASC`,
+        [electionId]
+      );
+
+      const partyDefinitions = partiesResult.rows.map((row) => ({
+        ...row,
+        metadata: row.metadata || {},
+        aliases: row.aliases || [],
+      }));
 
       if (results.rows.length === 0) {
+        const partyResults = partyDefinitions.map((party) => ({
+          party: party.party_code,
+          partyCode: party.party_code,
+          partyName: party.party_name,
+          displayName: party.display_name || party.party_name,
+          color: party.color,
+          metadata: party.metadata || {},
+          aliases: party.aliases || [],
+          totalVotes: 0,
+          percentage: '0.00',
+          pollingUnitsReported: 0,
+        }));
+
         return {
           electionId,
           totalSubmissions: 0,
-          aggregatedResults: {},
           pollingUnitResults: [],
-          lastUpdated: null
+          partyResults,
+          partyDefinitions,
+          leadingParty: partyResults[0] || null,
+          lastUpdated: null,
+          statistics: {
+            totalRegisteredVoters: 0,
+            totalAccreditedVoters: 0,
+            totalValidVotes: 0,
+            totalRejectedVotes: 0,
+            totalVotesCast: 0,
+            voterTurnout: 0,
+          },
         };
       }
 
-      // Aggregate votes per party across all polling units
-      const partyTotals = {};
+      const aliasToCode = new Map();
+      partyDefinitions.forEach((party) => {
+        aliasToCode.set(party.party_code.toUpperCase(), party.party_code);
+        (party.aliases || []).forEach((alias) => {
+          aliasToCode.set(alias.toUpperCase(), party.party_code);
+        });
+      });
+
+      const partyTotals = new Map(
+        partyDefinitions.map((party) => [
+          party.party_code,
+          {
+            partyCode: party.party_code,
+            partyName: party.party_name,
+            displayName: party.display_name,
+            color: party.color,
+            metadata: party.metadata || {},
+            aliases: party.aliases || [],
+            totalVotes: 0,
+            pollingUnits: [],
+          },
+        ])
+      );
       let totalRegisteredVoters = 0;
       let totalAccreditedVoters = 0;
       let totalValidVotes = 0;
       let totalRejectedVotes = 0;
       let totalVotesCast = 0;
 
-      results.rows.forEach(result => {
-        // Sum up totals
-        totalRegisteredVoters += result.registered_voters || 0;
-        totalAccreditedVoters += result.accredited_voters || 0;
-        totalValidVotes += result.valid_votes || 0;
-        totalRejectedVotes += result.rejected_votes || 0;
-        totalVotesCast += result.total_votes_cast || 0;
+      const pollingUnitResults = results.rows.map((row) => {
+        const resultData = row.result_data || {};
+        const stats = resultData.stats || {};
+        const baseData = row.base_data || {};
+        const scope = row.result_scope || row.base_scope || {};
 
-        // Aggregate party votes
-        if (result.votes_per_party && Array.isArray(result.votes_per_party)) {
-          result.votes_per_party.forEach(partyVote => {
-            const partyKey = partyVote.party || partyVote.candidate;
-            if (partyKey) {
-              if (!partyTotals[partyKey]) {
-                partyTotals[partyKey] = {
-                  party: partyKey,
-                  totalVotes: 0,
-                  pollingUnits: []
-                };
-              }
-              partyTotals[partyKey].totalVotes += parseInt(partyVote.votes) || 0;
-              partyTotals[partyKey].pollingUnits.push({
-                code: result.polling_unit_code,
-                name: result.polling_unit_name,
-                votes: partyVote.votes
-              });
+        const registered = toNumber(stats.registered);
+        const accredited = toNumber(stats.accredited);
+        const valid = toNumber(stats.valid);
+        const rejected = toNumber(stats.rejected);
+        const total = toNumber(stats.total);
+        const votesPerParty = ensureArray(stats.votesPerParty);
+
+        totalRegisteredVoters += registered;
+        totalAccreditedVoters += accredited;
+        totalValidVotes += valid;
+        totalRejectedVotes += rejected;
+        totalVotesCast += total;
+
+        votesPerParty.forEach((partyVote) => {
+          const partyKey = partyVote?.party || partyVote?.candidate;
+          if (!partyKey) {
+            return;
+          }
+          const partyCodeRaw = String(partyKey).trim().toUpperCase();
+          const partyCode = aliasToCode.get(partyCodeRaw) || partyCodeRaw;
+          let partyEntry = partyTotals.get(partyCode);
+          if (!partyEntry) {
+            partyEntry = {
+              partyCode,
+              partyName: partyCode,
+              displayName: null,
+              color: null,
+              metadata: {},
+              aliases: partyCode === partyCodeRaw ? [] : [partyKey],
+              totalVotes: 0,
+              pollingUnits: [],
+            };
+            partyTotals.set(partyCode, partyEntry);
+            if (!aliasToCode.has(partyCodeRaw)) {
+              aliasToCode.set(partyCodeRaw, partyCode);
             }
+          }
+          const votes = toNumber(partyVote?.votes);
+          partyEntry.totalVotes += votes;
+          partyEntry.pollingUnits.push({
+            code: scope.pollingUnitCode || baseData.pollingUnitCode || null,
+            name: scope.pollingUnitName || baseData.pollingUnitName || null,
+            votes: partyVote?.votes ?? votes,
           });
-        }
+        });
+
+        const monitorName =
+          baseData.monitorName ||
+          resultData.reporterName ||
+          row.monitor_name ||
+          row.monitor_username ||
+          null;
+
+        return {
+          submissionId: row.submission_id,
+          pollingUnitCode: scope.pollingUnitCode || baseData.pollingUnitCode || null,
+          pollingUnitName: scope.pollingUnitName || baseData.pollingUnitName || null,
+          ward: scope.ward || baseData.wardName || null,
+          lga: scope.lga || baseData.lgaName || null,
+          state: scope.state || baseData.stateName || null,
+          monitorName,
+          registeredVoters: registered,
+          accreditedVoters: accredited,
+          validVotes: valid,
+          rejectedVotes: rejected,
+          totalVotes: total,
+          votesPerParty,
+          announcementTime: resultData.timeAnnounced || null,
+          announcementDate: resultData.announcementDate || null,
+          submittedAt: row.result_created_at,
+        };
       });
 
-      // Calculate percentages for each party
-      const partyResults = Object.values(partyTotals).map(party => ({
-        party: party.party,
-        totalVotes: party.totalVotes,
-        percentage: totalValidVotes > 0
-          ? ((party.totalVotes / totalValidVotes) * 100).toFixed(2)
-          : 0,
-        pollingUnitsReported: party.pollingUnits.length
-      })).sort((a, b) => b.totalVotes - a.totalVotes);
+      const partyResults = Array.from(partyTotals.values())
+        .map((party) => ({
+          party: party.partyCode,
+          partyCode: party.partyCode,
+          partyName: party.partyName,
+          displayName: party.displayName || party.partyName || party.partyCode,
+          color: party.color,
+          metadata: party.metadata || {},
+          aliases: party.aliases || [],
+          totalVotes: party.totalVotes,
+          percentage:
+            totalValidVotes > 0
+              ? ((party.totalVotes / totalValidVotes) * 100).toFixed(2)
+              : '0.00',
+          pollingUnitsReported: party.pollingUnits.length,
+        }))
+        .sort((a, b) => b.totalVotes - a.totalVotes);
 
-      // Get leading party
       const leadingParty = partyResults.length > 0 ? partyResults[0] : null;
 
-      // Calculate voter turnout
-      const voterTurnout = totalRegisteredVoters > 0
-        ? ((totalVotesCast / totalRegisteredVoters) * 100).toFixed(2)
-        : 0;
+      const voterTurnout =
+        totalRegisteredVoters > 0
+          ? Number(((totalVotesCast / totalRegisteredVoters) * 100).toFixed(2))
+          : 0;
 
       return {
         electionId,
@@ -127,28 +269,13 @@ export const electionResultsService = {
           totalValidVotes,
           totalRejectedVotes,
           totalVotesCast,
-          voterTurnout: parseFloat(voterTurnout)
+          voterTurnout,
         },
         partyResults,
         leadingParty,
-        pollingUnitResults: results.rows.map(row => ({
-          submissionId: row.submission_id,
-          pollingUnitCode: row.polling_unit_code,
-          pollingUnitName: row.polling_unit_name,
-          ward: row.ward_name,
-          lga: row.lga_name,
-          state: row.state_name,
-          monitorName: row.monitor_name,
-          registeredVoters: row.registered_voters,
-          accreditedVoters: row.accredited_voters,
-          validVotes: row.valid_votes,
-          rejectedVotes: row.rejected_votes,
-          totalVotes: row.total_votes_cast,
-          votesPerParty: row.votes_per_party,
-          announcementTime: row.announcement_time,
-          submittedAt: row.created_at
-        })),
-        lastUpdated: results.rows[0].created_at
+        partyDefinitions,
+        pollingUnitResults,
+        lastUpdated: results.rows[0].result_created_at
       };
     } catch (error) {
       logger.error(`Error aggregating results for election ${electionId}:`, error);
@@ -161,32 +288,37 @@ export const electionResultsService = {
    */
   async getSubmissionProgress(electionId) {
     try {
-      // Get total polling units assigned to this election
       const totalPUsQuery = `
-        SELECT COUNT(DISTINCT polling_unit_code) as total
-        FROM polling_unit_submissions
+        SELECT COUNT(DISTINCT polling_unit_code) AS total
+        FROM monitor_submissions
         WHERE election_id = $1
+          AND submission_type = $2
       `;
-      const totalPUs = await query(totalPUsQuery, [electionId]);
+      const totalPUs = await query(totalPUsQuery, [
+        electionId,
+        MONITOR_SUBMISSION_TYPES.POLLING_UNIT_INFO,
+      ]);
 
-      // Get polling units with completed results
       const submittedPUsQuery = `
-        SELECT COUNT(DISTINCT pus.polling_unit_code) as submitted
-        FROM polling_unit_submissions pus
-        JOIN result_tracking_reports rtr ON pus.submission_id = rtr.submission_id
-        WHERE pus.election_id = $1
+        SELECT COUNT(DISTINCT polling_unit_code) AS submitted
+        FROM monitor_submissions
+        WHERE election_id = $1
+          AND submission_type = $2
       `;
-      const submittedPUs = await query(submittedPUsQuery, [electionId]);
+      const submittedPUs = await query(submittedPUsQuery, [
+        electionId,
+        MONITOR_SUBMISSION_TYPES.RESULT_TRACKING,
+      ]);
 
-      const total = parseInt(totalPUs.rows[0].total) || 0;
-      const submitted = parseInt(submittedPUs.rows[0].submitted) || 0;
-      const percentage = total > 0 ? ((submitted / total) * 100).toFixed(2) : 0;
+      const total = toNumber(totalPUs.rows[0]?.total);
+      const submitted = toNumber(submittedPUs.rows[0]?.submitted);
+      const percentage = total > 0 ? Number(((submitted / total) * 100).toFixed(2)) : 0;
 
       return {
         totalPollingUnits: total,
         submittedPollingUnits: submitted,
-        pendingPollingUnits: total - submitted,
-        completionPercentage: parseFloat(percentage)
+        pendingPollingUnits: Math.max(total - submitted, 0),
+        completionPercentage: percentage
       };
     } catch (error) {
       logger.error(`Error fetching submission progress for election ${electionId}:`, error);
@@ -201,24 +333,46 @@ export const electionResultsService = {
     try {
       const recentQuery = `
         SELECT 
-          rtr.submission_id,
-          rtr.created_at,
-          pus.polling_unit_code,
-          pus.polling_unit_name,
-          pus.lga_name,
-          pus.state_name,
-          pus.election_id,
+          result.submission_id,
+          result.created_at,
+          result.polling_unit_code,
+          result.scope_snapshot AS result_scope,
+          base.submission_data AS base_data,
           e.election_name,
-          e.election_type
-        FROM result_tracking_reports rtr
-        JOIN polling_unit_submissions pus ON rtr.submission_id = pus.submission_id
-        LEFT JOIN elections e ON pus.election_id = e.election_id
-        ORDER BY rtr.created_at DESC
+          e.election_type,
+          e.election_id
+        FROM monitor_submissions result
+        LEFT JOIN monitor_submissions base
+          ON base.submission_id = result.submission_id
+         AND base.submission_type = $2
+        LEFT JOIN elections e
+          ON e.election_id = result.election_id
+        WHERE result.submission_type = $3
+        ORDER BY result.created_at DESC
         LIMIT $1
       `;
 
-      const results = await query(recentQuery, [limit]);
-      return results.rows;
+      const results = await query(recentQuery, [
+        limit,
+        MONITOR_SUBMISSION_TYPES.POLLING_UNIT_INFO,
+        MONITOR_SUBMISSION_TYPES.RESULT_TRACKING,
+      ]);
+
+      return results.rows.map((row) => {
+        const baseData = row.base_data || {};
+        const scope = row.result_scope || {};
+        return {
+          submission_id: row.submission_id,
+          created_at: row.created_at,
+          polling_unit_code: row.polling_unit_code || scope.pollingUnitCode || baseData.pollingUnitCode || null,
+          polling_unit_name: scope.pollingUnitName || baseData.pollingUnitName || null,
+          lga_name: scope.lga || baseData.lgaName || null,
+          state_name: scope.state || baseData.stateName || null,
+          election_id: row.election_id,
+          election_name: row.election_name,
+          election_type: row.election_type,
+        };
+      });
     } catch (error) {
       logger.error('Error fetching recent submissions:', error);
       throw error;
@@ -315,10 +469,12 @@ export const electionResultsService = {
 
       return {
         election,
+        parties: aggregated.partyDefinitions,
         summary: {
           totalSubmissions: aggregated.totalSubmissions,
           statistics: aggregated.statistics,
           leadingParty: aggregated.leadingParty,
+          partyResults: aggregated.partyResults,
           progress,
           lastUpdated: aggregated.lastUpdated
         }

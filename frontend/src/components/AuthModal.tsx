@@ -2,9 +2,8 @@ import { useState, useEffect } from "react";
 import { X, Mail, Lock, User, Phone, Eye, EyeOff } from "lucide-react";
 import { registerUser, loginUser, resendVerificationEmail } from "../services/authService.js";
 import FormSelect from "./select/FormSelect.js";
-import { statesLGAWardList } from "../utils/StateLGAWard.js";
+import { getStateNames, getFormattedLGAs } from "../utils/StateLGAWardPollingUnits";
 import { OptionType } from "../utils/lookups.js";
-import { formatStateName, formatLocationName } from "../utils/textUtils.js";
 import { formatPhoneForStorage } from "../utils/phoneUtils.js";
 import ListBoxComp from "./select/ListBox.js";
 
@@ -57,21 +56,22 @@ export default function AuthModal({
 
   // Initialize states list
   useEffect(() => {
-    const stateOptions = statesLGAWardList.map((s, i) => ({
+    const stateNames = getStateNames();
+    const stateOptions = stateNames.map((stateName, i) => ({
       id: i,
-      label: formatStateName(s.state), // Display formatted name
-      value: s.state, // Keep original value for backend
+      label: stateName, // Display UPPERCASE name (e.g., "ABIA")
+      value: stateName, // Send UPPERCASE to backend
     }));
     setStates(stateOptions);
   }, []);
 
   const getLgas = (stateName: string): OptionType[] => {
-    const found = statesLGAWardList.find(s => s.state === stateName);
-    return found ? found.lgas.map((l, i) => ({
+    const formattedLGAs = getFormattedLGAs(stateName);
+    return formattedLGAs.map((lga, i) => ({
       id: i,
-      label: formatLocationName(l.lga), // Display formatted name
-      value: l.lga // Keep original value for backend
-    })) : [];
+      label: lga.label, // Display with abbreviation (e.g., "01 - ABA NORTH")
+      value: lga.value // Send only name to backend (e.g., "ABA NORTH")
+    }));
   };
 
   const validatePhone = (phone: string): boolean => {
@@ -191,9 +191,9 @@ export default function AuthModal({
         password: signupData.password,
         phone: formattedPhone,
         countryCode: signupData.countryCode,
-        // Format location data as Title Case before sending to backend
-        votingState: !signupData.isDiaspora && signupData.votingState ? formatStateName(signupData.votingState) : undefined,
-        votingLGA: !signupData.isDiaspora && signupData.votingLGA ? formatLocationName(signupData.votingLGA) : undefined,
+        // Send location data as-is (UPPERCASE format)
+        votingState: !signupData.isDiaspora && signupData.votingState ? signupData.votingState : undefined,
+        votingLGA: !signupData.isDiaspora && signupData.votingLGA ? signupData.votingLGA : undefined,
         country: signupData.isDiaspora ? signupData.country : undefined,
         isDiaspora: signupData.isDiaspora
       };

@@ -5,7 +5,7 @@ import FormSelect from "../../../components/select/FormSelect.js";
 // import NextButton from "../../../components/NextButton";
 import BackButton from "../../../components/BackButton.js";
 import { genderOptions, ageRangeOptions } from "../../../utils/lookups.js";
-import { statesLGAWardList } from "../../../utils/StateLGAWard.js";
+import { getStateNames, getFormattedLGAs, getFormattedWards } from "../../../utils/StateLGAWardPollingUnits";
 import { countries } from "../../../utils/countries.js";
 import { OptionType } from "../../../utils/lookups.js";
 import { savePersonalInfoStep } from "../../../services/kycService.js";
@@ -61,23 +61,33 @@ export default function KYCFormStepPersonalInfo({ initialData, onNext, onBack }:
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const stateOptions = statesLGAWardList.map((s, i) => ({
+    const stateNames = getStateNames();
+    const stateOptions = stateNames.map((stateName, i) => ({
       id: i,
-      label: s.state,
-      value: s.state,
+      label: stateName,
+      value: stateName,
     }));
     setStates(stateOptions);
   }, []);
 
   const getLgas = (stateName: string): OptionType[] => {
-    const found = statesLGAWardList.find(s => s.state === stateName);
-    return found ? found.lgas.map((l, i) => ({ id: i, label: l.lga, value: l.lga })) : [];
+    if (!stateName) return [];
+    const formattedLGAs = getFormattedLGAs(stateName);
+    return formattedLGAs.map((lga, i) => ({
+      id: i,
+      label: lga.label,
+      value: lga.value
+    }));
   };
 
-  const getWards = (lga: string, state: string): OptionType[] => {
-    const stateData = statesLGAWardList.find(s => s.state === state);
-    const lgaData = stateData?.lgas.find(l => l.lga === lga);
-    return lgaData ? lgaData.wards.map((w, i) => ({ id: i, label: w, value: w })) : [];
+  const getWards = (stateName: string, lgaName: string): OptionType[] => {
+    if (!stateName || !lgaName) return [];
+    const formattedWards = getFormattedWards(stateName, lgaName);
+    return formattedWards.map((ward, i) => ({
+      id: i,
+      label: ward.label,
+      value: ward.value
+    }));
   };
 
   const validateForm = (): boolean => {
@@ -284,7 +294,7 @@ export default function KYCFormStepPersonalInfo({ initialData, onNext, onBack }:
         />
         <FormSelect
           label="Ward"
-          options={getWards(formData.lga, formData.voting_engagement_state)}
+          options={getWards(formData.voting_engagement_state, formData.lga)}
           defaultSelected={formData.ward}
           onChange={(opt) => {
             if (opt) handleInputChange({ ...formData, ward: opt.value });

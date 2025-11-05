@@ -1,4 +1,10 @@
-# Redis Setup Guide for Obidient Movement Communications System
+# Redis Setup Guide for Obidient Movement
+
+## Overview
+Redis is used in the Obidient Movement system for:
+1. **Communications System** - BullMQ job queues for SMS and voice campaigns
+2. **Live Results Caching** - Real-time election results with 60-second TTL
+3. **Background Sync** - Queue management for offline submissions (planned)
 
 ## Installation (macOS)
 
@@ -250,6 +256,103 @@ pm2 monit
 ```
 
 ## Resources
+
+- [Redis Documentation](https://redis.io/docs/)
+- [BullMQ Documentation](https://docs.bullmq.io/)
+- [Redis CLI Command Reference](https://redis.io/commands)
+
+---
+
+## Live Results Caching (NEW)
+
+### Purpose
+The live results endpoint (`/api/live-results/elections/:electionId/live-summary`) uses Redis to cache aggregated election results for 60 seconds, reducing database load during high-traffic periods.
+
+### How It Works
+
+1. **Cache Key Format**: `live-results:{electionId}`
+2. **TTL**: 60 seconds (configurable in `liveResults.controller.js`)
+3. **Fallback**: Automatic memory cache if Redis unavailable
+4. **ETag Support**: Returns 304 Not Modified if client cache is valid
+
+### Architecture
+
+```javascript
+Request → Check Redis Cache → Cache Hit? → Return Cached Results
+                ↓ (miss)
+         Aggregate from DB → Store in Redis (60s TTL) → Return Results
+```
+
+### Cached Data Structure
+```json
+{
+  "election": {
+    "electionId": "abc123",
+    "electionName": "2027 Presidential Election",
+    "electionType": "presidential",
+    "state": "National",
+    "status": "ongoing"
+  },
+  "summary": {
+    "pollingUnitsReported": 1234,
+    "totalRegisteredVoters": 95000000,
+    "totalAccreditedVoters": 28500000,
+    "totalValidVotes": 27800000,
+    "totalRejectedVotes": 250000,
+    "voterTurnout": "30.00"
+  },
+  "parties": [
+    {
+      "partyCode": "LP",
+      "partyName": "Labour Party",
+      "displayName": "Labour Party (LP)",
+      "totalVotes": 12500000,
+      "percentage": "44.96"
+    }
+  ],
+  "lastUpdated": "2027-02-25T15:30:45.000Z"
+}
+```
+
+### Manual Cache Invalidation
+
+Admin users can force cache refresh:
+
+```bash
+curl -X POST http://localhost:5000/api/live-results/elections/abc123/invalidate-cache \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
+
+### Monitoring Live Results Cache
+
+```bash
+# Check cache keys
+redis-cli KEYS "live-results:*"
+
+# View cached data for an election
+redis-cli GET "live-results:abc123"
+
+# Check TTL
+redis-cli TTL "live-results:abc123"
+
+# Monitor cache hits in logs
+tail -f logs/server.log | grep "Cache hit\|Cache miss"
+```
+
+### Performance Benefits
+
+- **Before**: Every request hits database (100-500ms query time)
+- **After**: Cached requests return in <5ms
+- **Impact**: During election day with 1000 req/min, saves ~500 database queries/min
+
+### Configuration
+
+No additional Redis setup needed beyond existing configuration. The controller automatically:
+- Connects to Redis using `REDIS_URL` from `.env`
+- Falls back to memory cache if Redis unavailable
+- Logs cache hits/misses for monitoring
+
+---
 
 - [Redis Documentation](https://redis.io/docs/)
 - [BullMQ Documentation](https://docs.bullmq.io/)

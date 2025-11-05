@@ -11,9 +11,8 @@ import validatePassword from "../../utils/validatePassword.js";
 import { registerUser } from "../../services/authService.js";
 import { useUserContext } from "../../context/UserContext.js";
 import FormSelect from "../../components/select/FormSelect.js";
-import { statesLGAWardList } from "../../utils/StateLGAWard.js";
+import { getStateNames, getFormattedLGAs } from "../../utils/StateLGAWardPollingUnits";
 import { OptionType } from "../../utils/lookups.js";
-import { formatStateName, formatLocationName } from "../../utils/textUtils.js";
 import { formatPhoneForStorage } from "../../utils/phoneUtils.js";
 import ListBoxComp from "../../components/select/ListBox.js";
 
@@ -54,21 +53,22 @@ const GetStartedPage = () => {
 
   // Initialize states list
   useEffect(() => {
-    const stateOptions = statesLGAWardList.map((s, i) => ({
+    const stateNames = getStateNames();
+    const stateOptions = stateNames.map((stateName, i) => ({
       id: i,
-      label: formatStateName(s.state), // Display formatted name
-      value: s.state, // Keep original value for backend
+      label: stateName, // Display UPPERCASE name (e.g., "ABIA")
+      value: stateName, // Send UPPERCASE to backend
     }));
     setStates(stateOptions);
   }, []);
 
   const getLgas = (stateName: string): OptionType[] => {
-    const found = statesLGAWardList.find(s => s.state === stateName);
-    return found ? found.lgas.map((l, i) => ({
+    const formattedLGAs = getFormattedLGAs(stateName);
+    return formattedLGAs.map((lga, i) => ({
       id: i,
-      label: formatLocationName(l.lga), // Display formatted name
-      value: l.lga // Keep original value for backend
-    })) : [];
+      label: lga.label, // Display with abbreviation (e.g., "01 - ABA NORTH")
+      value: lga.value // Send only name to backend (e.g., "ABA NORTH")
+    }));
   };
 
   const validateEmail = (email: string): boolean => {
@@ -129,8 +129,8 @@ const GetStartedPage = () => {
         phone: formattedPhone,
         countryCode,
         password: validPassword,
-        votingState: !isDiaspora && votingState ? formatStateName(votingState) : undefined,
-        votingLGA: !isDiaspora && votingLGA ? formatLocationName(votingLGA) : undefined,
+        votingState: !isDiaspora && votingState ? votingState : undefined, // Send raw UPPERCASE value
+        votingLGA: !isDiaspora && votingLGA ? votingLGA : undefined, // Send raw UPPERCASE value
         country: isDiaspora ? country : undefined,
         isDiaspora,
       });

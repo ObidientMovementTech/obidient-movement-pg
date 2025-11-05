@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PUInfoForm from "../components/PUInfoForm";
 import { ArrowLeft } from "lucide-react";
 import { monitoringService } from '../../../../../services/monitoringService';
@@ -23,6 +23,35 @@ export default function PUInfoPage() {
       locationOther: '',
     },
   });
+
+  // Auto-populate from monitoring_location
+  useEffect(() => {
+    const loadMonitoringData = async () => {
+      try {
+        const statusData = await monitoringService.getMonitoringStatus();
+
+        if (statusData.monitoringScope) {
+          setFormData(prev => ({
+            pollingUnitInfo: {
+              ...prev.pollingUnitInfo,
+              code: statusData.monitoringScope?.pollingUnit || prev.pollingUnitInfo.code,
+              name: statusData.monitoringScope?.pollingUnitLabel || prev.pollingUnitInfo.name,
+              ward: statusData.monitoringScope?.wardLabel || statusData.monitoringScope?.ward || prev.pollingUnitInfo.ward,
+              lga: statusData.monitoringScope?.lgaLabel || statusData.monitoringScope?.lga || prev.pollingUnitInfo.lga,
+              state: statusData.monitoringScope?.stateLabel || statusData.monitoringScope?.state || prev.pollingUnitInfo.state,
+              // Don't overwrite GPS, locationType, locationOther if already set
+            },
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading monitoring data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMonitoringData();
+  }, []);
 
   const handleBack = () => {
     navigate("/dashboard/elections/monitor");
@@ -97,17 +126,13 @@ export default function PUInfoPage() {
 
       <div className="max-w-3xl mx-auto py-10 px-4">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-4">Polling Unit Setup</h1>
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
-            <p className="text-blue-900 dark:text-blue-100 text-sm">
-              <strong>Required Setup:</strong> This information establishes your monitoring context.
-              Once completed, you'll have full access to all monitoring forms including incident reporting,
-              officer verification, and result tracking.
+          <h1 className="text-2xl font-bold mb-4">Confirm Polling Unit Details</h1>
+          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mb-6">
+            <p className="text-green-900 dark:text-green-100 text-sm">
+              <strong>Quick Setup:</strong> Your polling unit information has been pre-filled from your assignment.
+              Please verify the details and add GPS coordinates if available.
             </p>
           </div>
-          <p className="text-gray-600">
-            Please provide your polling unit details and location information to begin monitoring.
-          </p>
         </div>
 
         <PUInfoForm

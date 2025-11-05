@@ -22,7 +22,7 @@
     "@weston/react-world-flags": "^2.0.0",
     "axios": "^1.9.0",
     "browser-image-compression": "^2.0.2",
-    "canvas-confetti": "^1.9.3",
+    "canvas-confetti": "^1.9.4",
     "chart.js": "^4.4.9",
     "date-fns": "^4.1.0",
     "dom-to-image": "^2.6.0",

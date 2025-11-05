@@ -27,6 +27,8 @@ const ResendVerification = lazy(() => import("./pages/auth/ResendPage.tsx"));
 const ForgotPassword = lazy(() => import("./pages/auth/ForgotPasswordPage.tsx"));
 const ChangePassword = lazy(() => import("./pages/auth/ChangePasswordPage.tsx"));
 const ConfirmEmailPage = lazy(() => import("./pages/auth/ConfirmEmailPage.tsx"));
+const OnboardingPage = lazy(() => import("./pages/auth/OnboardingPage.tsx"));
+const JoinRedirect = lazy(() => import("./pages/auth/JoinRedirect.tsx"));
 
 // Profile Pages
 const ProfileLayout = lazy(() => import("./pages/profile/page.tsx"));
@@ -95,6 +97,20 @@ const router = createBrowserRouter([
       { path: "change-password", element: <ChangePassword /> },
       { path: "confirm-email/:token", element: <ConfirmEmailPage /> },
     ],
+  },
+  {
+    path: "/onboarding",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <OnboardingPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/join/:shortCode",
+    element: (
+      <JoinRedirect />
+    ),
   },
   {
     path: "/anambra",

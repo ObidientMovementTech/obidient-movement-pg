@@ -8,10 +8,54 @@ import { sendConfirmationEmail } from '../utils/emailHandler.js';
 import dotenv from 'dotenv';
 import speakeasy from 'speakeasy';
 import { logger } from '../middlewares/security.middleware.js';
+import { query } from '../config/db.js';
 
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
+
+const getFrontendBaseUrl = () =>
+  (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+
+const sanitizeRedirectPath = (rawPath) => {
+  if (!rawPath || typeof rawPath !== 'string') {
+    return '/dashboard';
+  }
+
+  try {
+    const decoded = decodeURIComponent(rawPath);
+    if (!decoded.startsWith('/') || decoded.startsWith('//')) {
+      return '/dashboard';
+    }
+    return decoded;
+  } catch (error) {
+    logger.warn('Failed to decode Google redirect path', {
+      rawPath,
+      error: error.message,
+    });
+    return '/dashboard';
+  }
+};
+
+const decodeGoogleState = (stateParam) => {
+  if (!stateParam || typeof stateParam !== 'string') {
+    return {};
+  }
+
+  try {
+    const json = Buffer.from(stateParam, 'base64').toString('utf8');
+    const parsed = JSON.parse(json);
+    if (parsed && typeof parsed === 'object') {
+      return parsed;
+    }
+    return {};
+  } catch (error) {
+    logger.warn('Failed to parse Google OAuth state payload', {
+      error: error.message,
+    });
+    return {};
+  }
+};
 
 // REGISTER
 export const registerUser = async (req, res) => {
@@ -406,6 +450,126 @@ export const loginUser = async (req, res) => {
       message: "Unable to log in at this time. Please try again later.",
       errorType: 'SERVER_ERROR'
     });
+  }
+};
+
+export const googleLoginCallback = async (req, res) => {
+  try {
+    const oauthUser = req.user;
+
+    if (!oauthUser || !oauthUser.email) {
+      logger.error('Google OAuth callback missing email payload');
+      const fallbackUrl = `${getFrontendBaseUrl()}/auth/login?error=google_callback_error`;
+      return res.redirect(fallbackUrl);
+    }
+
+    const { googleId, email, displayName, photoUrl } = oauthUser;
+    const stateData = decodeGoogleState(req.query.state);
+    const redirectPath = sanitizeRedirectPath(stateData.redirectTo);
+    const frontendBase = getFrontendBaseUrl();
+    const redirectUrl = `${frontendBase}${redirectPath}`;
+
+    let userRecord = null;
+    if (googleId) {
+      const googleLookup = await query('SELECT * FROM users WHERE google_id = $1 LIMIT 1', [googleId]);
+      if (googleLookup.rows.length > 0) {
+        userRecord = new User(googleLookup.rows[0]);
+      }
+    }
+
+    if (!userRecord) {
+      userRecord = await User.findOne({ email });
+    }
+
+    if (!userRecord) {
+      logger.warn('Google login attempted for unknown account', {
+        email,
+        googleId,
+      });
+
+      const params = new URLSearchParams({
+        error: 'google_account_missing',
+        email,
+      });
+
+      return res.redirect(`${frontendBase}/auth/login?${params.toString()}`);
+    }
+
+    await query(
+      `UPDATE users SET
+         google_id = $1,
+         oauth_provider = 'google',
+         email = CASE
+           WHEN email IS NULL OR email = '' OR LOWER(email) LIKE '%@obidients.com' THEN $4
+           ELSE email
+         END,
+         "emailVerified" = TRUE,
+         "profileImage" = COALESCE($2, "profileImage"),
+         name = CASE
+           WHEN name IS NULL OR TRIM(name) = '' THEN $3
+           ELSE name
+         END,
+         last_login_at = NOW(),
+         "updatedAt" = NOW()
+       WHERE id = $5`,
+      [googleId, photoUrl, displayName, email, userRecord.id]
+    );
+
+    const updatedUser = await User.findById(userRecord.id);
+
+    if (!updatedUser) {
+      logger.error('Failed to load user after Google login update', {
+        userId: userRecord.id,
+      });
+      return res.redirect(`${frontendBase}/auth/login?error=google_callback_error`);
+    }
+
+    if (updatedUser.twoFactorEnabled) {
+      const tempToken = jwt.sign(
+        { userId: updatedUser.id, twoFactorPending: true },
+        JWT_SECRET,
+        { expiresIn: '10m' }
+      );
+
+      const params = new URLSearchParams({
+        requires2FA: '1',
+        tempToken,
+        email: updatedUser.email || email,
+        redirect: redirectPath,
+        status: 'google-linked'
+      });
+
+      logger.info('Google login requires 2FA', {
+        userId: updatedUser.id,
+        email: updatedUser.email,
+      });
+
+      return res.redirect(`${frontendBase}/auth/login?${params.toString()}`);
+    }
+
+    const authToken = generateToken(updatedUser.id);
+
+    res.cookie('cu-auth-token', authToken, {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24 * 3,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    logger.info('User logged in via Google', {
+      userId: updatedUser.id,
+      email: updatedUser.email,
+    });
+
+    return res.redirect(redirectUrl);
+  } catch (error) {
+    logger.error('Google login callback error', {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    const fallbackUrl = `${getFrontendBaseUrl()}/auth/login?error=google_callback_error`;
+    return res.redirect(fallbackUrl);
   }
 };
 

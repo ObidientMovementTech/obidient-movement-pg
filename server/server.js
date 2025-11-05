@@ -4,10 +4,12 @@ import express from 'express';
 // import path from 'path';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import session from 'express-session';
 import connectDB from './config/db.js';
 import cors from 'cors';
 import compression from 'compression';
 import hpp from 'hpp';
+import passport from './config/passport.js';
 import authRoutes from './routes/auth.route.js';
 import userRoutes from './routes/user.route.js';
 import adminBroadcastRoutes from './routes/adminBroadcast.route.js';
@@ -21,13 +23,18 @@ import stateDashboardRoutes from './routes/stateDashboard.routes.js';
 import monitorKeyRoutes from './routes/monitorKey.route.js';
 import electionRoutes from './routes/election.routes.js';
 import electionResultsRoutes from './routes/electionResults.routes.js';
+import partyRoutes from './routes/party.route.js';
+import electionPartyRoutes from './routes/electionParty.route.js';
 import monitoringRoutes from './routes/monitoring.route.js';
+import situationRoomRoutes from './routes/situationRoom.route.js';
 import mobileRoutes from './routes/mobile.route.js';
 import mobiliseDashboardRoutes from './routes/mobiliseDashboard.routes.js';
 import callCenterRoutes from './routes/callCenter.routes.js';
 import inecVotersRoutes from './routes/inecVoters.routes.js';
 import communicationsRoutes from './routes/communications.routes.js';
 import locationRoutes from './routes/location.routes.js';
+import onboardingRoutes from './routes/onboarding.routes.js';
+import liveResultsRoutes from './routes/liveResults.route.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -67,11 +74,29 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Onboarding-Token']
 }));
 app.use(express.json({ limit: '10mb' })); // Reduced from 50mb for security
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
+
+// Session middleware (for OAuth)
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || process.env.JWT_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Routes
 app.use('/auth', authRoutes);
@@ -79,21 +104,26 @@ app.use('/users', userRoutes);
 app.use('/admin-broadcasts', adminBroadcastRoutes);
 app.use('/admin', adminRoutes);
 app.use('/notifications', notificationRoutes);
-app.use('/evaluation', evaluationRoutes)
+app.use('/evaluation', evaluationRoutes);
 app.use('/kyc', kycRoutes);
 app.use('/voting-blocs', votingBlocRoutes);
 app.use('/api', imageProxyRoutes); // Image proxy route
 app.use('/state-dashboard', stateDashboardRoutes); // State Dashboard routes
 app.use('/mobilise-dashboard', mobiliseDashboardRoutes); // Mobilise Dashboard routes
 app.use('/monitor-key', monitorKeyRoutes); // Monitor Key routes
+app.use('/elections', electionPartyRoutes); // Election-Party linking (MUST come BEFORE electionRoutes)
 app.use('/elections', electionRoutes); // Election Management routes
 app.use('/election-results', electionResultsRoutes); // Election Results (Live) routes
+app.use('/api/parties', partyRoutes); // Political Parties management
 app.use('/monitoring', monitoringRoutes); // Vote Protection monitoring routes
 app.use('/mobile', mobileRoutes); // Mobile App API routes
 app.use('/call-center', callCenterRoutes); // Call Center routes
 app.use('/api/inec-voters', inecVotersRoutes); // INEC Voters API - Scalable data access
 app.use('/api/communications', communicationsRoutes); // Bulk communications (SMS & Voice)
 app.use('/api/locations', locationRoutes); // Location data (States & LGAs)
+app.use('/api/live-results', liveResultsRoutes); // Live election results with caching
+app.use('/api/situation-room', situationRoomRoutes); // Admin Situation Room - Comprehensive monitoring
+app.use('/auth/onboarding', onboardingRoutes); // Onboarding system with Google OAuth
 
 // Placeholder route
 app.get('/', (req, res) => {

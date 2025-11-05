@@ -1,10 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
-import { Trophy, 
+import {
+  Trophy,
   // Users, 
-  TrendingUp, MapPin, Filter, Medal, Crown, Award } from "lucide-react";
+  TrendingUp, MapPin, Filter, Medal, Crown, Award
+} from "lucide-react";
 import { getLeaderboard } from "../../../services/votingBlocService";
 import { LeaderboardEntry } from "../../../types/votingBloc";
-import { statesLGAWardList } from "../../../utils/StateLGAWard";
+import { getStateNames, getFormattedLGAs } from "../../../utils/StateLGAWardPollingUnits";
 import Loading from "../../../components/Loader";
 import Toast from "../../../components/Toast";
 
@@ -43,8 +45,8 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     if (selectedState) {
-      const stateData = statesLGAWardList.find(s => s.state === selectedState);
-      setLgaOptions(stateData ? stateData.lgas.map(lga => lga.lga) : []);
+      const formattedLGAs = getFormattedLGAs(selectedState);
+      setLgaOptions(formattedLGAs.map(lga => lga.value));
       setSelectedLga('');
       setSelectedWard('');
     }
@@ -181,8 +183,8 @@ export default function LeaderboardPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
               >
                 <option value="">All States</option>
-                {statesLGAWardList.map(state => (
-                  <option key={state.state} value={state.state}>{state.state}</option>
+                {getStateNames().map(state => (
+                  <option key={state} value={state}>{state}</option>
                 ))}
               </select>
             </div>
@@ -196,6 +198,14 @@ export default function LeaderboardPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
                   disabled={!selectedState}
                 >
+                  <option value="">All LGAs</option>
+                  {lgaOptions.map(lga => {
+                    const formattedLGAs = getFormattedLGAs(selectedState);
+                    const lgaData = formattedLGAs.find(l => l.value === lga);
+                    return (
+                      <option key={lga} value={lga}>{lgaData?.label || lga}</option>
+                    );
+                  })}
                   <option value="">All LGAs</option>
                   {lgaOptions.map(lga => (
                     <option key={lga} value={lga}>{lga}</option>

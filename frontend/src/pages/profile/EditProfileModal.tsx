@@ -7,9 +7,7 @@ import getCroppedImg from '../../utils/getCroppedImg';
 import compressImage from '../../utils/ImageCompression';
 import FormSelect from '../../components/select/FormSelect';
 import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
-import { statesLGAWardList } from '../../utils/StateLGAWard';
-import { getPollingUnitsForWard } from '../../utils/pollingUnitUtils';
-import { formatStateName, formatLocationName } from '../../utils/textUtils';
+import { getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from '../../utils/StateLGAWardPollingUnits';
 import { validateUsernameFormat, debouncedUsernameCheck } from '../../services/profileService';
 import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import axios from 'axios';
@@ -95,19 +93,16 @@ export default function EditProfileModal({
   const [bankAccountNumber, setBankAccountNumber] = useState(profile.bankAccountNumber || '');
   const [bankAccountName, setBankAccountName] = useState(profile.bankAccountName || '');
 
-  // For cascading dropdowns
-  const [selectedState, setSelectedState] = useState(profile.votingState || '');
-  const [selectedLGA, setSelectedLGA] = useState(profile.votingLGA || '');
-
   // Dropdown options state
   const [states, setStates] = useState<OptionType[]>([]);
 
   // Initialize states dropdown
   useEffect(() => {
-    const stateOptions = statesLGAWardList.map((s, i) => ({
+    const stateNames = getStateNames();
+    const stateOptions = stateNames.map((stateName, i) => ({
       id: i,
-      label: formatStateName(s.state), // Display formatted name
-      value: s.state, // Keep original value for backend
+      label: stateName, // Display UPPERCASE name (e.g., "ABIA")
+      value: stateName, // Send UPPERCASE to backend
     }));
     setStates(stateOptions);
   }, []);
@@ -158,27 +153,25 @@ export default function EditProfileModal({
     });
   };
 
-  // Helper functions for cascading dropdowns (same as KYC)
+  // Helper functions for cascading dropdowns
   const getLgas = (stateName: string): OptionType[] => {
-    const found = statesLGAWardList.find(s => s.state === stateName);
-    return found ? found.lgas.map((l, i) => ({
+    if (!stateName) return [];
+    const formattedLGAs = getFormattedLGAs(stateName);
+    return formattedLGAs.map((lga, i) => ({
       id: i,
-      label: formatLocationName(l.lga), // Display formatted name
-      value: l.lga // Keep original value for backend
-    })) : [];
+      label: lga.label, // Display with abbreviation (e.g., "01 - ABA NORTH")
+      value: lga.value // Send only name to backend (e.g., "ABA NORTH")
+    }));
   };
 
-  const getWards = (lga: string, state: string): OptionType[] => {
-    const stateData = statesLGAWardList.find(s => s.state === state);
-    const lgaData = stateData?.lgas.find(l => l.lga === lga);
-
-    const wards = lgaData ? lgaData.wards.map((w, i) => ({
+  const getWards = (stateName: string, lgaName: string): OptionType[] => {
+    if (!stateName || !lgaName) return [];
+    const formattedWards = getFormattedWards(stateName, lgaName);
+    return formattedWards.map((ward, i) => ({
       id: i,
-      label: formatLocationName(w), // Display formatted name
-      value: w // Keep original value for backend
-    })) : [];
-
-    return wards;
+      label: ward.label, // Display with abbreviation (e.g., "01 - EZIAMA")
+      value: ward.value // Send only name to backend (e.g., "EZIAMA")
+    }));
   };
 
   // Get polling units for the selected location
@@ -188,58 +181,12 @@ export default function EditProfileModal({
     }
 
     try {
-      // Convert to the uppercase format expected by the new data structure
-      const stateUpper = votingState.toUpperCase().replace(/-/g, ' ');
-      let lgaUpper = votingLGA.toUpperCase().replace(/-/g, ' ');
-      let wardUpper = votingWard.toUpperCase().replace(/-/g, ' ');
-
-      // Handle specific ward name formatting patterns in polling data
-      // These conversions match the exact format in StateLGAWardPollingUnits
-      if (wardUpper.includes('IGBO UKWU')) {
-        if (wardUpper.includes(' I') && !wardUpper.includes(' II')) {
-          wardUpper = 'IGBO-UKWU  I'; // Note: double space before I
-        } else if (wardUpper.includes(' II')) {
-          wardUpper = 'IGBO - UKWU  II'; // Note: spaces around hyphen and double space before II
-        }
-      }
-
-      // Handle spelling inconsistencies between StateLGAWard and StateLGAWardPollingUnits
-      if (wardUpper === 'ORERI') {
-        wardUpper = 'ORAERI'; // StateLGAWard has "oreri" but polling data has "ORAERI"
-      }
-
-      // Handle other similar patterns that might have inconsistent formatting
-      // Add more specific conversions as we discover them      // Handle specific cases where the polling units data has double spaces
-      // This is a known issue with the data structure inconsistency
-      const lgaWithDoubleSpaces = lgaUpper.replace(/\s+/g, '  '); // Convert all spaces to double spaces
-
-      // Debug logging for Anambra cases
-      if (votingState.toLowerCase().includes('anambra') && (votingLGA.toLowerCase().includes('aguata') || votingWard.toLowerCase().includes('igbo') || votingWard.toLowerCase().includes('oreri'))) {
-        
-      }
-
-      // Try with single spaces first, then double spaces if that fails
-      let pollingUnits = getPollingUnitsForWard(stateUpper, lgaUpper, wardUpper);
-
-      // If no results with single spaces, try with double spaces
-      if (pollingUnits.length === 0) {
-        pollingUnits = getPollingUnitsForWard(stateUpper, lgaWithDoubleSpaces, wardUpper);
-
-        // Debug for retry
-        if (votingState.toLowerCase().includes('anambra') && (votingLGA.toLowerCase().includes('aguata') || votingWard.toLowerCase().includes('igbo') || votingWard.toLowerCase().includes('oreri'))) {
-          console.log('DEBUG - Retry with double spaces:', pollingUnits);
-        }
-      }
-
-      // Final result debug
-      if (votingState.toLowerCase().includes('anambra') && (votingLGA.toLowerCase().includes('aguata') || votingWard.toLowerCase().includes('igbo') || votingWard.toLowerCase().includes('oreri'))) {
-        console.log('DEBUG - Final Result:', pollingUnits);
-      }
-
-      return pollingUnits.map((pu, i) => ({
+      // Use the new helper function that returns formatted polling units with abbreviations
+      const formattedPollingUnits = getFormattedPollingUnits(votingState, votingLGA, votingWard);
+      return formattedPollingUnits.map((pu, i) => ({
         id: i,
-        label: pu.label,
-        value: pu.value
+        label: pu.label, // Display with abbreviation (e.g., "005 - ABIA POLY - ABIA POLY I")
+        value: pu.value // Send only name to backend (e.g., "ABIA POLY - ABIA POLY I")
       }));
     } catch (error) {
       console.error('Error getting polling units:', error);
@@ -247,20 +194,7 @@ export default function EditProfileModal({
     }
   };
 
-  // Helper function to convert formatted data back to original format for dropdowns
-  const convertToOriginalFormat = (formattedValue: string, type: 'state' | 'location'): string => {
-    if (!formattedValue) return '';
-
-    if (type === 'state') {
-      // Convert "Abia" back to "abia"
-      return formattedValue.toLowerCase();
-    } else {
-      // Convert "Aba North" back to "aba-north"
-      return formattedValue.toLowerCase().replace(/\s+/g, '-');
-    }
-  };
-
-  // Dropdown options (same as KYC)
+  // Dropdown options
   const citizenshipOptions = [
     { id: 1, label: "Nigerian Citizen", value: "Nigerian Citizen" },
     { id: 2, label: "Diasporan", value: "Diasporan" },
@@ -307,26 +241,6 @@ export default function EditProfileModal({
       setBankName(profile.bankName || '');
       setBankAccountNumber(profile.bankAccountNumber || '');
       setBankAccountName(profile.bankAccountName || '');
-
-      // Update cascading dropdown states - convert to formats expected by StateLGAWard
-      const originalLGA = convertToOriginalFormat(newVotingLGA, 'location'); // "Osisioma" -> "osisioma"
-
-      setSelectedState(newVotingState); // StateLGAWard uses "Abia" (Title Case)
-      setSelectedLGA(originalLGA); // StateLGAWard uses "osisioma" (lowercase)
-
-      // Load polling units if we have all required values
-      if (newVotingState && newVotingLGA && newVotingWard) {
-        try {
-          // Convert to uppercase format for the new data structure
-          getPollingUnitsForWard(
-            newVotingState.toUpperCase().replace(/-/g, ' '),
-            newVotingLGA.toUpperCase().replace(/-/g, ' '),
-            newVotingWard.toUpperCase().replace(/-/g, ' ')
-          );
-        } catch (error) {
-          console.error('Error loading polling units:', error);
-        }
-      }
     }
   }, [isOpen, profile]);
 
@@ -406,11 +320,11 @@ export default function EditProfileModal({
         ageRange,
         citizenship,
         countryCode: finalCountryCode,
-        // Format location data as Title Case before sending to backend
-        stateOfOrigin: stateOfOrigin ? formatStateName(stateOfOrigin) : stateOfOrigin,
-        votingState: votingState ? formatStateName(votingState) : votingState,
-        votingLGA: votingLGA ? formatLocationName(votingLGA) : votingLGA,
-        votingWard: votingWard ? formatLocationName(votingWard) : votingWard,
+        // Send location data as-is (UPPERCASE format)
+        stateOfOrigin: stateOfOrigin || undefined,
+        votingState: votingState || undefined,
+        votingLGA: votingLGA || undefined,
+        votingWard: votingWard || undefined,
         votingPU: votingPU || '', // Add polling unit
         isVoter,
         willVote,
@@ -675,18 +589,16 @@ export default function EditProfileModal({
                 <FormSelect
                   label="Voting State"
                   options={states}
-                  defaultSelected={selectedState}
+                  defaultSelected={votingState}
                   onChange={(opt) => {
                     const newState = opt?.value || '';
-                    setSelectedState(newState);
                     setVotingState(newState);
                     // Reset dependent fields
-                    setSelectedLGA('');
                     setVotingLGA('');
                     setVotingWard('');
-                    setVotingPU(''); // Reset polling unit when state changes
+                    setVotingPU('');
                   }}
-                  key={`votingState-${selectedState}`} // Force re-render when selectedState changes
+                  key={`votingState-${votingState}`}
                 />
               </div>
 
@@ -694,18 +606,17 @@ export default function EditProfileModal({
               <div>
                 <FormSelect
                   label="Voting LGA"
-                  options={getLgas(selectedState)}
-                  defaultSelected={selectedLGA}
+                  options={getLgas(votingState)}
+                  defaultSelected={votingLGA}
                   onChange={(opt) => {
                     const newLGA = opt?.value || '';
-                    setSelectedLGA(newLGA);
                     setVotingLGA(newLGA);
                     // Reset dependent fields
                     setVotingWard('');
-                    setVotingPU(''); // Reset polling unit when LGA changes
+                    setVotingPU('');
                   }}
-                  disabled={!selectedState}
-                  key={`votingLGA-${selectedLGA}`} // Force re-render when selectedLGA changes
+                  disabled={!votingState}
+                  key={`votingLGA-${votingLGA}`}
                 />
               </div>
 
@@ -713,20 +624,16 @@ export default function EditProfileModal({
               <div>
                 <FormSelect
                   label="Voting Ward"
-                  options={getWards(selectedLGA, selectedState)}
-                  defaultSelected={convertToOriginalFormat(votingWard, 'location')}
+                  options={getWards(votingState, votingLGA)}
+                  defaultSelected={votingWard}
                   onChange={(opt) => {
-                    if (opt) {
-                      setVotingWard(opt.value);
-                      // Reset polling unit when ward changes
-                      setVotingPU('');
-                    } else {
-                      setVotingWard('');
-                      setVotingPU('');
-                    }
+                    const newWard = opt?.value || '';
+                    setVotingWard(newWard);
+                    // Reset polling unit when ward changes
+                    setVotingPU('');
                   }}
-                  disabled={!selectedLGA}
-                  key={`votingWard-${votingWard}-${selectedLGA}`} // Force re-render when votingWard or LGA changes
+                  disabled={!votingLGA}
+                  key={`votingWard-${votingWard}`}
                 />
               </div>
 
@@ -737,10 +644,11 @@ export default function EditProfileModal({
                   options={getPollingUnits()}
                   defaultSelected={votingPU}
                   onChange={(opt) => {
-                    if (opt) setVotingPU(opt.value);
+                    const newPU = opt?.value || '';
+                    setVotingPU(newPU);
                   }}
                   disabled={!votingWard}
-                  key={`votingPU-${votingWard}-${votingPU}`} // Force re-render when ward or PU changes
+                  key={`votingPU-${votingPU}`}
                   placeholder="Select your polling unit"
                 />
               </div>

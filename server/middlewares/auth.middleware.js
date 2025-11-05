@@ -140,3 +140,40 @@ export function isKYCVerified(req, res, next) {
       message: "KYC verification required to perform this action.",
     });
 }
+
+// Alias for protect - used in onboarding routes
+export const verifyToken = protect;
+
+// Role-based authorization middleware
+export const authorize = (allowedRoles = []) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(403).json({ 
+        message: "Access denied - User not authenticated" 
+      });
+    }
+
+    // Check if user's role or designation is in the allowed list
+    const userRole = req.user.role;
+    const userDesignation = req.user.designation;
+
+    const isAuthorized = 
+      allowedRoles.includes(userRole) || 
+      allowedRoles.includes(userDesignation) ||
+      userRole === 'admin'; // Admins have access to everything
+
+    if (!isAuthorized) {
+      console.log(
+        `[AUTH] Access denied for user ${req.user.email}. Role: ${userRole}, Designation: ${userDesignation}, Required: ${allowedRoles.join(', ')}`
+      );
+      return res.status(403).json({ 
+        message: "Access denied - Insufficient permissions",
+        required: allowedRoles,
+        current: userDesignation || userRole
+      });
+    }
+
+    console.log(`[AUTH] Authorization successful for ${req.user.email}`);
+    next();
+  };
+};

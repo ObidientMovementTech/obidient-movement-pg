@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { statesLGAWardList } from '../utils/StateLGAWard';
+import { statesLGAWardList } from '../utils/StateLGAWardPollingUnits';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -338,5 +338,19 @@ export const electionService = {
     const year = new Date(formData.election_date).getFullYear();
 
     return `${stateCode}-${typeCode}-${year}`;
+  },
+
+  // Get parties for an election
+  async getElectionParties(electionId: string) {
+    try {
+      const response = await axios.get(
+        `${API_BASE}/elections/${electionId}/parties`,
+        { withCredentials: true }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching election parties:', error);
+      throw error.response?.data || error;
+    }
   }
 };

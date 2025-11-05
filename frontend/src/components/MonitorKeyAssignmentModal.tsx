@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { X, Key, Loader2, MapPin, Calendar } from 'lucide-react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { X, Key, Loader2, MapPin, Calendar, AlertTriangle } from 'lucide-react';
 import { monitorKeyService } from '../services/monitorKeyService.ts';
-import { statesLGAWardList } from '../utils/StateLGAWard.ts';
 // import { electionService } from '../services/electionService.ts';
 
 interface Election {
@@ -23,6 +22,10 @@ interface MonitorKeyAssignmentModalProps {
     assignedState?: string;
     assignedLGA?: string;
     assignedWard?: string;
+    votingState?: string;
+    votingLGA?: string;
+    votingWard?: string;
+    votingPU?: string;
   };
   onSuccess: () => void;
 }
@@ -31,117 +34,54 @@ const MonitorKeyAssignmentModal = ({ isOpen, onClose, user, onSuccess }: Monitor
   const [loading, setLoading] = useState(false);
   const [elections, setElections] = useState<Election[]>([]);
   const [selectedElections, setSelectedElections] = useState<string[]>([]);
-  const [monitoringLocation, setMonitoringLocation] = useState({
-    state: user.assignedState || '',
-    lga: user.assignedLGA || '',
-    ward: user.assignedWard || ''
-  });
-  const [availableLGAs, setAvailableLGAs] = useState<Array<{ value: string, label: string }>>([]);
-  const [availableWards, setAvailableWards] = useState<Array<{ value: string, label: string }>>([]);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchElections();
-      setMonitoringLocation({
-        state: user.assignedState || '',
-        lga: user.assignedLGA || '',
-        ward: user.assignedWard || ''
-      });
+  const monitoringLocation = useMemo(() => {
+    return {
+      state: user.votingState || user.assignedState || '',
+      lga: user.votingLGA || user.assignedLGA || '',
+      ward: user.votingWard || user.assignedWard || '',
+      pollingUnit: user.votingPU || ''
+    };
+  }, [user]);
 
-      // Initialize LGAs and wards if user has assigned location
-      if (user.assignedState) {
-        updateAvailableLGAs(user.assignedState);
-        if (user.assignedLGA) {
-          updateAvailableWards(user.assignedState, user.assignedLGA);
-        }
-      }
+  const locationIssues = useMemo(() => {
+    const issues: string[] = [];
+    const designation = user.designation || '';
+
+    if (!monitoringLocation.state && designation !== 'National Coordinator') {
+      issues.push('No voting state on file');
     }
-  }, [isOpen, user]);
 
-  // Get Nigerian states for dropdown
-  const getNigerianStates = () => {
-    return statesLGAWardList.map(stateData => stateData.state).sort();
-  };
-
-  // Get LGAs for a specific state
-  const getLGAsByState = (state: string) => {
-    const stateData = statesLGAWardList.find(s => s.state === state);
-    return stateData ? stateData.lgas.map(lga => ({
-      value: lga.lga,
-      label: lga.lga.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    })).sort((a, b) => a.label.localeCompare(b.label)) : [];
-  };
-
-  // Get wards for a specific LGA
-  const getWardsByLGA = (state: string, lga: string) => {
-    const stateData = statesLGAWardList.find(s => s.state === state);
-    if (!stateData) return [];
-
-    const lgaData = stateData.lgas.find(l => l.lga === lga);
-    return lgaData ? lgaData.wards.map(ward => ({
-      value: ward,
-      label: ward.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    })).sort((a, b) => a.label.localeCompare(b.label)) : [];
-  };
-
-  // Update available LGAs when state changes
-  const updateAvailableLGAs = (state: string) => {
-    if (state) {
-      const lgas = getLGAsByState(state);
-      setAvailableLGAs(lgas);
-    } else {
-      setAvailableLGAs([]);
+    if (['LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Vote Defender'].includes(designation) && !monitoringLocation.lga) {
+      issues.push('No voting LGA on file');
     }
-  };
 
-  // Update available wards when LGA changes
-  const updateAvailableWards = (state: string, lga: string) => {
-    if (state && lga) {
-      const wards = getWardsByLGA(state, lga);
-      setAvailableWards(wards);
-    } else {
-      setAvailableWards([]);
+    if (['Ward Coordinator', 'Polling Unit Agent', 'Vote Defender'].includes(designation) && !monitoringLocation.ward) {
+      issues.push('No voting ward on file');
     }
-  };
 
-  // Handle state change
-  const handleStateChange = (newState: string) => {
-    setMonitoringLocation(prev => ({
-      ...prev,
-      state: newState,
-      lga: '', // Reset LGA when state changes
-      ward: '' // Reset ward when state changes
-    }));
-    updateAvailableLGAs(newState);
-    setAvailableWards([]); // Clear wards when state changes
-  };
+    if (['Polling Unit Agent', 'Vote Defender'].includes(designation) && !monitoringLocation.pollingUnit) {
+      issues.push('No polling unit on file');
+    }
 
-  // Handle LGA change
-  const handleLGAChange = (newLGA: string) => {
-    setMonitoringLocation(prev => ({
-      ...prev,
-      lga: newLGA,
-      ward: '' // Reset ward when LGA changes
-    }));
-    updateAvailableWards(monitoringLocation.state, newLGA);
-  };
+    return issues;
+  }, [monitoringLocation, user.designation]);
 
-  // Handle ward change
-  const handleWardChange = (newWard: string) => {
-    setMonitoringLocation(prev => ({
-      ...prev,
-      ward: newWard
-    }));
-  };
-
-  const fetchElections = async () => {
+  const fetchElections = useCallback(async () => {
     try {
       const response = await monitorKeyService.getActiveElections();
       setElections(response.data || []);
     } catch (error) {
       console.error('Error fetching elections:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchElections();
+      setSelectedElections([]);
+    }
+  }, [fetchElections, isOpen, user.id]);
 
   const canAssignKey = () => {
     const eligibleDesignations = [
@@ -170,56 +110,22 @@ const MonitorKeyAssignmentModal = ({ isOpen, onClose, user, onSuccess }: Monitor
       return;
     }
 
-    // Validate monitoring location based on user's designation
-    if (!monitoringLocation.state) {
-      alert('Please select a state for monitoring');
-      return;
-    }
-
-    // For LGA and Ward coordinators, ensure their respective locations are selected
-    if (user.designation === 'LGA Coordinator' && !monitoringLocation.lga) {
-      alert('LGA Coordinator must have an LGA selected');
-      return;
-    }
-    if (user.designation === 'Ward Coordinator' && !monitoringLocation.ward) {
-      alert('Ward Coordinator must have a ward selected');
+    if (locationIssues.length > 0) {
+      alert(`Cannot assign monitoring access yet. Missing information: ${locationIssues.join(', ')}`);
       return;
     }
 
     setLoading(true);
     try {
-      // Define the assignment data with proper types
-      const assignmentData: {
-        userId: string;
-        electionIds: string[];
-        monitoring_location: {
-          state: string;
-          lga: string | null;
-          ward: string | null;
-        };
-        assignedState: string;
-        assignedLGA: string | null;
-        assignedWard: string | null;
-        key_status: 'active' | 'inactive';
-        election_access_level: string;
-      } = {
-        userId: user.id,
+      const payload = {
         electionIds: selectedElections,
-        monitoring_location: {
-          state: monitoringLocation.state,
-          lga: monitoringLocation.lga || null,
-          ward: monitoringLocation.ward || null
-        },
-        assignedState: monitoringLocation.state,
-        assignedLGA: monitoringLocation.lga || null,
-        assignedWard: monitoringLocation.ward || null,
         key_status: 'active' as const,
-        election_access_level: user.designation || 'undefined_role' // Provide a default value
+        election_access_level: user.designation || undefined
       };
 
-      console.log('Assigning monitor key with data:', assignmentData);
+      console.log('Assigning monitor key with data:', payload);
 
-      const response = await monitorKeyService.assignMonitorKey(user.id, assignmentData);
+      const response = await monitorKeyService.assignMonitorKey(user.id, payload);
       console.log('Monitor key assignment response:', response);
 
       onSuccess();
@@ -292,70 +198,40 @@ const MonitorKeyAssignmentModal = ({ isOpen, onClose, user, onSuccess }: Monitor
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
                   <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-                  Monitoring Location
+                  Monitoring Location (from profile)
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      State
-                    </label>
-                    <select
-                      value={monitoringLocation.state}
-                      onChange={(e) => handleStateChange(e.target.value)}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="">Select State</option>
-                      {getNigerianStates().map(state => (
-                        <option key={state} value={state}>{state}</option>
-                      ))}
-                    </select>
+
+                {locationIssues.length > 0 && (
+                  <div className="mb-4 flex items-start space-x-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-200">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Missing location details</p>
+                      <ul className="list-disc list-inside">
+                        {locationIssues.map(issue => (
+                          <li key={issue}>{issue}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs">Update the volunteer's voting information before assigning monitoring access.</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      LGA
-                    </label>
-                    <select
-                      value={monitoringLocation.lga}
-                      onChange={(e) => handleLGAChange(e.target.value)}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                      disabled={!monitoringLocation.state}
-                    >
-                      <option value="">Select LGA</option>
-                      {availableLGAs.map(lga => (
-                        <option key={lga.value} value={lga.value}>{lga.label}</option>
-                      ))}
-                    </select>
-                    {!monitoringLocation.state && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Select a state first
-                      </p>
-                    )}
+                )}
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
+                    <p className="text-gray-500 dark:text-gray-400">State</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.state || 'Not set'}</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Ward
-                    </label>
-                    <select
-                      value={monitoringLocation.ward}
-                      onChange={(e) => handleWardChange(e.target.value)}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                      disabled={!monitoringLocation.lga}
-                    >
-                      <option value="">Select Ward</option>
-                      {availableWards.map(ward => (
-                        <option key={ward.value} value={ward.value}>{ward.label}</option>
-                      ))}
-                    </select>
-                    {!monitoringLocation.lga && monitoringLocation.state && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Select an LGA first
-                      </p>
-                    )}
-                    {!monitoringLocation.state && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Select state and LGA first
-                      </p>
-                    )}
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
+                    <p className="text-gray-500 dark:text-gray-400">LGA</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.lga || 'Not set'}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
+                    <p className="text-gray-500 dark:text-gray-400">Ward</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.ward || 'Not set'}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
+                    <p className="text-gray-500 dark:text-gray-400">Polling Unit</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.pollingUnit || 'Not set'}</p>
                   </div>
                 </div>
               </div>

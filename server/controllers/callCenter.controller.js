@@ -619,32 +619,32 @@ const getMyAssignment = async (req, res) => {
     const assignmentQuery = `
       SELECT 
         cca.id,
-        cca.state,
-        cca.lga,
-        cca.ward,
-        cca.polling_unit,
+        TRIM(cca.state) AS state,
+        TRIM(cca.lga) AS lga,
+        TRIM(cca.ward) AS ward,
+        TRIM(cca.polling_unit) AS polling_unit,
         cca.polling_unit_code,
         cca.assigned_at,
         cca.is_active,
         (SELECT COUNT(*) 
          FROM inec_voters iv 
-         WHERE UPPER(iv.state) = UPPER(cca.state)
-           AND iv.lga = cca.lga 
-           AND iv.ward = cca.ward 
-           AND iv.polling_unit = cca.polling_unit) as total_voters,
-        (SELECT COUNT(*) 
-         FROM inec_voters iv 
-         WHERE UPPER(iv.state) = UPPER(cca.state)
-           AND iv.lga = cca.lga 
-           AND iv.ward = cca.ward 
-           AND iv.polling_unit = cca.polling_unit
+         WHERE UPPER(TRIM(iv.state)) = UPPER(TRIM(cca.state))
+           AND UPPER(TRIM(iv.lga)) = UPPER(TRIM(cca.lga))
+           AND UPPER(TRIM(iv.ward)) = UPPER(TRIM(cca.ward))
+           AND UPPER(TRIM(iv.polling_unit)) = UPPER(TRIM(cca.polling_unit))) as total_voters,
+        (SELECT COUNT(*)
+         FROM inec_voters iv
+         WHERE UPPER(TRIM(iv.state)) = UPPER(TRIM(cca.state))
+           AND UPPER(TRIM(iv.lga)) = UPPER(TRIM(cca.lga))
+           AND UPPER(TRIM(iv.ward)) = UPPER(TRIM(cca.ward))
+           AND UPPER(TRIM(iv.polling_unit)) = UPPER(TRIM(cca.polling_unit))
            AND iv.called_recently = true) as recently_called,
         (SELECT COUNT(*) 
          FROM inec_voters iv 
-         WHERE UPPER(iv.state) = UPPER(cca.state)
-           AND iv.lga = cca.lga 
-           AND iv.ward = cca.ward 
-           AND iv.polling_unit = cca.polling_unit
+         WHERE UPPER(TRIM(iv.state)) = UPPER(TRIM(cca.state))
+           AND UPPER(TRIM(iv.lga)) = UPPER(TRIM(cca.lga))
+           AND UPPER(TRIM(iv.ward)) = UPPER(TRIM(cca.ward))
+           AND UPPER(TRIM(iv.polling_unit)) = UPPER(TRIM(cca.polling_unit))
            AND iv.confirmed_to_vote = true) as confirmed_voters
       FROM call_center_assignments cca
       WHERE cca.user_id = $1 AND cca.is_active = true
@@ -688,7 +688,11 @@ const getMyVoters = async (req, res) => {
 
     // First get the volunteer's assignment
     const assignmentQuery = `
-      SELECT id, state, lga, ward, polling_unit 
+      SELECT id,
+             TRIM(state) AS state,
+             TRIM(lga) AS lga,
+             TRIM(ward) AS ward,
+             TRIM(polling_unit) AS polling_unit
       FROM call_center_assignments 
       WHERE user_id = $1 AND is_active = true
     `;
@@ -730,10 +734,10 @@ const getMyVoters = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM inec_voters 
-      WHERE UPPER(state) = UPPER($1)
-        AND lga = $2 
-        AND ward = $3 
-        AND polling_unit = $4 
+      WHERE UPPER(TRIM(state)) = UPPER(TRIM($1))
+        AND UPPER(TRIM(lga)) = UPPER(TRIM($2))
+        AND UPPER(TRIM(ward)) = UPPER(TRIM($3))
+        AND UPPER(TRIM(polling_unit)) = UPPER(TRIM($4))
         ${filterCondition}
     `;
 
@@ -758,10 +762,10 @@ const getMyVoters = async (req, res) => {
         notes,
         COALESCE((SELECT COUNT(*) FROM call_logs WHERE voter_id = inec_voters.id), 0) as call_count
       FROM inec_voters 
-      WHERE UPPER(state) = UPPER($1)
-        AND lga = $2 
-        AND ward = $3 
-        AND polling_unit = $4 
+      WHERE UPPER(TRIM(state)) = UPPER(TRIM($1))
+        AND UPPER(TRIM(lga)) = UPPER(TRIM($2))
+        AND UPPER(TRIM(ward)) = UPPER(TRIM($3))
+        AND UPPER(TRIM(polling_unit)) = UPPER(TRIM($4))
         ${filterCondition}
       ORDER BY 
         CASE WHEN called_recently = true THEN 1 ELSE 0 END,

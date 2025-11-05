@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Shield, Key, Calendar } from 'lucide-react';
 import MonitorKeyEntry from '../../../../components/MonitorKeyEntry';
-import PUSetupGuard from '../../../../components/PUSetupGuard';
 import MonitoringDashboard from '../../../../components/MonitoringDashboard';
 import { monitorKeyService } from '../../../../services/monitorKeyService.ts';
 
@@ -105,10 +104,8 @@ export default function MonitorHomePage() {
         </div>
       </div>
 
-      {/* PU Setup Guard wraps the main dashboard */}
-      <PUSetupGuard>
-        <MonitoringDashboard userInfo={userInfo} elections={elections} />
-      </PUSetupGuard>
+      {/* Main Dashboard - No longer wrapped in PUSetupGuard */}
+      <MonitoringDashboard userInfo={userInfo} elections={elections} />
     </div>
   );
 }

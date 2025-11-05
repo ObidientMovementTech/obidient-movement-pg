@@ -33,6 +33,19 @@ export interface MonitoringStatus {
     resultTracking: FormStatus;
     incidentReporting: FormStatus;
   };
+  monitoringScope?: {
+    state?: string;
+    stateLabel?: string;
+    lga?: string;
+    lgaLabel?: string;
+    ward?: string;
+    wardLabel?: string;
+    pollingUnit?: string;
+    pollingUnitLabel?: string;
+    level?: string;
+    designation?: string;
+    source?: 'monitoring_location' | 'voting_fields';
+  };
 }
 
 export interface RecentSubmission {

@@ -1,5 +1,12 @@
 import { query, getClient } from '../config/db.js';
 import { sendVoteDefenderKeyAssignedEmail } from '../utils/emailHandler.js';
+import {
+  deriveMonitoringScopeFromUser,
+  stringifyMonitoringScope,
+  parseMonitoringScope,
+  buildElectionFilterClause,
+  MonitoringScopeError,
+} from '../utils/monitoringScope.js';
 
 // Generate unique monitoring key
 const generateMonitorKey = (designation, state, year = new Date().getFullYear()) => {
@@ -42,10 +49,6 @@ export const monitorKeyController = {
       const { userId } = req.params;
       const {
         electionIds,
-        monitoring_location,
-        assignedState,
-        assignedLGA,
-        assignedWard,
         key_status,
         election_access_level
       } = req.body;
@@ -59,17 +62,23 @@ export const monitorKeyController = {
         });
       }
 
-      // Validate monitoring location
-      if (!monitoring_location || !monitoring_location.state) {
-        return res.status(400).json({
-          success: false,
-          message: 'Monitoring location with state is required'
-        });
-      }
-
       // Get user details
       const userResult = await client.query(
-        'SELECT id, name, email, designation, assignedState, assignedLGA, assignedWard FROM users WHERE id = $1',
+        `SELECT 
+           id,
+           name,
+           email,
+           designation,
+           "votingState" as "votingState",
+           "votingLGA" as "votingLGA",
+           "votingWard" as "votingWard",
+           "votingPU" as "votingPU",
+           "assignedState",
+           "assignedLGA",
+           "assignedWard",
+           monitoring_location
+         FROM users 
+         WHERE id = $1`,
         [userId]
       );
 
@@ -90,6 +99,20 @@ export const monitorKeyController = {
         });
       }
 
+      let scope;
+      try {
+        scope = deriveMonitoringScopeFromUser(user);
+      } catch (error) {
+        if (error instanceof MonitoringScopeError) {
+          return res.status(error.httpStatus).json({
+            success: false,
+            message: error.message,
+          });
+        }
+
+        throw error;
+      }
+
       // Check if user already has an active key
       const existingKeyResult = await client.query(
         'SELECT monitor_unique_key, key_status FROM users WHERE id = $1 AND key_status = $2',
@@ -105,9 +128,9 @@ export const monitorKeyController = {
       }
 
       // Generate unique key
-      const uniqueKey = generateMonitorKey(
+      let uniqueKey = generateMonitorKey(
         election_access_level || user.designation,
-        monitoring_location.state
+        scope.stateLabel || scope.state
       );
 
       // Ensure key is unique
@@ -118,11 +141,10 @@ export const monitorKeyController = {
 
       if (keyCheckResult.rows.length > 0) {
         // Regenerate if collision (very rare)
-        const newKey = generateMonitorKey(
+        uniqueKey = generateMonitorKey(
           user.designation,
-          user.assignedState || monitoring_location?.state
+          scope.stateLabel || scope.state
         );
-        uniqueKey = newKey;
       }
 
       // Update user with monitoring key and location information
@@ -144,10 +166,10 @@ export const monitorKeyController = {
         adminId,
         key_status || 'active',
         election_access_level || user.designation,
-        monitoring_location,
-        assignedState || monitoring_location.state,
-        assignedLGA || monitoring_location.lga,
-        assignedWard || monitoring_location.ward,
+        stringifyMonitoringScope({ ...scope, electionIds }),
+        scope.stateLabel || scope.state || null,
+        scope.lgaLabel || scope.lga || null,
+        scope.wardLabel || scope.ward || null,
         userId
       ]);
 
@@ -167,10 +189,11 @@ export const monitorKeyController = {
           uniqueKey,
           user.designation,
           electionsResult.rows,
-          monitoring_location || {
-            state: user.assignedState,
-            lga: user.assignedLGA,
-            ward: user.assignedWard
+          {
+            state: scope.stateLabel || scope.state || null,
+            lga: scope.lgaLabel || scope.lga || null,
+            ward: scope.wardLabel || scope.ward || null,
+            pollingUnit: scope.pollingUnitLabel || scope.pollingUnit || null,
           }
         );
       } catch (emailError) {
@@ -184,7 +207,8 @@ export const monitorKeyController = {
         data: {
           uniqueKey,
           elections: electionsResult.rows,
-          assignedDate: new Date().toISOString()
+          assignedDate: new Date().toISOString(),
+          monitoringLocation: scope,
         }
       });
 
@@ -275,47 +299,40 @@ export const monitorKeyController = {
         });
       }
 
-      // Get elections based on user's access level and location
+      // Determine monitoring scope
+      let scope = parseMonitoringScope(user.monitoring_location);
+      if (!scope) {
+        try {
+          scope = deriveMonitoringScopeFromUser(user);
+        } catch (error) {
+          if (error instanceof MonitoringScopeError) {
+            return res.status(400).json({
+              success: false,
+              message: error.message,
+            });
+          }
+
+          throw error;
+        }
+      }
+
+      // Get elections based on scope
       let elections = [];
       try {
-        console.log('🔍 Fetching elections based on access level and location...');
-
-        // Build query based on access level
-        let electionQuery = `
-          SELECT 
-            election_id, election_name, election_type, state, election_date, status
-          FROM elections 
-          WHERE status = 'active'
-        `;
-        let queryParams = [];
-
-        // Filter elections based on user's access level and location
-        const accessLevel = user.election_access_level || user.designation;
-        const monitoringLocation = user.monitoring_location ? JSON.parse(user.monitoring_location) : null;
-
-        if (accessLevel === 'State Coordinator' && monitoringLocation?.state) {
-          electionQuery += ` AND state = $1`;
-          queryParams.push(monitoringLocation.state);
-        } else if (accessLevel === 'LGA Coordinator' && monitoringLocation?.state) {
-          electionQuery += ` AND state = $1`;
-          queryParams.push(monitoringLocation.state);
-          // Could add LGA filtering if that field exists in elections table
-        } else if (accessLevel === 'National Coordinator') {
-          // National coordinators can see all elections
-        }
-
-        electionQuery += ` ORDER BY election_date DESC`;
-
-        console.log('🔍 Election query:', electionQuery);
-        console.log('🔍 Query params:', queryParams);
-
-        const electionsResult = await query(electionQuery, queryParams);
+        const { clause, params } = buildElectionFilterClause(scope);
+        const electionsResult = await query(
+          `SELECT 
+             election_id, election_name, election_type, state, lga, election_date, status
+           FROM elections e
+           WHERE status IN ('active', 'upcoming')
+           ${clause}
+           ORDER BY election_date DESC`,
+          params
+        );
         elections = electionsResult.rows;
-        console.log('🔍 Found elections:', elections.length);
-
       } catch (error) {
         console.log('❌ Error fetching elections:', error.message);
-        // Continue without elections - key verification can still succeed
+        elections = [];
       }
 
       console.log('✅ Key verification successful for user:', user.name);
@@ -329,7 +346,7 @@ export const monitorKeyController = {
             designation: user.designation,
             accessLevel: user.election_access_level,
             assignedDate: user.key_assigned_date,
-            monitoringLocation: user.monitoring_location
+            monitoringLocation: scope
           },
           elections: elections,
           accessGranted: true,
@@ -354,34 +371,24 @@ export const monitorKeyController = {
 
       const result = await query(`
         SELECT 
-          monitor_unique_key, key_status, key_assigned_date,
-          election_access_level, monitoring_location, designation,
-          ARRAY_AGG(
-            JSON_BUILD_OBJECT(
-              'election_id', e.election_id,
-              'election_name', e.election_name,
-              'election_type', e.election_type,
-              'state', e.state,
-              'election_date', e.election_date,
-              'status', e.status
-            )
-          ) as elections
-        FROM users u
-        LEFT JOIN elections e ON (
-          u.election_access_level IS NOT NULL 
-          AND u.election_access_level != '' 
-          AND e.election_id = ANY(
-            CASE 
-              WHEN u.election_access_level ~ '^\\[.*\\]$' THEN
-                ARRAY(SELECT json_array_elements_text(u.election_access_level::json))
-              ELSE 
-                ARRAY[u.election_access_level]
-            END
-          )
-        )
-        WHERE u.id = $1
-        GROUP BY u.id, u.monitor_unique_key, u.key_status, u.key_assigned_date,
-                 u.election_access_level, u.monitoring_location, u.designation
+          id,
+          name,
+          email,
+          designation,
+          monitor_unique_key,
+          key_status,
+          key_assigned_date,
+          election_access_level,
+          monitoring_location,
+          "votingState" as "votingState",
+          "votingLGA" as "votingLGA",
+          "votingWard" as "votingWard",
+          "votingPU" as "votingPU",
+          "assignedState",
+          "assignedLGA",
+          "assignedWard"
+        FROM users
+        WHERE id = $1
       `, [userId]);
 
       if (result.rows.length === 0) {
@@ -393,6 +400,50 @@ export const monitorKeyController = {
 
       const userData = result.rows[0];
 
+      let scope = parseMonitoringScope(userData.monitoring_location);
+      if (!scope) {
+        try {
+          scope = deriveMonitoringScopeFromUser(userData);
+        } catch (error) {
+          if (error instanceof MonitoringScopeError) {
+            return res.status(200).json({
+              success: true,
+              data: {
+                hasAccess: false,
+                keyStatus: userData.key_status,
+                uniqueKey: userData.monitor_unique_key,
+                assignedDate: userData.key_assigned_date,
+                elections: [],
+                monitoringLocation: null,
+                designation: userData.designation,
+                canHaveAccess: false,
+                blockingReason: error.message,
+              }
+            });
+          }
+
+          throw error;
+        }
+      }
+
+      let elections = [];
+      try {
+        const { clause, params } = buildElectionFilterClause(scope);
+        const electionsResult = await query(
+          `SELECT 
+             election_id, election_name, election_type, state, lga, election_date, status
+           FROM elections e
+           WHERE status IN ('active', 'upcoming')
+           ${clause}
+           ORDER BY election_date ASC`,
+          params
+        );
+        elections = electionsResult.rows;
+      } catch (error) {
+        console.error('Error filtering elections for monitoring access:', error);
+        elections = [];
+      }
+
       res.status(200).json({
         success: true,
         data: {
@@ -400,8 +451,8 @@ export const monitorKeyController = {
           keyStatus: userData.key_status,
           uniqueKey: userData.monitor_unique_key,
           assignedDate: userData.key_assigned_date,
-          elections: userData.elections.filter(e => e.election_id !== null),
-          monitoringLocation: userData.monitoring_location,
+          elections,
+          monitoringLocation: scope,
           designation: userData.designation,
           canHaveAccess: canAssignMonitoringAccess(userData.designation)
         }

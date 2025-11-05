@@ -18,6 +18,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { electionService, Election, ElectionFormData } from '../../../services/electionService';
+import { partyService, Party } from '../../../services/partyService';
 
 const ElectionManagement = () => {
   const [elections, setElections] = useState<Election[]>([]);
@@ -35,6 +36,8 @@ const ElectionManagement = () => {
     election_date: ''
   });
   const [availableLGAs, setAvailableLGAs] = useState<Array<{ value: string, label: string }>>([]);
+  const [allParties, setAllParties] = useState<Party[]>([]);
+  const [selectedParties, setSelectedParties] = useState<string[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -44,7 +47,17 @@ const ElectionManagement = () => {
 
   useEffect(() => {
     fetchElections();
+    fetchParties();
   }, []);
+
+  const fetchParties = async () => {
+    try {
+      const response = await partyService.getAllParties();
+      setAllParties(response.data.parties || []);
+    } catch (error) {
+      console.error('Error fetching parties:', error);
+    }
+  };
 
   const fetchElections = async () => {
     try {
@@ -65,7 +78,14 @@ const ElectionManagement = () => {
     setError('');
 
     try {
-      await electionService.createElection(formData);
+      const response = await electionService.createElection(formData);
+      const newElectionId = response.data.election.election_id;
+
+      // Link selected parties to the election
+      if (selectedParties.length > 0) {
+        await partyService.linkPartiesToElection(newElectionId, selectedParties);
+      }
+
       setSuccess('Election created successfully!');
       setShowCreateModal(false);
       resetForm();
@@ -86,6 +106,12 @@ const ElectionManagement = () => {
 
     try {
       await electionService.updateElection(selectedElection.id, formData);
+
+      // Update linked parties for the election
+      if (selectedParties.length > 0) {
+        await partyService.linkPartiesToElection(selectedElection.election_id, selectedParties);
+      }
+
       setSuccess('Election updated successfully!');
       setShowEditModal(false);
       setSelectedElection(null);
@@ -128,7 +154,7 @@ const ElectionManagement = () => {
     }
   };
 
-  const openEditModal = (election: Election) => {
+  const openEditModal = async (election: Election) => {
     setSelectedElection(election);
     setFormData({
       election_name: election.election_name,
@@ -144,6 +170,16 @@ const ElectionManagement = () => {
       setAvailableLGAs(lgas);
     }
 
+    // Load parties linked to this election
+    try {
+      const response = await partyService.getElectionParties(election.election_id);
+      const linkedPartyIds = response.data.parties.map((p: Party) => p.id);
+      setSelectedParties(linkedPartyIds);
+    } catch (error) {
+      console.error('Error loading election parties:', error);
+      setSelectedParties([]);
+    }
+
     setShowEditModal(true);
   };
 
@@ -156,6 +192,7 @@ const ElectionManagement = () => {
       election_date: ''
     });
     setAvailableLGAs([]);
+    setSelectedParties([]);
   };
 
   // Handle state change to update available LGAs
@@ -487,6 +524,59 @@ const ElectionManagement = () => {
                 </div>
               </div>
 
+              {/* Parties Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Political Parties *
+                </label>
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50 max-h-60 overflow-y-auto">
+                  {allParties.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                      No parties available. Please create parties first.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {allParties
+                        .sort((a, b) => a.display_order - b.display_order)
+                        .map((party) => (
+                          <label
+                            key={party.id}
+                            className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedParties.includes(party.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedParties([...selectedParties, party.id]);
+                                } else {
+                                  setSelectedParties(selectedParties.filter(id => id !== party.id));
+                                }
+                              }}
+                              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: party.color }}
+                              />
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                {party.party_code}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                - {party.display_name}
+                              </span>
+                            </div>
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Select all parties participating in this election
+                </p>
+              </div>
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
@@ -607,6 +697,59 @@ const ElectionManagement = () => {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Parties Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Political Parties *
+                </label>
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50 max-h-60 overflow-y-auto">
+                  {allParties.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                      No parties available. Please create parties first.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {allParties
+                        .sort((a, b) => a.display_order - b.display_order)
+                        .map((party) => (
+                          <label
+                            key={party.id}
+                            className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedParties.includes(party.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedParties([...selectedParties, party.id]);
+                                } else {
+                                  setSelectedParties(selectedParties.filter(id => id !== party.id));
+                                }
+                              }}
+                              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: party.color }}
+                              />
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                {party.party_code}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                - {party.display_name}
+                              </span>
+                            </div>
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Select all parties participating in this election
+                </p>
               </div>
 
               <div className="flex justify-end space-x-3">

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DynamicPartyVotes from './DynamicPartyVotes';
 
 interface PUResultDetailsProps {
   onNext: (data: any) => void;
@@ -18,8 +19,11 @@ export default function PUResultDetails({ onNext, onBack, formData }: PUResultDe
   const [votesPerParty, setVotesPerParty] = useState<{ party: string; votes: number }[]>(
     formData.resultTracking?.stats?.votesPerParty && formData.resultTracking.stats.votesPerParty.length > 0
       ? formData.resultTracking.stats.votesPerParty
-      : [{ party: '', votes: 0 }]
+      : []
   );
+
+  // Get electionId from formData (should be set during polling unit selection)
+  const electionId = formData.electionId || formData.resultTracking?.electionId;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -30,38 +34,15 @@ export default function PUResultDetails({ onNext, onBack, formData }: PUResultDe
     }));
   };
 
-  const handleVotesChange = (index: number, value: number) => {
-    const updated = [...votesPerParty];
-    updated[index].votes = value;
-    setVotesPerParty(updated);
-  };
-
-  const handlePartyNameChange = (index: number, value: string) => {
-    const updated = [...votesPerParty];
-    updated[index].party = value.toUpperCase();
-    setVotesPerParty(updated);
-  };
-
-  const addPartyRow = () => {
-    setVotesPerParty([...votesPerParty, { party: '', votes: 0 }]);
-  };
-
-  const removePartyRow = (index: number) => {
-    if (votesPerParty.length > 1) {
-      const updated = votesPerParty.filter((_, i) => i !== index);
-      setVotesPerParty(updated);
-    }
-  };
-
   const handleNext = () => {
-    // Validate that all party names are filled
+    // Validate that all party names are filled if there are any entries
     const hasEmptyPartyNames = votesPerParty.some(entry => !entry.party.trim());
     if (hasEmptyPartyNames) {
-      alert('Please enter party names for all entries or remove empty rows.');
+      alert('Please enter party names for all entries or use the remove button.');
       return;
     }
 
-    // Filter out any entries with 0 votes if party name is empty
+    // Filter out any entries with empty party names
     const validEntries = votesPerParty.filter(entry => entry.party.trim() !== '');
 
     // Combine stats and party votes
@@ -151,69 +132,13 @@ export default function PUResultDetails({ onNext, onBack, formData }: PUResultDe
         </div>
       </div>
 
+      {/* Dynamic Party Votes Component */}
       <div className="mt-6 bg-white border-2 border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <span className="w-8 h-8 bg-[#006837] text-white rounded-full flex items-center justify-center text-sm">
-              ✓
-            </span>
-            Vote Count Per Party
-          </h3>
-          <button
-            type="button"
-            onClick={addPartyRow}
-            className="bg-[#8cc63f] hover:bg-[#7ab52f] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-          >
-            <span className="text-lg">+</span> Add Party
-          </button>
-        </div>
-
-        <p className="text-sm text-gray-600 mb-4">
-          Enter the party name/initials and the number of votes they received.
-        </p>
-
-        <div className="space-y-3">
-          {votesPerParty.map((entry: { party: string; votes: number }, i: number) => (
-            <div key={i} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <div className="flex-1 grid grid-cols-2 gap-3">
-                <div>
-                  <input
-                    type="text"
-                    className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-[#8cc63f] focus:border-transparent text-base font-semibold uppercase"
-                    placeholder="Party (e.g. LP, APC)"
-                    value={entry.party}
-                    onChange={(e) => handlePartyNameChange(i, e.target.value)}
-                    maxLength={10}
-                    required
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-[#8cc63f] focus:border-transparent text-base"
-                    placeholder="Number of votes"
-                    value={entry.votes === 0 ? '' : entry.votes}
-                    onChange={(e) => handleVotesChange(i, parseInt(e.target.value) || 0)}
-                    min="0"
-                    required
-                  />
-                </div>
-              </div>
-              {votesPerParty.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removePartyRow(i)}
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors"
-                  title="Remove party"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+        <DynamicPartyVotes
+          electionId={electionId}
+          votesPerParty={votesPerParty}
+          onChange={setVotesPerParty}
+        />
       </div>
 
       <div className="pt-6 flex justify-between">

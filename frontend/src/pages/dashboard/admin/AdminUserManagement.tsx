@@ -1655,19 +1655,6 @@ export default function AdminUserManagement() {
       <ConfirmationModalComponent />
 
       {/* Monitor Key Assignment Modal */}
-      {monitorKeyModal.isOpen && monitorKeyModal.user && (
-        <MonitorKeyAssignmentModal
-          isOpen={monitorKeyModal.isOpen}
-          user={monitorKeyModal.user}
-          onClose={() => setMonitorKeyModal({ isOpen: false, user: null })}
-          onSuccess={handleMonitorKeySuccess}
-        />
-      )}
-
-      {/* Confirmation Modal */}
-      <ConfirmationModalComponent />
-
-      {/* Monitor Key Assignment Modal */}
       {monitorKeyModal.user && (
         <MonitorKeyAssignmentModal
           isOpen={monitorKeyModal.isOpen}
