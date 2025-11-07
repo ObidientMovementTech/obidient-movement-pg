@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   MapPin, Activity, AlertTriangle, Users, Clock,
-  CheckCircle, RefreshCw, TrendingUp
+  CheckCircle, RefreshCw, TrendingUp, BarChart3
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -147,14 +147,24 @@ export default function SituationRoomPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => loadSituationRoomData()}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.open('/admin/results-dashboard', '_blank')}
+              className="flex items-center gap-2 px-4 py-2 bg-[#8cc63f] text-white rounded-lg hover:bg-[#7ab52f] transition-colors"
+            >
+              <BarChart3 className="w-4 h-4" />
+              View Results
+            </button>
+
+            <button
+              onClick={() => loadSituationRoomData()}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Last updated */}

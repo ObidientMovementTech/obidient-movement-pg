@@ -385,6 +385,93 @@ export const getOnboardingStats = async (req, res) => {
   }
 };
 
+/**
+ * Get agent details by location
+ */
+export const getAgentsByLocation = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { votingState, votingLGA, votingWard, votingPU } = req.query;
+
+    logger.info('Fetching agents by location', {
+      votingState,
+      votingLGA,
+      votingWard,
+      votingPU
+    });
+
+    const conditions = [`designation = 'Polling Unit Agent'`];
+    const params = [];
+    let paramIndex = 1;
+
+    if (votingState) {
+      conditions.push(`UPPER(TRIM("votingState")) = UPPER(TRIM($${paramIndex}))`);
+      params.push(votingState);
+      paramIndex++;
+    }
+
+    if (votingLGA) {
+      conditions.push(`UPPER(TRIM("votingLGA")) = UPPER(TRIM($${paramIndex}))`);
+      params.push(votingLGA);
+      paramIndex++;
+    }
+
+    if (votingWard) {
+      conditions.push(`UPPER(TRIM("votingWard")) = UPPER(TRIM($${paramIndex}))`);
+      params.push(votingWard);
+      paramIndex++;
+    }
+
+    if (votingPU) {
+      conditions.push(`UPPER(TRIM("votingPU")) = UPPER(TRIM($${paramIndex}))`);
+      params.push(votingPU);
+      paramIndex++;
+    }
+
+    const query = `
+      SELECT 
+        id,
+        name,
+        phone,
+        email,
+        "profileImage",
+        support_group,
+        designation,
+        "votingState",
+        "votingLGA",
+        "votingWard",
+        "votingPU"
+      FROM users
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY name ASC
+    `;
+
+    logger.info('Executing query', { query, params });
+
+    const result = await client.query(query, params);
+
+    logger.info('Query result', { count: result.rows.length });
+
+    res.json({
+      success: true,
+      data: result.rows,
+      count: result.rows.length,
+    });
+  } catch (error) {
+    logger.error('Error fetching agents by location', {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch agents',
+      error: error.message,
+    });
+  } finally {
+    client.release();
+  }
+};
+
 // ==================== PUBLIC ONBOARDING CONTROLLERS ====================
 
 /**
@@ -889,7 +976,8 @@ export const completeOnboarding = async (req, res) => {
     const resolvedOauthProvider = googleData
       ? 'google'
       : (existingUser?.oauth_provider ?? (bypassGoogle ? 'local' : null));
-    const resolvedEmailVerified = !bypassGoogle;
+    // Set email as verified for all onboarding users (Google and manual registration)
+    const resolvedEmailVerified = true;
     const oauthProviderForUpdate = resolvedOauthProvider
       || existingUserResult.rows[0]?.oauth_provider
       || (googleData ? 'google' : bypassGoogle ? 'local' : null);
@@ -933,6 +1021,7 @@ export const completeOnboarding = async (req, res) => {
           "bankName" = COALESCE($14, "bankName"),
           "bankAccountName" = COALESCE($15, "bankAccountName"),
           polling_unit_code = $16,
+          "emailVerified" = true,
           last_login_at = NOW(),
           "updatedAt" = NOW()
          WHERE id = $17`,

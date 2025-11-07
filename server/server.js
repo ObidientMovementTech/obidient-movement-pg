@@ -35,6 +35,7 @@ import communicationsRoutes from './routes/communications.routes.js';
 import locationRoutes from './routes/location.routes.js';
 import onboardingRoutes from './routes/onboarding.routes.js';
 import liveResultsRoutes from './routes/liveResults.route.js';
+import resultsDashboardRoutes from './routes/resultsDashboard.route.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -122,6 +123,7 @@ app.use('/api/inec-voters', inecVotersRoutes); // INEC Voters API - Scalable dat
 app.use('/api/communications', communicationsRoutes); // Bulk communications (SMS & Voice)
 app.use('/api/locations', locationRoutes); // Location data (States & LGAs)
 app.use('/api/live-results', liveResultsRoutes); // Live election results with caching
+app.use('/api/results-dashboard', resultsDashboardRoutes); // Results Dashboard - Hierarchical results view
 app.use('/api/situation-room', situationRoomRoutes); // Admin Situation Room - Comprehensive monitoring
 app.use('/auth/onboarding', onboardingRoutes); // Onboarding system with Google OAuth
 

@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Users, TrendingUp, MapPin, RefreshCw, Download,
   Calendar, Award, Building2, Loader2, Filter, Search,
-  Plus, Link2, Copy, CheckCircle2, ExternalLink
+  Plus, Link2, Copy, CheckCircle2, ExternalLink, X, User, Phone, Mail
 } from 'lucide-react'; const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 interface OnboardingStats {
@@ -70,6 +70,12 @@ const OnboardingDashboard: React.FC = () => {
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedShortCode, setCopiedShortCode] = useState<string | null>(null);
 
+  // Agent details modal state
+  const [showAgentModal, setShowAgentModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
+  const [agentDetails, setAgentDetails] = useState<any[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+
   const fetchStats = async () => {
     setIsLoading(true);
     setError('');
@@ -100,6 +106,38 @@ const OnboardingDashboard: React.FC = () => {
   useEffect(() => {
     fetchStats();
   }, [selectedState, selectedLGA, selectedSupportGroup]);
+
+  const fetchAgentDetails = async (location: any) => {
+    setIsLoadingAgents(true);
+    setShowAgentModal(true);
+    setSelectedLocation(location);
+
+    try {
+      // Only include non-empty parameters
+      const params = new URLSearchParams();
+      if (location.votingState) params.append('votingState', location.votingState);
+      if (location.votingLGA) params.append('votingLGA', location.votingLGA);
+      if (location.votingWard) params.append('votingWard', location.votingWard);
+      if (location.votingPU) params.append('votingPU', location.votingPU);
+
+      console.log('Fetching agents for location:', location);
+      console.log('Query params:', params.toString());
+
+      const response = await axios.get(
+        `${API_URL}/auth/onboarding/agents?${params.toString()}`,
+        { withCredentials: true }
+      );
+
+      console.log('Agent response:', response.data);
+      setAgentDetails(response.data.data || []);
+    } catch (err: any) {
+      console.error('Error fetching agent details:', err);
+      console.error('Error response:', err.response?.data);
+      setAgentDetails([]);
+    } finally {
+      setIsLoadingAgents(false);
+    }
+  };
 
   const handleExport = () => {
     if (!stats) return;
@@ -407,9 +445,13 @@ const OnboardingDashboard: React.FC = () => {
                     <td className="py-3 px-4 text-sm text-gray-900">{item.votingWard}</td>
                     <td className="py-3 px-4 text-sm text-gray-600">{item.votingPU}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+                      <button
+                        onClick={() => fetchAgentDetails(item)}
+                        disabled={agentCount === 0}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass} ${agentCount > 0 ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'}`}
+                      >
                         {formatNumber(agentCount)}
-                      </span>
+                      </button>
                     </td>
                     <td className="py-3 px-4 text-center text-sm text-gray-600">
                       {formatNumber(item.support_group_count)}
@@ -680,6 +722,137 @@ const OnboardingDashboard: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Agent Details Modal */}
+      {showAgentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <User className="w-6 h-6" />
+                  Agent Details
+                </h2>
+                {selectedLocation && (
+                  <p className="text-purple-100 text-sm mt-1">
+                    {[selectedLocation.votingState, selectedLocation.votingLGA, selectedLocation.votingWard, selectedLocation.votingPU]
+                      .filter(Boolean)
+                      .join(' • ')}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowAgentModal(false);
+                  setSelectedLocation(null);
+                  setAgentDetails([]);
+                }}
+                className="text-white hover:bg-purple-800 p-2 rounded-lg transition"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {isLoadingAgents ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading agent details...</p>
+                  </div>
+                </div>
+              ) : agentDetails.length === 0 ? (
+                <div className="text-center py-12">
+                  <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg">No agents found for this location</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {agentDetails.map((agent: any) => (
+                    <div
+                      key={agent.id}
+                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      {/* Agent Header */}
+                      <div className="flex items-start gap-4 mb-4">
+                        {agent.profileImage ? (
+                          <img
+                            src={agent.profileImage}
+                            alt={agent.name}
+                            className="w-16 h-16 rounded-full object-cover border-2 border-purple-200"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center">
+                            <User className="w-8 h-8 text-purple-600" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 text-lg truncate">
+                            {agent.name || 'N/A'}
+                          </h3>
+                          {agent.designation && (
+                            <p className="text-sm text-purple-600 font-medium">
+                              {agent.designation}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Agent Details */}
+                      <div className="space-y-3">
+                        {agent.phone && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <a
+                              href={`tel:${agent.phone}`}
+                              className="text-gray-700 hover:text-purple-600 transition truncate"
+                            >
+                              {agent.phone}
+                            </a>
+                          </div>
+                        )}
+
+                        {agent.email && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <a
+                              href={`mailto:${agent.email}`}
+                              className="text-gray-700 hover:text-purple-600 transition truncate"
+                            >
+                              {agent.email}
+                            </a>
+                          </div>
+                        )}
+
+                        {agent.support_group && (
+                          <div className="flex items-start gap-3 text-sm">
+                            <Users className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-500 mb-1">Support Group</p>
+                              <p className="font-medium text-gray-900">{agent.support_group}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Agent Count Summary */}
+              {!isLoadingAgents && agentDetails.length > 0 && (
+                <div className="mt-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <p className="text-sm text-purple-800">
+                    <span className="font-semibold">{agentDetails.length}</span> agent{agentDetails.length !== 1 ? 's' : ''} found at this location
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

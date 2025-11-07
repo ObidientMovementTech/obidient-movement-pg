@@ -5,6 +5,7 @@ import {
   verifyPhone,
   completeOnboarding,
   getOnboardingStats,
+  getAgentsByLocation,
   createOnboardingToken,
   validateOnboardingToken,
   getOnboardingTokenInfo,
@@ -33,6 +34,14 @@ router.get(
   verifyToken,
   authorize(['National Coordinator', 'State Coordinator', 'LGA Coordinator']),
   getOnboardingStats
+);
+
+// Get agents by location (Admin only)
+router.get(
+  '/agents',
+  verifyToken,
+  authorize(['National Coordinator', 'State Coordinator', 'LGA Coordinator']),
+  getAgentsByLocation
 );
 
 // ==================== PUBLIC ONBOARDING ROUTES ====================

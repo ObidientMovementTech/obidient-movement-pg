@@ -51,6 +51,7 @@ const OfficerVerificationPage = lazy(() => import("./pages/dashboard/elections/m
 const ResultTrackingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/ResultTrackingPage.tsx"));
 const IncidentReportingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/IncidentReportingPage.tsx"));
 const LiveResultsPage = lazy(() => import("./pages/elections/LiveResults.tsx"));
+const ResultsDashboardPage = lazy(() => import("./pages/dashboard/admin/ResultsDashboardPage.tsx"));
 
 // Call Center Pages
 const CallCenterAdmin = lazy(() => import("./pages/callCenter/CallCenterAdmin.tsx"));
@@ -147,27 +148,19 @@ const router = createBrowserRouter([
     ),
   },
 
-  // Election Monitoring Dashboard - Protected Route
+  // Election Monitoring Dashboard - Has built-in authentication
   {
     path: "/dashboard/elections/monitor",
-    element: (
-      <ProtectedRoute>
-        <MonitorDashboard />
-      </ProtectedRoute>
-    ),
+    element: <MonitorDashboard />,
   },
 
   // Legacy route for backwards compatibility
   {
     path: "/dashboard/elections/monitoring",
-    element: (
-      <ProtectedRoute>
-        <MonitorDashboard />
-      </ProtectedRoute>
-    ),
+    element: <MonitorDashboard />,
   },
 
-  // Monitoring Form Pages
+  // Sub-routes for monitoring (Protected Routes - require authentication)
   {
     path: "/dashboard/elections/monitor/polling-unit",
     element: (
@@ -177,6 +170,7 @@ const router = createBrowserRouter([
     ),
   },
 
+  // Officer Verification
   {
     path: "/dashboard/elections/monitor/officer-verification",
     element: (
@@ -186,6 +180,7 @@ const router = createBrowserRouter([
     ),
   },
 
+  // Result Tracking
   {
     path: "/dashboard/elections/monitor/result-tracking",
     element: (
@@ -195,6 +190,7 @@ const router = createBrowserRouter([
     ),
   },
 
+  // Incident Reporting
   {
     path: "/dashboard/elections/monitor/incident-reporting",
     element: (
@@ -211,6 +207,16 @@ const router = createBrowserRouter([
       <Suspense fallback={<PageLoader />}>
         <LiveResultsPage />
       </Suspense>
+    ),
+  },
+
+  // Admin Results Dashboard
+  {
+    path: "/admin/results-dashboard",
+    element: (
+      <AdminRoute>
+        <ResultsDashboardPage />
+      </AdminRoute>
     ),
   },
 

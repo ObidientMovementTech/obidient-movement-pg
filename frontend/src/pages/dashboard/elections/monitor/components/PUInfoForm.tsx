@@ -3,12 +3,20 @@ import { Loader2 } from 'lucide-react';
 import { monitoringService, Election } from '../../../../../services/monitoringService';
 
 export default function PUInfoForm({ onNext, formData, setFormData, loading }: any) {
-  const [locationType, setLocationType] = useState(formData.pollingUnitInfo?.locationType || '');
+  const [locationType, setLocationType] = useState(formData.pollingUnitInfo?.locationType || 'Polling Unit');
   const [gpsCoordinates, setGpsCoordinates] = useState('');
   const [elections, setElections] = useState<Election[]>([]);
   const [loadingElections, setLoadingElections] = useState(true);
 
   useEffect(() => {
+    // Set default location type to "Polling Unit" if not already set
+    if (!formData.pollingUnitInfo?.locationType) {
+      setFormData((prev: any) => ({
+        ...prev,
+        pollingUnitInfo: { ...prev.pollingUnitInfo, locationType: 'Polling Unit' },
+      }));
+    }
+
     // Load elections
     loadElections();
 
@@ -33,6 +41,14 @@ export default function PUInfoForm({ onNext, formData, setFormData, loading }: a
         .sort((a, b) => new Date(b.election_date).getTime() - new Date(a.election_date).getTime());
 
       setElections(sortedElections);
+
+      // Auto-select if only one active election
+      if (sortedElections.length === 1 && !formData.pollingUnitInfo?.electionId) {
+        setFormData((prev: any) => ({
+          ...prev,
+          pollingUnitInfo: { ...prev.pollingUnitInfo, electionId: sortedElections[0].election_id },
+        }));
+      }
     } catch (error) {
       console.error('Error loading elections:', error);
     } finally {
@@ -67,6 +83,15 @@ export default function PUInfoForm({ onNext, formData, setFormData, loading }: a
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-green-600" />
             <span className="ml-2 text-gray-600">Loading active elections...</span>
+          </div>
+        ) : elections.length === 1 && formData.pollingUnitInfo?.electionId ? (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-sm text-green-800">
+              <strong>Selected Election:</strong> {elections[0].election_name} ({elections[0].election_type})
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              Auto-selected (only active election)
+            </p>
           </div>
         ) : (
           <select
