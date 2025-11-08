@@ -15,6 +15,7 @@ import {
   updateSyncPreferences
 } from '../controllers/templateSync.controller.js';
 import { cleanupDuplicateAutoBlocs } from '../controllers/auth.controller.js';
+import { submitManualResult, uploadAdminEvidence } from '../controllers/adminManualResult.controller.js';
 import adminUserManagementRoutes from './adminUserManagement.route.js';
 import monitorKeyRoutes from './monitorKey.route.js';
 
@@ -37,6 +38,10 @@ router.use('/user-management', adminUserManagementRoutes);
 
 // Monitor key management routes
 router.use('/monitor-key', monitorKeyRoutes);
+
+// Manual result upload (admin-only, bypasses monitor key)
+router.post('/manual-result-upload', protect, isAdmin, submitManualResult);
+router.post('/upload-evidence', protect, isAdmin, parseFileUpload('evidence'), uploadAdminEvidence);
 
 // Cleanup and maintenance routes
 router.post('/cleanup/duplicate-auto-blocs', protect, isAdmin, cleanupDuplicateAutoBlocs);

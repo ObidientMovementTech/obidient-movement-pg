@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   MapPin, Activity, AlertTriangle, Users, Clock,
-  CheckCircle, RefreshCw, TrendingUp, BarChart3
+  CheckCircle, RefreshCw, TrendingUp, BarChart3, Upload
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -148,6 +148,14 @@ export default function SituationRoomPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.open('/admin/manual-result-upload', '_blank')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Manual Result Upload
+            </button>
+
             <button
               onClick={() => window.open('/admin/results-dashboard', '_blank')}
               className="flex items-center gap-2 px-4 py-2 bg-[#8cc63f] text-white rounded-lg hover:bg-[#7ab52f] transition-colors"

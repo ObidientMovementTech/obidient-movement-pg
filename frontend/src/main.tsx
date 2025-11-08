@@ -52,6 +52,7 @@ const ResultTrackingPage = lazy(() => import("./pages/dashboard/elections/monito
 const IncidentReportingPage = lazy(() => import("./pages/dashboard/elections/monitor/pages/IncidentReportingPage.tsx"));
 const LiveResultsPage = lazy(() => import("./pages/elections/LiveResults.tsx"));
 const ResultsDashboardPage = lazy(() => import("./pages/dashboard/admin/ResultsDashboardPage.tsx"));
+const ManualResultUploadPage = lazy(() => import("./pages/dashboard/admin/ManualResultUploadPage.tsx"));
 
 // Call Center Pages
 const CallCenterAdmin = lazy(() => import("./pages/callCenter/CallCenterAdmin.tsx"));
@@ -216,6 +217,18 @@ const router = createBrowserRouter([
     element: (
       <AdminRoute>
         <ResultsDashboardPage />
+      </AdminRoute>
+    ),
+  },
+
+  // Admin Manual Result Upload
+  {
+    path: "/admin/manual-result-upload",
+    element: (
+      <AdminRoute>
+        <Suspense fallback={<PageLoader />}>
+          <ManualResultUploadPage />
+        </Suspense>
       </AdminRoute>
     ),
   },

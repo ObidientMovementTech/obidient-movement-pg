@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
+import axios from 'axios';
 import { monitoringService } from '../../../../../../../services/monitoringService';
 import Toast from '../../../../../../../components/Toast';
 import DynamicPartyVotes from './DynamicPartyVotes';
@@ -6,10 +7,13 @@ import DynamicPartyVotes from './DynamicPartyVotes';
 // Lazy load heavy camera component
 const CameraCapture = lazy(() => import('../../../../../../../components/CameraCapture'));
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 interface CombinedResultFormProps {
   onNext: (data: any) => void;
   formData: any;
   setFormData: (data: any) => void;
+  useAdminUpload?: boolean; // Flag to use admin upload endpoint
 }
 
 interface EvidenceUrls {
@@ -19,7 +23,7 @@ interface EvidenceUrls {
   selfieProof: string;
 }
 
-export default function CombinedResultForm({ onNext, formData, setFormData }: CombinedResultFormProps) {
+export default function CombinedResultForm({ onNext, formData, setFormData, useAdminUpload = false }: CombinedResultFormProps) {
   // Result Details State
   const [stats, setStats] = useState({
     registered: formData.resultTracking?.stats?.registered || 0,
@@ -60,25 +64,68 @@ export default function CombinedResultForm({ onNext, formData, setFormData }: Co
   };
 
   const handleFileUpload = async (name: keyof EvidenceUrls, file: File) => {
+    console.log('handleFileUpload called:', { name, file, useAdminUpload });
     try {
-      setUploading({ ...uploading, [name]: true });
-      setUploadProgress({ ...uploadProgress, [name]: 0 });
+      setUploading(prev => ({ ...prev, [name]: true }));
+      setUploadProgress(prev => ({ ...prev, [name]: 0 }));
 
-      // Upload to S3
-      const fileUrl = await monitoringService.uploadEvidence(
-        file,
-        {
-          type: 'result_evidence',
-          description: name
-        },
-        (progress) => {
-          setUploadProgress({ ...uploadProgress, [name]: progress });
+      let fileUrl: string;
+
+      if (useAdminUpload) {
+        console.log('Using admin upload endpoint');
+        // Use admin upload endpoint (no monitoring key required)
+        const formData = new FormData();
+        formData.append('evidence', file);
+
+        const response = await axios.post(
+          `${API_BASE_URL}/admin/upload-evidence`,
+          formData,
+          {
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            },
+            onUploadProgress: (progressEvent) => {
+              if (progressEvent.total) {
+                const percentCompleted = Math.round(
+                  (progressEvent.loaded * 100) / progressEvent.total
+                );
+                setUploadProgress(prev => ({ ...prev, [name]: percentCompleted }));
+              }
+            }
+          }
+        );
+
+        console.log('Admin upload response:', response.data);
+        if (response.data.success) {
+          fileUrl = response.data.data.url;
+          console.log('File uploaded successfully, URL:', fileUrl);
+        } else {
+          throw new Error(response.data.message || 'Upload failed');
         }
-      );
+      } else {
+        console.log('Using monitoring service upload');
+        // Use monitoring service (requires monitoring key)
+        fileUrl = await monitoringService.uploadEvidence(
+          file,
+          {
+            type: 'result_evidence',
+            description: name
+          },
+          (progress) => {
+            setUploadProgress(prev => ({ ...prev, [name]: progress }));
+          }
+        );
+        console.log('Monitoring service upload successful, URL:', fileUrl);
+      }
 
       // Update evidence URLs
-      const updatedUrls = { ...evidenceUrls, [name]: fileUrl };
-      setEvidenceUrls(updatedUrls);
+      console.log('Setting evidence URLs, name:', name, 'fileUrl:', fileUrl);
+      setEvidenceUrls(prev => {
+        const updated = { ...prev, [name]: fileUrl };
+        console.log('Updated evidenceUrls:', updated);
+        return updated;
+      });
 
       // Update parent form data
       setFormData((prev: any) => ({
@@ -94,11 +141,17 @@ export default function CombinedResultForm({ onNext, formData, setFormData }: Co
       console.error('Upload failed:', error);
       setToast({ message: error.message || 'Failed to upload evidence. Please try again.', type: 'error' });
     } finally {
-      setUploading({ ...uploading, [name]: false });
+      setUploading(prev => ({ ...prev, [name]: false }));
+      console.log('Upload finished, resetting uploading state for:', name);
     }
   };
 
   const handleSubmit = async () => {
+    console.log('=== CombinedResultForm handleSubmit ===');
+    console.log('votesPerParty:', votesPerParty);
+    console.log('stats:', stats);
+    console.log('evidenceUrls:', evidenceUrls);
+
     // Validate that all party names are filled if there are any entries
     const hasEmptyPartyNames = votesPerParty.some(entry => !entry.party.trim());
     if (hasEmptyPartyNames) {
@@ -114,9 +167,11 @@ export default function CombinedResultForm({ onNext, formData, setFormData }: Co
 
     // Filter out any entries with empty party names
     const validEntries = votesPerParty.filter(entry => entry.party.trim() !== '');
+    console.log('validEntries:', validEntries);
 
     // Calculate total votes from all parties
     const totalPartyVotes = validEntries.reduce((sum, entry) => sum + entry.votes, 0);
+    console.log('totalPartyVotes:', totalPartyVotes, 'stats.valid:', stats.valid);
 
     // Validate that total party votes matches valid votes
     if (totalPartyVotes !== stats.valid) {
@@ -132,13 +187,15 @@ export default function CombinedResultForm({ onNext, formData, setFormData }: Co
 
     try {
       // Combine all data
-      await onNext({
+      const dataToSubmit = {
         stats: {
           ...stats,
           votesPerParty: validEntries,
         },
         ec8aPhoto: evidenceUrls.ec8aPhoto,
-      });
+      };
+      console.log('Calling onNext with data:', dataToSubmit);
+      await onNext(dataToSubmit);
     } catch (error) {
       setIsSubmitting(false);
       // Error handling is done in parent component
@@ -146,6 +203,16 @@ export default function CombinedResultForm({ onNext, formData, setFormData }: Co
   };
 
   const isAnyUploading = Object.values(uploading).some(u => u);
+
+  // Debug logging
+  console.log('Button state:', {
+    isAnyUploading,
+    isSubmitting,
+    hasEc8aPhoto: !!evidenceUrls.ec8aPhoto,
+    evidenceUrls,
+    uploading,
+    disabled: isAnyUploading || isSubmitting || !evidenceUrls.ec8aPhoto
+  });
 
   // Calculate total votes from all parties
   const totalPartyVotes = votesPerParty.reduce((sum, entry) => sum + entry.votes, 0);
