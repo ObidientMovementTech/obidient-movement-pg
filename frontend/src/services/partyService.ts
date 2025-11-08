@@ -33,7 +33,7 @@ export const partyService = {
   async getElectionParties(electionId: string) {
     try {
       const response = await axios.get(
-        `${API_BASE}/api/elections/${electionId}/parties`,
+        `${API_BASE}/elections/${electionId}/parties`,
         { withCredentials: true }
       );
       return response.data;
@@ -97,7 +97,7 @@ export const partyService = {
   async linkPartiesToElection(electionId: string, partyIds: string[]) {
     try {
       const response = await axios.post(
-        `${API_BASE}/api/elections/${electionId}/parties`,
+        `${API_BASE}/elections/${electionId}/parties`,
         { party_ids: partyIds },
         { withCredentials: true }
       );
@@ -111,7 +111,7 @@ export const partyService = {
   async removePartyFromElection(electionId: string, partyId: string) {
     try {
       const response = await axios.delete(
-        `${API_BASE}/api/elections/${electionId}/parties/${partyId}`,
+        `${API_BASE}/elections/${electionId}/parties/${partyId}`,
         { withCredentials: true }
       );
       return response.data;

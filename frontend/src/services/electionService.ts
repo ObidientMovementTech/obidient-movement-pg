@@ -22,6 +22,13 @@ export interface ElectionFormData {
   state: string;
   lga: string;
   election_date: string;
+  parties?: Array<{
+    code: string;
+    name: string;
+    displayName?: string | null;
+    color?: string | null;
+    metadata?: Record<string, any>;
+  }>;
 }
 
 export interface ElectionStats {

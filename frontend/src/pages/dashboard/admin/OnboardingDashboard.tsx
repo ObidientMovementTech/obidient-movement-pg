@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import {
-  Users, TrendingUp, MapPin, RefreshCw, Download,
-  Calendar, Award, Building2, Loader2, Filter, Search,
-  Plus, Link2, Copy, CheckCircle2, ExternalLink, X, User, Phone, Mail
+  Users, MapPin, TrendingUp, Search, X,
+  ChevronDown, ChevronRight as ChevronRightIcon,
+  Building2, Loader2, Download, Plus, RefreshCw, Calendar, Award, Filter,
+  Copy, Link2, CheckCircle2, ExternalLink, User, Phone, Mail
 } from 'lucide-react'; const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 interface OnboardingStats {
@@ -52,6 +53,11 @@ const OnboardingDashboard: React.FC = () => {
   const [selectedSupportGroup, setSelectedSupportGroup] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // Hierarchical view state
+  const [expandedStates, setExpandedStates] = useState<Set<string>>(new Set());
+  const [expandedLGAs, setExpandedLGAs] = useState<Set<string>>(new Set());
+  const [expandedWards, setExpandedWards] = useState<Set<string>>(new Set());
 
   const toNumber = (value: unknown) => {
     const parsed = Number(value);
@@ -208,15 +214,154 @@ const OnboardingDashboard: React.FC = () => {
   const activeUsers = stats ? toNumber(stats.overview.active_users) : 0;
 
   const coverageRows = stats?.coverage ?? [];
-  const normalizedSearch = searchQuery.trim().toLowerCase();
-  const filteredCoverage = coverageRows.filter((item) => {
-    if (!normalizedSearch) return true;
-    const ward = (item.votingWard || '').toLowerCase();
-    const pu = (item.votingPU || '').toLowerCase();
-    const lgaValue = (item.votingLGA || '').toLowerCase();
-    return pu.includes(normalizedSearch) || ward.includes(normalizedSearch) || lgaValue.includes(normalizedSearch);
-  });
-  const totalCoverageAgents = filteredCoverage.reduce((sum, item) => sum + toNumber(item.agent_count), 0);
+
+  // Build hierarchical data structure (memoized for performance)
+  const hierarchicalData = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+
+    // Filter first
+    const filtered = coverageRows.filter((item) => {
+      if (!normalizedSearch) return true;
+      const state = (item.votingState || '').toLowerCase();
+      const lga = (item.votingLGA || '').toLowerCase();
+      const ward = (item.votingWard || '').toLowerCase();
+      const pu = (item.votingPU || '').toLowerCase();
+      return state.includes(normalizedSearch) ||
+        lga.includes(normalizedSearch) ||
+        ward.includes(normalizedSearch) ||
+        pu.includes(normalizedSearch);
+    });
+
+    // Group by State -> LGA -> Ward -> PU
+    const stateMap = new Map<string, {
+      name: string;
+      totalAgents: number;
+      totalGroups: number;
+      lgas: Map<string, {
+        name: string;
+        totalAgents: number;
+        totalGroups: number;
+        wards: Map<string, {
+          name: string;
+          totalAgents: number;
+          totalGroups: number;
+          pollingUnits: Array<typeof filtered[0]>;
+        }>;
+      }>;
+    }>();
+
+    filtered.forEach(item => {
+      const stateName = item.votingState || 'Unknown State';
+      const lgaName = item.votingLGA || 'Unknown LGA';
+      const wardName = item.votingWard || 'Unknown Ward';
+
+      // Get or create state
+      if (!stateMap.has(stateName)) {
+        stateMap.set(stateName, {
+          name: stateName,
+          totalAgents: 0,
+          totalGroups: 0,
+          lgas: new Map()
+        });
+      }
+      const state = stateMap.get(stateName)!;
+      state.totalAgents += toNumber(item.agent_count);
+      state.totalGroups += toNumber(item.support_group_count);
+
+      // Get or create LGA
+      if (!state.lgas.has(lgaName)) {
+        state.lgas.set(lgaName, {
+          name: lgaName,
+          totalAgents: 0,
+          totalGroups: 0,
+          wards: new Map()
+        });
+      }
+      const lga = state.lgas.get(lgaName)!;
+      lga.totalAgents += toNumber(item.agent_count);
+      lga.totalGroups += toNumber(item.support_group_count);
+
+      // Get or create Ward
+      if (!lga.wards.has(wardName)) {
+        lga.wards.set(wardName, {
+          name: wardName,
+          totalAgents: 0,
+          totalGroups: 0,
+          pollingUnits: []
+        });
+      }
+      const ward = lga.wards.get(wardName)!;
+      ward.totalAgents += toNumber(item.agent_count);
+      ward.totalGroups += toNumber(item.support_group_count);
+      ward.pollingUnits.push(item);
+    });
+
+    return stateMap;
+  }, [coverageRows, searchQuery]);
+
+  const totalCoverageAgents = useMemo(() => {
+    let total = 0;
+    hierarchicalData.forEach(state => {
+      total += state.totalAgents;
+    });
+    return total;
+  }, [hierarchicalData]);
+
+  const toggleState = (stateName: string) => {
+    const newExpanded = new Set(expandedStates);
+    if (newExpanded.has(stateName)) {
+      newExpanded.delete(stateName);
+      // Also collapse all LGAs in this state
+      const state = hierarchicalData.get(stateName);
+      if (state) {
+        state.lgas.forEach((_, lgaName) => {
+          expandedLGAs.delete(`${stateName}::${lgaName}`);
+          // Also collapse all wards
+          const lga = state.lgas.get(lgaName);
+          if (lga) {
+            lga.wards.forEach((_, wardName) => {
+              expandedWards.delete(`${stateName}::${lgaName}::${wardName}`);
+            });
+          }
+        });
+      }
+    } else {
+      newExpanded.add(stateName);
+    }
+    setExpandedStates(newExpanded);
+  };
+
+  const toggleLGA = (stateName: string, lgaName: string) => {
+    const key = `${stateName}:${lgaName}`;
+    const newExpanded = new Set(expandedLGAs);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+      // Also collapse all wards in this LGA
+      const state = hierarchicalData.get(stateName);
+      if (state) {
+        const lga = state.lgas.get(lgaName);
+        if (lga) {
+          lga.wards.forEach((_, wardName) => {
+            expandedWards.delete(`${stateName}:${lgaName}:${wardName}`);
+          });
+        }
+      }
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedLGAs(newExpanded);
+  };
+
+  const toggleWard = (stateName: string, lgaName: string, wardName: string) => {
+    const key = `${stateName}:${lgaName}:${wardName}`;
+    const newExpanded = new Set(expandedWards);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedWards(newExpanded);
+  };
 
   if (isLoading && !stats) {
     return (
@@ -333,13 +478,6 @@ const OnboardingDashboard: React.FC = () => {
           </div>
         </div>
       )}
-      {filteredCoverage.length === 0 && (
-        <tr>
-          <td colSpan={7} className="py-6 text-center text-sm text-gray-500">
-            No polling unit agents match the current filters.
-          </td>
-        </tr>
-      )}
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-md p-6">
@@ -395,79 +533,213 @@ const OnboardingDashboard: React.FC = () => {
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-gray-600" />
             <h2 className="text-lg font-semibold text-gray-900">
-              Polling Unit Coverage ({filteredCoverage.length})
+              Polling Unit Coverage
             </h2>
-            {filteredCoverage.length > 0 && (
-              <span className="text-sm text-gray-500">
-                • Agents: {formatNumber(totalCoverageAgents)}
-              </span>
-            )}
+            <span className="text-sm text-gray-500">
+              • Agents: {formatNumber(totalCoverageAgents)}
+            </span>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search polling units..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search state, LGA, ward, or PU..."
+                className="pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-80"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">State</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">LGA</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Ward</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Polling Unit</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-gray-700">Agents</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-gray-700">Groups</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Support Groups</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCoverage.slice(0, 100).map((item, index) => {
-                const agentCount = toNumber(item.agent_count);
-                const badgeClass = agentCount >= 8
-                  ? 'bg-green-100 text-green-800'
-                  : agentCount >= 4
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800';
-                const supportGroups = (item.support_groups ?? []).filter(Boolean);
+        {/* Hierarchical View */}
+        <div className="space-y-2">
+          {hierarchicalData.size === 0 ? (
+            <div className="py-12 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <MapPin className="w-12 h-12 text-gray-300" />
+                <p className="text-gray-600 text-lg">
+                  {searchQuery ? 'No locations found matching your search' : 'No coverage data available'}
+                </p>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="text-sm text-green-600 hover:text-green-700 font-medium"
+                  >
+                    Clear search
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            Array.from(hierarchicalData.entries()).map(([stateName, stateData]) => {
+              const isStateExpanded = expandedStates.has(stateName);
 
-                return (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 text-sm text-gray-900">{item.votingState}</td>
-                    <td className="py-3 px-4 text-sm text-gray-900">{item.votingLGA}</td>
-                    <td className="py-3 px-4 text-sm text-gray-900">{item.votingWard}</td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{item.votingPU}</td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => fetchAgentDetails(item)}
-                        disabled={agentCount === 0}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass} ${agentCount > 0 ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'}`}
-                      >
-                        {formatNumber(agentCount)}
-                      </button>
-                    </td>
-                    <td className="py-3 px-4 text-center text-sm text-gray-600">
-                      {formatNumber(item.support_group_count)}
-                    </td>
-                    <td className="py-3 px-4 text-xs text-gray-500">
-                      {supportGroups.length > 0 ? supportGroups.join(', ') : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filteredCoverage.length > 100 && (
-            <p className="text-sm text-gray-500 text-center py-4">
-              Showing first 100 of {filteredCoverage.length} polling units
-            </p>
+              return (
+                <div key={stateName} className="border rounded-lg overflow-hidden">
+                  {/* State Level */}
+                  <div
+                    onClick={() => toggleState(stateName)}
+                    className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isStateExpanded ? (
+                        <ChevronDown className="w-5 h-5 text-gray-600" />
+                      ) : (
+                        <ChevronRightIcon className="w-5 h-5 text-gray-600" />
+                      )}
+                      <span className="font-semibold text-gray-900">{stateName}</span>
+                      <span className="text-sm text-gray-500">
+                        ({stateData.lgas.size} LGA{stateData.lgas.size !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-sm">
+                        <span className="text-gray-600">Agents: </span>
+                        <span className="font-semibold text-gray-900">{formatNumber(stateData.totalAgents)}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-600">Groups: </span>
+                        <span className="font-semibold text-gray-900">{formatNumber(stateData.totalGroups)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* LGA Level */}
+                  {isStateExpanded && (
+                    <div className="bg-white">
+                      {Array.from(stateData.lgas.entries()).map(([lgaName, lgaData]) => {
+                        const lgaKey = `${stateName}:${lgaName}`;
+                        const isLGAExpanded = expandedLGAs.has(lgaKey);
+
+                        return (
+                          <div key={lgaKey} className="border-t">
+                            <div
+                              onClick={() => toggleLGA(stateName, lgaName)}
+                              className="flex items-center justify-between p-3 pl-12 hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                {isLGAExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                                ) : (
+                                  <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+                                )}
+                                <span className="font-medium text-gray-900">{lgaName}</span>
+                                <span className="text-xs text-gray-500">
+                                  ({lgaData.wards.size} Ward{lgaData.wards.size !== 1 ? 's' : ''})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="text-sm">
+                                  <span className="text-gray-600">Agents: </span>
+                                  <span className="font-medium text-gray-900">{formatNumber(lgaData.totalAgents)}</span>
+                                </div>
+                                <div className="text-sm">
+                                  <span className="text-gray-600">Groups: </span>
+                                  <span className="font-medium text-gray-900">{formatNumber(lgaData.totalGroups)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Ward Level */}
+                            {isLGAExpanded && (
+                              <div className="bg-gray-50">
+                                {Array.from(lgaData.wards.entries()).map(([wardName, wardData]) => {
+                                  const wardKey = `${stateName}:${lgaName}:${wardName}`;
+                                  const isWardExpanded = expandedWards.has(wardKey);
+
+                                  return (
+                                    <div key={wardKey} className="border-t border-gray-200">
+                                      <div
+                                        onClick={() => toggleWard(stateName, lgaName, wardName)}
+                                        className="flex items-center justify-between p-3 pl-20 hover:bg-gray-100 cursor-pointer transition-colors"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          {isWardExpanded ? (
+                                            <ChevronDown className="w-4 h-4 text-gray-600" />
+                                          ) : (
+                                            <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+                                          )}
+                                          <span className="text-sm font-medium text-gray-900">{wardName}</span>
+                                          <span className="text-xs text-gray-500">
+                                            ({wardData.pollingUnits.length} PU{wardData.pollingUnits.length !== 1 ? 's' : ''})
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                          <div className="text-sm">
+                                            <span className="text-gray-600">Agents: </span>
+                                            <span className="font-medium text-gray-900">{formatNumber(wardData.totalAgents)}</span>
+                                          </div>
+                                          <div className="text-sm">
+                                            <span className="text-gray-600">Groups: </span>
+                                            <span className="font-medium text-gray-900">{formatNumber(wardData.totalGroups)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Polling Unit Level */}
+                                      {isWardExpanded && (
+                                        <div className="bg-white">
+                                          {wardData.pollingUnits.map((pu, index) => {
+                                            const agentCount = toNumber(pu.agent_count);
+                                            const badgeClass = agentCount >= 8
+                                              ? 'bg-green-100 text-green-800'
+                                              : agentCount >= 4
+                                                ? 'bg-yellow-100 text-yellow-800'
+                                                : 'bg-red-100 text-red-800';
+                                            const supportGroups = (pu.support_groups ?? []).filter(Boolean);
+
+                                            return (
+                                              <div
+                                                key={index}
+                                                className="flex items-center justify-between p-3 pl-28 border-t border-gray-100 hover:bg-gray-50 transition-colors"
+                                              >
+                                                <div className="flex items-center gap-3 flex-1">
+                                                  <MapPin className="w-4 h-4 text-gray-400" />
+                                                  <span className="text-sm text-gray-900">{pu.votingPU}</span>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+                                                    {formatNumber(agentCount)} agent{agentCount !== 1 ? 's' : ''}
+                                                  </div>
+                                                  <div className="text-xs text-gray-500 w-32">
+                                                    {supportGroups.length > 0 ? supportGroups.join(', ') : '—'}
+                                                  </div>
+                                                  <button
+                                                    onClick={() => fetchAgentDetails(pu)}
+                                                    disabled={agentCount === 0}
+                                                    className="px-3 py-1.5 text-xs font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg border border-green-200 hover:border-green-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                                  >
+                                                    View
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>

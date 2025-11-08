@@ -78,13 +78,25 @@ const ElectionManagement = () => {
     setError('');
 
     try {
-      const response = await electionService.createElection(formData);
-      const newElectionId = response.data.election.election_id;
+      // Prepare party data in the format expected by backend
+      const parties = selectedParties.map(partyId => {
+        const party = allParties.find(p => p.id === partyId);
+        if (!party) return null;
 
-      // Link selected parties to the election
-      if (selectedParties.length > 0) {
-        await partyService.linkPartiesToElection(newElectionId, selectedParties);
-      }
+        return {
+          code: party.party_code,
+          name: party.party_name,
+          displayName: party.display_name,
+          color: party.color,
+          metadata: {}
+        };
+      }).filter((p): p is NonNullable<typeof p> => p !== null);
+
+      // Create election with parties in one request
+      await electionService.createElection({
+        ...formData,
+        parties
+      });
 
       setSuccess('Election created successfully!');
       setShowCreateModal(false);
@@ -105,12 +117,25 @@ const ElectionManagement = () => {
     setError('');
 
     try {
-      await electionService.updateElection(selectedElection.id, formData);
+      // Prepare party data in the format expected by backend
+      const parties = selectedParties.map(partyId => {
+        const party = allParties.find(p => p.id === partyId);
+        if (!party) return null;
 
-      // Update linked parties for the election
-      if (selectedParties.length > 0) {
-        await partyService.linkPartiesToElection(selectedElection.election_id, selectedParties);
-      }
+        return {
+          code: party.party_code,
+          name: party.party_name,
+          displayName: party.display_name,
+          color: party.color,
+          metadata: {}
+        };
+      }).filter((p): p is NonNullable<typeof p> => p !== null);
+
+      // Update election with parties in one request
+      await electionService.updateElection(selectedElection.id, {
+        ...formData,
+        parties
+      });
 
       setSuccess('Election updated successfully!');
       setShowEditModal(false);
@@ -156,12 +181,18 @@ const ElectionManagement = () => {
 
   const openEditModal = async (election: Election) => {
     setSelectedElection(election);
+
+    // Format the date to YYYY-MM-DD for the date input
+    const formattedDate = election.election_date
+      ? new Date(election.election_date).toISOString().split('T')[0]
+      : '';
+
     setFormData({
       election_name: election.election_name,
       election_type: election.election_type,
       state: election.state,
       lga: election.lga,
-      election_date: election.election_date
+      election_date: formattedDate
     });
 
     // Set available LGAs for the selected state

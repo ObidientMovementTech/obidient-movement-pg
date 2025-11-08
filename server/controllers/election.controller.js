@@ -708,22 +708,7 @@ class ElectionController {
 
       const election = existingElection.rows[0];
 
-      // Check if there are monitor keys assigned to this election
-      const monitorKeysCheck = await query(
-        'SELECT COUNT(*) FROM monitor_keys WHERE election_id = $1',
-        [election.election_id]
-      );
-
-      const monitorKeyCount = parseInt(monitorKeysCheck.rows[0].count);
-
-      if (monitorKeyCount > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot delete election. ${monitorKeyCount} monitor key(s) are assigned to this election. Please revoke all monitor keys first.`
-        });
-      }
-
-      // Check if there are monitor submissions for this election
+      // Count monitor submissions that will be deleted
       const submissionsCheck = await query(
         'SELECT COUNT(*) FROM monitor_submissions WHERE election_id = $1',
         [election.election_id]
@@ -731,12 +716,17 @@ class ElectionController {
 
       const submissionCount = parseInt(submissionsCheck.rows[0].count);
 
+      // Delete monitor submissions for this election
       if (submissionCount > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot delete election. ${submissionCount} monitor submission(s) exist for this election.`
-        });
+        await query(
+          'DELETE FROM monitor_submissions WHERE election_id = $1',
+          [election.election_id]
+        );
+        logger.info(`Deleted ${submissionCount} monitor submission(s) for election: ${election.election_id}`);
       }
+
+      // Delete associated election parties
+      await query('DELETE FROM election_parties WHERE election_id = $1', [election.election_id]);
 
       // Delete the election
       await query('DELETE FROM elections WHERE id = $1', [id]);
@@ -745,7 +735,9 @@ class ElectionController {
 
       res.json({
         success: true,
-        message: 'Election deleted successfully'
+        message: submissionCount > 0
+          ? `Election deleted successfully along with ${submissionCount} monitor submission(s)`
+          : 'Election deleted successfully'
       });
 
     } catch (error) {

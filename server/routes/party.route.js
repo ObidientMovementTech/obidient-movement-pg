@@ -125,10 +125,10 @@ router.put('/:partyId', async (req, res) => {
       });
     }
 
-    // If party_code is being updated, check for duplicates
+    // If party_code is being updated, check for duplicates (only among global parties)
     if (party_code) {
       const duplicateCheck = await query(
-        'SELECT id FROM election_parties WHERE party_code = $1 AND id != $2',
+        'SELECT id FROM election_parties WHERE party_code = $1 AND id != $2 AND election_id IS NULL',
         [party_code.toUpperCase(), partyId]
       );
 
