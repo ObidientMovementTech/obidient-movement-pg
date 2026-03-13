@@ -231,26 +231,42 @@ class Notification {
 
       const createdNotifications = [];
 
-      for (const notificationData of notificationsData) {
-        const {
-          recipient,
-          type,
-          title,
-          message,
-          relatedCause,
-          relatedVotingBloc,
-          read = false
-        } = notificationData;
+      // Use multi-row INSERT in chunks of 200 to avoid param limits
+      // (7 params per row × 200 = 1400 params — well under PG's limit)
+      const chunkSize = 200;
+      for (let i = 0; i < notificationsData.length; i += chunkSize) {
+        const chunk = notificationsData.slice(i, i + chunkSize);
+        const values = [];
+        const placeholders = [];
+        let paramIdx = 1;
+
+        for (const notificationData of chunk) {
+          const {
+            recipient,
+            type,
+            title,
+            message,
+            relatedCause = null,
+            relatedVotingBloc = null,
+            read = false
+          } = notificationData;
+
+          placeholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6})`);
+          values.push(recipient, type, title, message, relatedCause, relatedVotingBloc, read);
+          paramIdx += 7;
+        }
 
         const result = await client.query(
           `INSERT INTO notifications (
             recipient, type, title, message, "relatedCause", "relatedVotingBloc", read
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7) 
+          ) VALUES ${placeholders.join(', ')}
           RETURNING *`,
-          [recipient, type, title, message, relatedCause, relatedVotingBloc, read]
+          values
         );
 
-        createdNotifications.push(new Notification(result.rows[0]));
+        for (const row of result.rows) {
+          createdNotifications.push(new Notification(row));
+        }
       }
 
       await client.query('COMMIT');

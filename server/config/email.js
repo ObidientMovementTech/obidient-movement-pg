@@ -12,15 +12,17 @@ export const createEmailTransporter = () => {
     const port = parseInt(process.env.SMTP_PORT) || 587;
     const isSSL = port === 465;
     const host = process.env.SMTP_HOST || 'smtp.zeptomail.com';
+    const maxConnections = parseInt(process.env.EMAIL_MAX_CONNECTIONS) || 5;
+    const rateLimit = parseInt(process.env.EMAIL_RATE_LIMIT) || 14;
 
     return nodemailer.createTransport({
       host: host,
       port: port,
       secure: isSSL, // true for 465 (SSL), false for 587 (TLS)
       pool: true,
-      maxConnections: 50, // High volume support for ZeptoMail Pro
-      maxMessages: Infinity, // Unlimited messages per connection
-      rateLimit: 100, // ZeptoMail Pro can handle high rates
+      maxConnections, // Tuned to avoid ZeptoMail rate limits
+      maxMessages: Infinity,
+      rateLimit, // Emails per second - kept under ZeptoMail's limit
       auth: {
         user: process.env.EMAIL_USER, // emailapikey
         pass: process.env.EMAIL_PASS  // API key

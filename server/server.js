@@ -137,6 +137,16 @@ connectDB().then(async () => {
   // Verify Email connection
   await verifyEmailConnection();
 
+  // Boot inline workers in dev mode (in production, PM2 manages workers separately)
+  if (process.env.INLINE_WORKERS === 'true') {
+    try {
+      await import('./workers/emailBroadcastWorker.js');
+      console.log('📧 Email broadcast worker started inline (dev mode)');
+    } catch (workerErr) {
+      console.error('⚠️ Failed to start inline email worker:', workerErr.message);
+    }
+  }
+
   // Log server startup
   logger.info('Server starting up', {
     port: PORT,

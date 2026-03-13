@@ -105,7 +105,7 @@ class AdminBroadcast {
     const values = [];
     let paramCount = 1;
 
-    const updatableFields = ['title', 'message'];
+    const updatableFields = ['title', 'message', 'status', 'totalRecipients', 'emailsSent', 'emailsFailed', 'notificationsCreated', 'startedAt', 'completedAt'];
 
     updatableFields.forEach(field => {
       if (updateData[field] !== undefined) {
@@ -190,7 +190,7 @@ class AdminBroadcast {
     const values = [];
     let paramCount = 1;
 
-    const updatableFields = ['title', 'message'];
+    const updatableFields = ['title', 'message', 'status', 'totalRecipients', 'emailsSent', 'emailsFailed', 'notificationsCreated', 'startedAt', 'completedAt'];
 
     updatableFields.forEach(field => {
       if (this[field] !== undefined) {

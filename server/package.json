@@ -13,6 +13,7 @@
     "check-cors": "node check-cors.js",
     "worker:sms": "node workers/smsWorker.js",
     "worker:voice": "node workers/voiceWorker.js",
+    "worker:email": "node workers/emailBroadcastWorker.js",
     "queue:health": "node scripts/communications/checkQueueHealth.js",
     "test:at": "node scripts/communications/testAfricasTalking.js",
     "test:at-account": "node scripts/communications/checkAtAccount.js",
