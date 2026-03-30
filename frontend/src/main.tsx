@@ -1,21 +1,30 @@
 // src/main.tsx (or index.tsx)
 import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router";
+import { HelmetProvider } from "react-helmet-async";
 import "./index.css";
 
 // Only import essential components that are needed immediately
 import ErrorPage from "./pages/ErrorPage.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import AdminRoute from "./components/AdminRoute.tsx";
+import PbxRoute from "./components/pbx/PbxRoute.tsx";
+import ChatWidget from "./components/pbx/ChatWidget.tsx";
 
 // Contexts (these are lightweight)
 import { ThemeProvider } from "./context/ThemeContexts.tsx";
 import { UserProvider } from "./context/UserContext.tsx";
 import { ModalProvider } from "./context/ModalContext.tsx";
+import { SocketProvider } from "./context/SocketContext.tsx";
 
 // Lazy load all page components
-const LandingPage2 = lazy(() => import("./pages/home/LandingPage2.tsx"));
+const PublicLayout = lazy(() => import("./pages/public/PublicLayout.tsx"));
+const HomePage = lazy(() => import("./pages/public/HomePage.tsx"));
+const AboutPage = lazy(() => import("./pages/public/AboutPage.tsx"));
+const NewsPage = lazy(() => import("./pages/public/NewsPage.tsx"));
+const NewsPostPage = lazy(() => import("./pages/public/NewsPostPage.tsx"));
+const ContactPage = lazy(() => import("./pages/public/ContactPage.tsx"));
 
 // Auth Pages
 const AuthPage = lazy(() => import("./pages/auth/page.tsx"));
@@ -35,8 +44,15 @@ const ProfileLayout = lazy(() => import("./pages/profile/page.tsx"));
 const ProfilePage = lazy(() => import("./pages/profile/ProfilePage.tsx"));
 
 // Dashboard Pages
-const DashboardPage = lazy(() => import("./pages/dashboard/DashboardPage.tsx"));
+const DashboardLayout = lazy(() => import("./pages/dashboard/DashboardLayout.tsx"));
+const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome.tsx"));
+const MemberCardPage = lazy(() => import("./pages/dashboard/MemberCardPage.tsx"));
+const MyVotingBlocRedirect = lazy(() => import("./pages/dashboard/votingBloc/MyVotingBlocRedirect.tsx"));
+const LeaderboardPage = lazy(() => import("./pages/dashboard/votingBloc/LeaderboardPage.tsx"));
+const StateDashboard = lazy(() => import("./pages/dashboard/state/StateDashboard.tsx"));
+const AllNotificationsPage = lazy(() => import("./pages/dashboard/notifications/AllNotificationsPage.tsx"));
 const EligibilityChecker = lazy(() => import("./pages/dashboard/lead/eligibilityChecker/EligibilityChecker.tsx"));
+const ChatPage = lazy(() => import("./pages/dashboard/ChatPage.tsx"));
 
 // Voting Bloc Pages
 const VotingBlocDetail = lazy(() => import("./pages/dashboard/votingBloc/VotingBlocDetail.tsx"));
@@ -59,6 +75,21 @@ const CallCenterAdmin = lazy(() => import("./pages/callCenter/CallCenterAdmin.ts
 const CallCenterVolunteer = lazy(() => import("./pages/callCenter/CallCenterVolunteer.tsx"));
 const CommunicationsPage = lazy(() => import("./pages/dashboard/admin/CommunicationsPage.tsx"));
 
+// PBX Admin Dashboard Pages
+const PbxLayout = lazy(() => import("./pages/pbx/PbxLayout.tsx"));
+const PbxDashboard = lazy(() => import("./pages/pbx/PbxDashboard.tsx"));
+const HierarchyDashboard = lazy(() => import("./pages/pbx/HierarchyDashboard.tsx"));
+const PbxMembershipPage = lazy(() => import("./pages/pbx/MembershipPage.tsx"));
+const ChatInboxPage = lazy(() => import("./pages/pbx/chat/ChatInboxPage.tsx"));
+const PbxCommunitiesPage = lazy(() => import("./pages/pbx/CommunitiesPage.tsx"));
+const PbxMobilisationPage = lazy(() => import("./pages/pbx/MobilisationPage.tsx"));
+const BlogListPage = lazy(() => import("./pages/pbx/blog/BlogListPage.tsx"));
+const BlogEditorPage = lazy(() => import("./pages/pbx/blog/BlogEditorPage.tsx"));
+const PbxUsersPage = lazy(() => import("./pages/pbx/UsersPage.tsx"));
+const PbxCommunicationsPage = lazy(() => import("./pages/pbx/CommunicationsPage.tsx"));
+const PbxSettingsPage = lazy(() => import("./pages/pbx/SettingsPage.tsx"));
+const PbxAdcPage = lazy(() => import("./pages/pbx/AdcPage.tsx"));
+
 // Loading component
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -77,13 +108,33 @@ const preloadComponents = () => {
 // Start preloading after a short delay
 setTimeout(preloadComponents, 2000);
 
+// Root layout that renders the ChatWidget inside the router context
+const RootLayout = () => (
+  <>
+    <Outlet />
+    <ChatWidget />
+  </>
+);
+
 const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
   {
     path: "/",
     element: (
-      <LandingPage2 />
+      <Suspense fallback={<PageLoader />}>
+        <PublicLayout />
+      </Suspense>
     ),
     errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: "about", element: <AboutPage /> },
+      { path: "news", element: <NewsPage /> },
+      { path: "news/:slug", element: <NewsPostPage /> },
+      { path: "contact", element: <ContactPage /> },
+    ],
   },
   {
     path: "/auth",
@@ -131,13 +182,30 @@ const router = createBrowserRouter([
     errorElement: <ErrorPage />,
     children: [{ index: true, element: <ProfilePage /> }],
   },
+  // Dashboard — nested routes with horizontal header layout
   {
-    path: "/dashboard/*",
+    path: "/dashboard",
     element: (
-      <Suspense fallback={<PageLoader />}>
-        <DashboardPage />
-      </Suspense>
+      <ProtectedRoute>
+        <Suspense fallback={<PageLoader />}>
+          <DashboardLayout />
+        </Suspense>
+      </ProtectedRoute>
     ),
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <Suspense fallback={<PageLoader />}><DashboardHome /></Suspense> },
+      { path: "voting-bloc", element: <Suspense fallback={<PageLoader />}><MyVotingBlocRedirect /></Suspense> },
+      { path: "leaderboard", element: <Suspense fallback={<PageLoader />}><LeaderboardPage /></Suspense> },
+      { path: "state", element: <Suspense fallback={<PageLoader />}><StateDashboard /></Suspense> },
+      { path: "card", element: <Suspense fallback={<PageLoader />}><MemberCardPage /></Suspense> },
+      { path: "notifications", element: <Suspense fallback={<PageLoader />}><AllNotificationsPage /></Suspense> },
+      { path: "profile", element: <Suspense fallback={<PageLoader />}><ProfilePage /></Suspense> },
+      { path: "manage-voting-bloc/:id", element: <Suspense fallback={<PageLoader />}><VotingBlocManagePage /></Suspense> },
+      { path: "new-voting-bloc", element: <Suspense fallback={<PageLoader />}><NewVotingBlocPage /></Suspense> },
+      { path: "edit-voting-bloc/:id", element: <Suspense fallback={<PageLoader />}><EditVotingBlocPage /></Suspense> },
+      { path: "chat", element: <Suspense fallback={<PageLoader />}><ChatPage /></Suspense> },
+    ],
   },
 
   {
@@ -261,31 +329,9 @@ const router = createBrowserRouter([
     ),
   },
 
-  // Voting Bloc Links
-  {
-    path: "/dashboard/new-voting-bloc",
-    element: (
-      <ProtectedRoute>
-        <NewVotingBlocPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/dashboard/edit-voting-bloc/:id",
-    element: (
-      <ProtectedRoute>
-        <EditVotingBlocPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/dashboard/manage-voting-bloc/:id",
-    element: (
-      <ProtectedRoute>
-        <VotingBlocManagePage />
-      </ProtectedRoute>
-    ),
-  },
+  // Voting Bloc Routes (these are now children of /dashboard layout above,
+  // but we keep these as fallback redirects for any old bookmarks)
+  
 
   // Voting Bloc Routes (Public view)
   {
@@ -296,6 +342,38 @@ const router = createBrowserRouter([
     errorElement: <ErrorPage />
   },
 
+  // PBX Admin Dashboard
+  {
+    path: "/pbx",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <PbxRoute>
+          <PbxLayout />
+        </PbxRoute>
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <Navigate to="/pbx/dashboard" replace /> },
+      { path: "dashboard", element: <Suspense fallback={<PageLoader />}><PbxDashboard /></Suspense> },
+      { path: "dashboard/:level", element: <Suspense fallback={<PageLoader />}><HierarchyDashboard /></Suspense> },
+      { path: "dashboard/:level/:locationId", element: <Suspense fallback={<PageLoader />}><HierarchyDashboard /></Suspense> },
+      { path: "membership", element: <Suspense fallback={<PageLoader />}><PbxMembershipPage /></Suspense> },
+      { path: "chat", element: <Suspense fallback={<PageLoader />}><ChatInboxPage /></Suspense> },
+      { path: "communities", element: <Suspense fallback={<PageLoader />}><PbxCommunitiesPage /></Suspense> },
+      { path: "mobilisation", element: <Suspense fallback={<PageLoader />}><PbxMobilisationPage /></Suspense> },
+      { path: "blog", element: <Suspense fallback={<PageLoader />}><BlogListPage /></Suspense> },
+      { path: "blog/new", element: <Suspense fallback={<PageLoader />}><BlogEditorPage /></Suspense> },
+      { path: "blog/edit/:id", element: <Suspense fallback={<PageLoader />}><BlogEditorPage /></Suspense> },
+      { path: "users", element: <Suspense fallback={<PageLoader />}><PbxUsersPage /></Suspense> },
+      { path: "communications", element: <Suspense fallback={<PageLoader />}><PbxCommunicationsPage /></Suspense> },
+      { path: "adc", element: <Suspense fallback={<PageLoader />}><PbxAdcPage /></Suspense> },
+      { path: "settings", element: <Suspense fallback={<PageLoader />}><PbxSettingsPage /></Suspense> },
+    ],
+  },
+
+    ], // end children of RootLayout
+  },
 ]);
 
 // Create root safely - this pattern prevents the warning in development
@@ -305,13 +383,17 @@ const container = document.getElementById("root")!;
 // This is expected behavior and the warning can be safely ignored, but we can improve it
 const renderApp = () => (
   <React.StrictMode>
-    <ThemeProvider>
-      <ModalProvider>
-        <UserProvider>
-          <RouterProvider router={router} />
-        </UserProvider>
-      </ModalProvider>
-    </ThemeProvider>
+    <HelmetProvider>
+      <ThemeProvider>
+        <ModalProvider>
+          <UserProvider>
+            <SocketProvider>
+              <RouterProvider router={router} />
+            </SocketProvider>
+          </UserProvider>
+        </ModalProvider>
+      </ThemeProvider>
+    </HelmetProvider>
   </React.StrictMode>
 );
 

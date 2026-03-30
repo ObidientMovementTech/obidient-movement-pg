@@ -2,9 +2,6 @@ import React from 'react';
 import {
   Users,
   Shield,
-  Award,
-  BarChart3,
-  Target
 } from 'lucide-react';
 import { StatsCardProps } from '../types/dashboard.types';
 
@@ -13,58 +10,27 @@ interface Props extends StatsCardProps {
 }
 
 const StatsCards: React.FC<Props> = ({ currentStats, currentView, currentScope, loading, formatNumber }) => {
-  // Helper function to get appropriate labels based on current view
   const getViewLabels = () => {
-    switch (currentView) {
-      case 'national':
-        return {
-          scope: 'National',
-          obidientLabel: 'Total Obidient Platform Users',
-          inecLabel: 'Total INEC Registered Voters',
-          conversionLabel: 'National Conversion Rate',
-          pvcLabel: 'PVC Status Overview'
-        };
-      case 'state':
-        return {
-          scope: currentScope || 'State',
-          obidientLabel: `Obidient Users in ${currentScope}`,
-          inecLabel: `INEC Registered Voters in ${currentScope}`,
-          conversionLabel: `${currentScope} Conversion Rate`,
-          pvcLabel: `${currentScope} PVC Status`
-        };
-      case 'lga':
-        return {
-          scope: currentScope || 'LGA',
-          obidientLabel: `Obidient Users in ${currentScope}`,
-          inecLabel: `INEC Registered Voters in ${currentScope}`,
-          conversionLabel: `${currentScope} Conversion Rate`,
-          pvcLabel: `${currentScope} PVC Status`
-        };
-      case 'ward':
-        return {
-          scope: currentScope || 'Ward',
-          obidientLabel: `Obidient Users in ${currentScope}`,
-          inecLabel: `INEC Registered Voters in ${currentScope}`,
-          conversionLabel: `${currentScope} Conversion Rate`,
-          pvcLabel: `${currentScope} PVC Status`
-        };
-      case 'pu':
-        return {
-          scope: currentScope || 'Polling Unit',
-          obidientLabel: `Obidient Users in ${currentScope}`,
-          inecLabel: `INEC Registered Voters in ${currentScope}`,
-          conversionLabel: `${currentScope} Conversion Rate`,
-          pvcLabel: `${currentScope} PVC Status`
-        };
-      default:
-        return {
-          scope: 'Overview',
-          obidientLabel: 'Obidient Platform Users',
-          inecLabel: 'INEC Registered Voters',
-          conversionLabel: 'Conversion Rate',
-          pvcLabel: 'PVC Status'
-        };
-    }
+    const scope = (() => {
+      switch (currentView) {
+        case 'national': return 'National';
+        case 'state': return currentScope || 'State';
+        case 'lga': return currentScope || 'LGA';
+        case 'ward': return currentScope || 'Ward';
+        case 'pu': return currentScope || 'Polling Unit';
+        default: return 'Overview';
+      }
+    })();
+
+    return {
+      scope,
+      obidientLabel: currentView === 'national'
+        ? 'Total Obidient Platform Users'
+        : `Obidient Users in ${scope}`,
+      pvcLabel: currentView === 'national'
+        ? 'PVC Status Overview'
+        : `${scope} PVC Status`,
+    };
   };
 
   const labels = getViewLabels();
@@ -72,9 +38,8 @@ const StatsCards: React.FC<Props> = ({ currentStats, currentView, currentScope, 
   if (loading || !currentStats) {
     return (
       <div className="space-y-8 mb-8">
-        {/* Main Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, index) => (
             <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center">
                 <div className="p-3 bg-gray-100 rounded-lg animate-pulse">
@@ -88,48 +53,27 @@ const StatsCards: React.FC<Props> = ({ currentStats, currentView, currentScope, 
             </div>
           ))}
         </div>
-
-        {/* Additional Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[...Array(3)].map((_, index) => (
-            <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-5 h-5 bg-gray-200 rounded animate-pulse" />
-                <div className="h-5 bg-gray-200 rounded animate-pulse w-32" />
-              </div>
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <div className="h-4 bg-gray-200 rounded animate-pulse w-20" />
-                    <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     );
   }
 
+  const pvcTotal = (currentStats.pvcWithStatus || 0) + (currentStats.pvcWithoutStatus || 0);
+  const pvcCompletion = pvcTotal > 0
+    ? ((currentStats.pvcWithStatus / pvcTotal) * 100).toFixed(1)
+    : '0.0';
+
   return (
     <div className="space-y-8 mb-8">
       {/* Main Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Obidient Users */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-3 bg-blue-100 rounded-lg">
               <Users className="w-6 h-6 text-blue-600" />
             </div>
             <div className="ml-4">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-500">{labels.obidientLabel}</p>
-                {currentStats.realData?.isRealData && (
-                  <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
-                    LIVE DATA
-                  </span>
-                )}
-              </div>
+              <p className="text-sm font-medium text-gray-500">{labels.obidientLabel}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {formatNumber(currentStats.obidientRegisteredVoters)}
               </p>
@@ -143,43 +87,31 @@ const StatsCards: React.FC<Props> = ({ currentStats, currentView, currentScope, 
           </div>
         </div>
 
+        {/* With PVC */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-3 bg-green-100 rounded-lg">
-              <BarChart3 className="w-6 h-6 text-green-600" />
+              <Shield className="w-6 h-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">{labels.inecLabel}</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatNumber(currentStats.inecRegisteredVoters)}
+              <p className="text-sm font-medium text-gray-500">With PVC</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatNumber(currentStats.pvcWithStatus)}
               </p>
             </div>
           </div>
         </div>
 
+        {/* Without PVC */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <Target className="w-6 h-6 text-red-600" />
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <Shield className="w-6 h-6 text-orange-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Unconverted Voters</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatNumber(currentStats.unconvertedVoters)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-indigo-100 rounded-lg">
-              <Award className="w-6 h-6 text-indigo-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">{labels.conversionLabel}</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {currentStats.conversionRate.toFixed(2)}%
+              <p className="text-sm font-medium text-gray-500">Without PVC</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {formatNumber(currentStats.pvcWithoutStatus)}
               </p>
             </div>
           </div>
@@ -197,13 +129,13 @@ const StatsCards: React.FC<Props> = ({ currentStats, currentView, currentScope, 
             <div className="flex justify-between items-center">
               <span className="text-gray-600">With PVC</span>
               <span className="font-bold text-green-600">
-                {formatNumber(currentStats.obidientVotersWithPVC || currentStats.pvcWithStatus)}
+                {formatNumber(currentStats.pvcWithStatus)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Without PVC</span>
               <span className="font-bold text-orange-600">
-                {formatNumber(currentStats.obidientVotersWithoutPVC || currentStats.pvcWithoutStatus)}
+                {formatNumber(currentStats.pvcWithoutStatus)}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -214,12 +146,7 @@ const StatsCards: React.FC<Props> = ({ currentStats, currentView, currentScope, 
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">PVC Completion</span>
-              <span className="font-bold">
-                {currentStats.realData?.pvcCompletionRate
-                  ? `${currentStats.realData.pvcCompletionRate}%`
-                  : `${((currentStats.pvcWithStatus / (currentStats.pvcWithStatus + currentStats.pvcWithoutStatus)) * 100).toFixed(1)}%`
-                }
-              </span>
+              <span className="font-bold">{pvcCompletion}%</span>
             </div>
           </div>
         </div>

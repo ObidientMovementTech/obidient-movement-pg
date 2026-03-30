@@ -1,7 +1,5 @@
 import express from 'express';
-// import https from 'https';
-// import fs from 'fs';
-// import path from 'path';
+import { createServer } from 'http';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
@@ -36,6 +34,13 @@ import locationRoutes from './routes/location.routes.js';
 import onboardingRoutes from './routes/onboarding.routes.js';
 import liveResultsRoutes from './routes/liveResults.route.js';
 import resultsDashboardRoutes from './routes/resultsDashboard.route.js';
+import blogRoutes from './routes/blog.route.js';
+import chatRoutes from './routes/chat.route.js';
+import conversationRoutes from './routes/conversation.route.js';
+import roomRoutes from './routes/room.route.js';
+import appSettingsRoutes from './routes/appSettings.route.js';
+import adcRoutes from './routes/adc.route.js';
+import { initSocket } from './config/socket.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
   helmetConfig,
@@ -50,6 +55,7 @@ import {
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
@@ -126,6 +132,12 @@ app.use('/api/live-results', liveResultsRoutes); // Live election results with c
 app.use('/api/results-dashboard', resultsDashboardRoutes); // Results Dashboard - Hierarchical results view
 app.use('/api/situation-room', situationRoomRoutes); // Admin Situation Room - Comprehensive monitoring
 app.use('/auth/onboarding', onboardingRoutes); // Onboarding system with Google OAuth
+app.use('/api/blog', blogRoutes); // Blog system (public + admin)
+app.use('/api/chat', chatRoutes); // Chat coordinator chain + rate limiting
+app.use('/api/conversations', conversationRoutes); // Real-time chat conversations
+app.use('/api/rooms', roomRoutes); // Community rooms (location-based group chat)
+app.use('/api/settings', appSettingsRoutes); // App settings (mobilization pack, etc.)
+app.use('/api/adc', adcRoutes); // ADC membership registration
 
 // Placeholder route
 app.get('/', (req, res) => {
@@ -155,8 +167,11 @@ connectDB().then(async () => {
     timestamp: new Date().toISOString()
   });
 
+  // Initialize Socket.IO
+  initSocket(httpServer);
+
   // Development - use HTTP
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`🌐 HTTP Server running on port ${PORT}`);
     logger.info(`Server successfully started on port ${PORT}`);
   });

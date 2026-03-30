@@ -15,34 +15,34 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   currentData,
   formatNumber
 }) => {
-  // Chart data preparation for conversion overview (doughnut chart)
-  const getConversionChartData = () => {
+  // PVC Status doughnut chart
+  const getPvcChartData = () => {
     if (!nationalStats) return null;
 
+    const withPvc = nationalStats.pvcWithStatus || 0;
+    const withoutPvc = nationalStats.pvcWithoutStatus || 0;
+    if (withPvc === 0 && withoutPvc === 0) return null;
+
     return {
-      labels: ['Obidient Voters', 'Other Voters'],
+      labels: ['With PVC', 'Without PVC'],
       datasets: [
         {
-          data: [
-            nationalStats.obidientRegisteredVoters,
-            nationalStats.inecRegisteredVoters - nationalStats.obidientRegisteredVoters
-          ],
-          backgroundColor: ['#22c55e', '#e5e7eb'],
-          borderColor: ['#16a34a', '#d1d5db'],
+          data: [withPvc, withoutPvc],
+          backgroundColor: ['#22c55e', '#f97316'],
+          borderColor: ['#16a34a', '#ea580c'],
           borderWidth: 2,
         },
       ],
     };
   };
 
-  // Chart data preparation for state/LGA/ward comparison (bar chart)
+  // Comparison bar chart — obidient voters only
   const getComparisonChartData = () => {
     if (!currentData || currentData.length === 0) return null;
 
-    // Sort by obidient registered voters (descending) and take top 5
     const topItems = [...currentData]
       .sort((a, b) => b.obidientRegisteredVoters - a.obidientRegisteredVoters)
-      .slice(0, 5);
+      .slice(0, 8);
 
     return {
       labels: topItems.map(item => item.name),
@@ -54,48 +54,33 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
           borderColor: '#16a34a',
           borderWidth: 1,
         },
-        {
-          label: 'Total Registered',
-          data: topItems.map(item => item.inecRegisteredVoters),
-          backgroundColor: '#60a5fa',
-          borderColor: '#3b82f6',
-          borderWidth: 1,
-        }
       ],
     };
   };
 
-  // Get appropriate title for the comparison chart based on current view
   const getComparisonChartTitle = () => {
     switch (currentView) {
-      case 'national':
-        return 'Top States Comparison';
-      case 'state':
-        return 'Top LGAs Comparison';
-      case 'lga':
-        return 'Top Wards Comparison';
-      case 'ward':
-        return 'Top Polling Units Comparison';
-      default:
-        return 'Top Items Comparison';
+      case 'national': return 'Top States by Obidient Voters';
+      case 'state': return 'Top LGAs by Obidient Voters';
+      case 'lga': return 'Top Wards by Obidient Voters';
+      case 'ward': return 'Top Polling Units by Obidient Voters';
+      default: return 'Top Items Comparison';
     }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-      {/* Conversion Overview Chart */}
+      {/* PVC Status Chart */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Voter Conversion Overview</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">PVC Status Overview</h3>
         <div className="h-80 flex items-center justify-center">
-          {getConversionChartData() && (
+          {getPvcChartData() ? (
             <Doughnut
-              data={getConversionChartData()!}
+              data={getPvcChartData()!}
               options={{
                 responsive: true,
                 plugins: {
-                  legend: {
-                    position: 'bottom',
-                  },
+                  legend: { position: 'bottom' },
                   tooltip: {
                     callbacks: {
                       label: (context) => {
@@ -109,6 +94,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
                 }
               }}
             />
+          ) : (
+            <p className="text-gray-400">No data available</p>
           )}
         </div>
       </div>
@@ -117,34 +104,30 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">{getComparisonChartTitle()}</h3>
         <div className="h-80">
-          {getComparisonChartData() && (
+          {getComparisonChartData() ? (
             <Bar
               data={getComparisonChartData()!}
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                  legend: {
-                    position: 'top',
-                  },
+                  legend: { position: 'top' },
                   tooltip: {
                     callbacks: {
-                      label: (context) => {
-                        return `${context.dataset.label}: ${formatNumber(context.parsed.y)}`;
-                      }
+                      label: (context) => `${context.dataset.label}: ${formatNumber(context.parsed.y)}`
                     }
                   }
                 },
                 scales: {
                   y: {
                     beginAtZero: true,
-                    ticks: {
-                      callback: (value) => formatNumber(value as number)
-                    }
+                    ticks: { callback: (value) => formatNumber(value as number) }
                   }
                 }
               }}
             />
+          ) : (
+            <p className="text-gray-400 flex items-center justify-center h-full">No data available</p>
           )}
         </div>
       </div>

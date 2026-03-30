@@ -5,24 +5,11 @@
 
 // Core data interfaces
 export interface MobilizationStats {
-  inecRegisteredVoters: number;
   obidientRegisteredVoters: number; // Total Obidient users (PVC + non-PVC)
-  obidientVotersWithPVC?: number; // New field for users with PVC
-  obidientVotersWithoutPVC?: number; // New field for users without PVC
-  unconvertedVoters: number;
-  conversionRate: number;
+  obidientVotersWithPVC?: number;
+  obidientVotersWithoutPVC?: number;
   pvcWithStatus: number;
   pvcWithoutStatus: number;
-  // Additional real data tracking
-  realData?: {
-    totalObidientUsers: number;
-    votersWithPVC: number;
-    votersWithoutPVC: number;
-    votersWithPhone: number;
-    votersWithEmail: number;
-    pvcCompletionRate: number;
-    isRealData: boolean;
-  };
 }
 
 // API response interface for voter data
@@ -74,7 +61,7 @@ export interface BreadcrumbItem {
 // Filter and sort types
 export type PerformanceFilter = 'all' | 'high' | 'medium' | 'low';
 export type MobilizationFilter = 'all' | 'above-average' | 'below-average';
-export type SortField = 'name' | 'inec' | 'obidient' | 'conversion';
+export type SortField = 'name' | 'obidient' | 'pvc';
 export type SortOrder = 'asc' | 'desc';
 
 export interface FilterOptions {

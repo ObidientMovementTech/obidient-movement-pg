@@ -272,9 +272,14 @@ export const adminUserManagementController = {
       const userQuery = `
         SELECT 
           u.*,
-          pi.*,
-          od.*,
-          kyc.*
+          pi."firstName", pi."middleName", pi."lastName", pi."userName", pi."phoneNumber",
+          pi."countryCode", pi.gender, pi.lga, pi.ward, pi."ageRange", pi."stateOfOrigin",
+          pi."votingEngagementState", pi.citizenship, pi."isVoter", pi."willVote",
+          od."profilePictureUrl", od.ethnicity, od.religion, od.occupation,
+          od."levelOfEducation", od."maritalStatus", od."partyAffiliation",
+          od."isVolunteering", od."pastElectionParticipation", od."likelyToVote",
+          od."isRegistered", od."registrationDate",
+          kyc."selfieImageUrl", kyc."idType", kyc."idNumber", kyc."idImageUrl"
         FROM users u
         LEFT JOIN "userPersonalInfo" pi ON u.id = pi."userId"
         LEFT JOIN "userOnboardingData" od ON u.id = od."userId"
@@ -456,13 +461,34 @@ export const adminUserManagementController = {
   async updateUserProfile(req, res) {
     try {
       const { userId } = req.params;
+
+      // Validate userId is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!userId || !uuidRegex.test(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid user ID format'
+        });
+      }
+
       const {
         name,
         email,
         phone,
+        userName,
         countryOfResidence,
         votingState,
         votingLGA,
+        votingWard,
+        votingPU,
+        gender,
+        ageRange,
+        citizenship,
+        isVoter,
+        stateOfOrigin,
+        role,
+        emailVerified,
+        kycStatus,
         personalInfo,
         bankName,
         bankAccountNumber,
@@ -474,66 +500,60 @@ export const adminUserManagementController = {
       try {
         await client.query('BEGIN');
 
-        // Update main user table
-        if (name || email || phone || countryOfResidence || votingState || votingLGA || bankName !== undefined || bankAccountNumber !== undefined || bankAccountName !== undefined) {
-          let updateFields = [];
-          let queryParams = [];
-          let paramIndex = 1;
+        // Build dynamic update for all provided fields
+        let updateFields = [];
+        let queryParams = [];
+        let paramIndex = 1;
 
-          if (name) {
-            updateFields.push(`name = $${paramIndex}`);
-            queryParams.push(name);
+        // Helper to add a field conditionally
+        const addField = (column, value, checkUndefined = false) => {
+          if (checkUndefined ? value !== undefined : value) {
+            updateFields.push(`"${column}" = $${paramIndex}`);
+            queryParams.push(value);
             paramIndex++;
           }
+        };
 
-          if (email) {
-            updateFields.push(`email = $${paramIndex}`);
-            queryParams.push(email);
-            paramIndex++;
-          }
+        addField('name', name);
+        addField('email', email);
+        addField('phone', phone);
+        addField('userName', userName);
+        addField('countryOfResidence', countryOfResidence);
+        addField('votingState', votingState);
+        addField('votingLGA', votingLGA);
+        addField('votingWard', votingWard);
+        addField('votingPU', votingPU, true);
+        addField('gender', gender);
+        addField('ageRange', ageRange);
+        addField('citizenship', citizenship);
+        addField('stateOfOrigin', stateOfOrigin);
+        addField('bankName', bankName, true);
+        addField('bankAccountNumber', bankAccountNumber, true);
+        addField('bankAccountName', bankAccountName, true);
 
-          if (phone) {
-            updateFields.push(`phone = $${paramIndex}`);
-            queryParams.push(phone);
-            paramIndex++;
-          }
+        // Boolean/enum fields — use !== undefined check
+        if (isVoter !== undefined) {
+          updateFields.push(`"isVoter" = $${paramIndex}`);
+          queryParams.push(isVoter ? 'Yes' : 'No');
+          paramIndex++;
+        }
+        if (role !== undefined) {
+          updateFields.push(`role = $${paramIndex}`);
+          queryParams.push(role);
+          paramIndex++;
+        }
+        if (emailVerified !== undefined) {
+          updateFields.push(`"emailVerified" = $${paramIndex}`);
+          queryParams.push(emailVerified);
+          paramIndex++;
+        }
+        if (kycStatus !== undefined) {
+          updateFields.push(`"kycStatus" = $${paramIndex}`);
+          queryParams.push(kycStatus);
+          paramIndex++;
+        }
 
-          if (countryOfResidence) {
-            updateFields.push(`"countryOfResidence" = $${paramIndex}`);
-            queryParams.push(countryOfResidence);
-            paramIndex++;
-          }
-
-          if (votingState) {
-            updateFields.push(`"votingState" = $${paramIndex}`);
-            queryParams.push(votingState);
-            paramIndex++;
-          }
-
-          if (votingLGA) {
-            updateFields.push(`"votingLGA" = $${paramIndex}`);
-            queryParams.push(votingLGA);
-            paramIndex++;
-          }
-
-          if (bankName !== undefined) {
-            updateFields.push(`"bankName" = $${paramIndex}`);
-            queryParams.push(bankName);
-            paramIndex++;
-          }
-
-          if (bankAccountNumber !== undefined) {
-            updateFields.push(`"bankAccountNumber" = $${paramIndex}`);
-            queryParams.push(bankAccountNumber);
-            paramIndex++;
-          }
-
-          if (bankAccountName !== undefined) {
-            updateFields.push(`"bankAccountName" = $${paramIndex}`);
-            queryParams.push(bankAccountName);
-            paramIndex++;
-          }
-
+        if (updateFields.length > 0) {
           updateFields.push(`"updatedAt" = NOW()`);
           queryParams.push(userId);
 
@@ -1449,6 +1469,16 @@ export const adminUserManagementController = {
   async updateUserDesignation(req, res) {
     try {
       const { userId } = req.params;
+
+      // Validate userId is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!userId || !uuidRegex.test(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid user ID format'
+        });
+      }
+
       const { designation, assignedState, assignedLGA, assignedWard } = req.body;
 
       // Validate designation

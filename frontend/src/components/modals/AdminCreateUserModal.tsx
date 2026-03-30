@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, MapPin, Shield, AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import {
+  Drawer, Box, Typography, IconButton, Divider, Button,
+  CircularProgress, TextField, Checkbox, FormControlLabel
+} from '@mui/material';
+import { UserPlus, X as XIcon } from 'lucide-react';
 import FormSelect from '../select/FormSelect';
 import { getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from '../../utils/StateLGAWardPollingUnits';
 import { formatPhoneForStorage } from '../../utils/phoneUtils';
@@ -290,202 +295,178 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <User size={20} className="text-green-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">Create New User</h2>
-              <p className="text-sm text-gray-600">Mass onboarding - Admin user creation</p>
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
-        </div>
+  const FONT = '"Poppins", sans-serif';
+  const PRIMARY = '#006837';
 
-        {/* Form */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Quick Onboarding Mode Toggle */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="quickOnboardingMode"
-                  checked={quickOnboardingMode}
-                  onChange={(e) => handleQuickOnboardingToggle(e.target.checked)}
-                  className="mt-1 h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                />
-                <div className="flex-1">
-                  <label htmlFor="quickOnboardingMode" className="text-sm font-medium text-gray-900 cursor-pointer">
-                    Quick Onboarding Mode (Anambra Bulk Registration)
-                  </label>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Automatically sets: Email (from name), Password (123456), Voting State (Anambra),
-                    Citizenship (Nigerian Citizen), Registered Voter (Yes), Will Vote (Yes).
-                    <span className="font-medium"> All fields remain editable.</span>
-                  </p>
-                  {quickOnboardingMode && (
-                    <div className="mt-2 text-xs text-green-700 font-medium flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      Quick mode active - Enter name to auto-generate email
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+  return (
+    <Drawer
+      anchor="right"
+      open={isOpen}
+      onClose={handleClose}
+      PaperProps={{
+        sx: { width: { xs: '100%', sm: 560 }, fontFamily: FONT }
+      }}
+    >
+      {/* Fixed Header */}
+      <Box sx={{ px: 3, py: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ p: 1, bgcolor: '#dcfce7', borderRadius: 2, display: 'flex' }}>
+            <UserPlus size={22} style={{ color: PRIMARY }} />
+          </Box>
+          <Box>
+            <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '1rem', color: '#111827' }}>
+              Create New User
+            </Typography>
+            <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', color: '#6b7280' }}>
+              Mass onboarding &bull; Admin user creation
+            </Typography>
+          </Box>
+        </Box>
+        <IconButton onClick={handleClose} size="small">
+          <XIcon size={18} />
+        </IconButton>
+      </Box>
+
+      {/* Scrollable Body */}
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 3 }}>
+        <form onSubmit={handleSubmit}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5 }}>
+
+            {/* Quick Onboarding Toggle */}
+            <Box sx={{ p: 2, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 2 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={quickOnboardingMode}
+                    onChange={(e) => handleQuickOnboardingToggle(e.target.checked)}
+                    size="small"
+                    sx={{ color: PRIMARY, '&.Mui-checked': { color: PRIMARY } }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>
+                      Quick Onboarding Mode (Anambra Bulk Registration)
+                    </Typography>
+                    <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: '#6b7280', mt: 0.3 }}>
+                      Auto-sets: Email (from name), Password (123456), Voting State (Anambra), Citizenship, Voter status.
+                    </Typography>
+                  </Box>
+                }
+              />
+              {quickOnboardingMode && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1, color: PRIMARY }}>
+                  <AlertCircle size={12} />
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', fontWeight: 600 }}>
+                    Quick mode active — Enter name to auto-generate email
+                  </Typography>
+                </Box>
+              )}
+            </Box>
 
             {/* Basic Information */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                  <User size={18} />
-                  Basic Information
-                </h3>
-
-                {/* Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="Enter full name"
-                    required
-                  />
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                    Email Address *
-                    {quickOnboardingMode && formData.email.endsWith('@obidients.com') && (
-                      <span className="text-xs text-green-600 font-normal">(Auto-generated)</span>
-                    )}
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${quickOnboardingMode && formData.email.endsWith('@obidients.com')
-                      ? 'border-green-300 bg-green-50'
-                      : 'border-gray-300'
-                      }`}
-                    placeholder="Enter email address"
-                    required
-                  />
-                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    Email will be marked as verified automatically
-                  </p>
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    WhatsApp Phone Number *
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="flex items-center border border-gray-300 rounded-lg bg-gray-50 px-3 py-2">
-                      <ListBoxComp
-                        defaultSelected={formData.countryCode}
-                        onChange={(country: any) => setFormData(prev => ({ ...prev, countryCode: country.code }))}
-                      />
-                    </div>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => {
-                        const cleanValue = e.target.value.replace(/[^\d\-+]/g, '');
-                        setFormData(prev => ({ ...prev, phone: cleanValue }));
-                      }}
-                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      placeholder="Phone Number"
-                      required
+            <Box>
+              <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: '#111827', mb: 2 }}>
+                Basic Information
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <TextField
+                  label="Full Name *"
+                  value={formData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  size="small"
+                  fullWidth
+                  required
+                  sx={{ gridColumn: '1 / -1', '& .MuiInputBase-root': { fontFamily: FONT }, '& .MuiInputLabel-root': { fontFamily: FONT } }}
+                />
+                <TextField
+                  label={quickOnboardingMode && formData.email.endsWith('@obidients.com') ? 'Email * (Auto-generated)' : 'Email *'}
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  size="small"
+                  fullWidth
+                  required
+                  sx={{
+                    gridColumn: '1 / -1',
+                    '& .MuiInputBase-root': { fontFamily: FONT, ...(quickOnboardingMode && formData.email.endsWith('@obidients.com') ? { bgcolor: '#f0fdf4' } : {}) },
+                    '& .MuiInputLabel-root': { fontFamily: FONT }
+                  }}
+                />
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: 1, px: 1.5, bgcolor: '#f9fafb' }}>
+                    <ListBoxComp
+                      defaultSelected={formData.countryCode}
+                      onChange={(country: any) => setFormData(prev => ({ ...prev, countryCode: country.code }))}
                     />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                    Password *
-                    {quickOnboardingMode && formData.password === '123456' && (
-                      <span className="text-xs text-green-600 font-normal">(Default: 123456)</span>
-                    )}
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={formData.password}
-                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                      className={`flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${quickOnboardingMode && formData.password === '123456'
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-gray-300'
-                        }`}
-                      placeholder="Enter password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={generateStrongPassword}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-                    >
-                      Generate
-                    </button>
-                  </div>
-                  <div className="flex items-center mt-2">
-                    <input
-                      type="checkbox"
-                      id="showPassword"
+                  </Box>
+                  <TextField
+                    label="Phone *"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      const cleanValue = e.target.value.replace(/[^\d\-+]/g, '');
+                      setFormData(prev => ({ ...prev, phone: cleanValue }));
+                    }}
+                    size="small"
+                    fullWidth
+                    required
+                    sx={{ '& .MuiInputBase-root': { fontFamily: FONT }, '& .MuiInputLabel-root': { fontFamily: FONT } }}
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    label="Password *"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    size="small"
+                    fullWidth
+                    required
+                    sx={{
+                      '& .MuiInputBase-root': { fontFamily: FONT, ...(quickOnboardingMode && formData.password === '123456' ? { bgcolor: '#f0fdf4' } : {}) },
+                      '& .MuiInputLabel-root': { fontFamily: FONT }
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={generateStrongPassword}
+                    sx={{ fontFamily: FONT, textTransform: 'none', whiteSpace: 'nowrap', fontSize: '0.75rem', borderColor: '#d1d5db', color: '#374151', minWidth: 'auto', px: 1.5 }}
+                  >
+                    Generate
+                  </Button>
+                </Box>
+                <FormControlLabel
+                  control={
+                    <Checkbox
                       checked={showPassword}
                       onChange={(e) => setShowPassword(e.target.checked)}
-                      className="mr-2"
+                      size="small"
                     />
-                    <label htmlFor="showPassword" className="text-sm text-gray-600">
-                      Show password
-                    </label>
-                  </div>
-                </div>
-              </div>
+                  }
+                  label={<Typography sx={{ fontFamily: FONT, fontSize: '0.8rem' }}>Show password</Typography>}
+                  sx={{ gridColumn: '1 / -1' }}
+                />
+              </Box>
+            </Box>
 
-              {/* Profile Information */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                  <Shield size={18} />
-                  Profile Information
-                </h3>
+            <Divider />
 
-                {/* Username */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Username (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.userName || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, userName: e.target.value }))}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="Enter username"
-                  />
-                </div>
-
-
-
-                {/* Gender */}
-                <div>
+            {/* Profile Information */}
+            <Box>
+              <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: '#111827', mb: 2 }}>
+                Profile Information
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <TextField
+                  label="Username"
+                  value={formData.userName || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, userName: e.target.value }))}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiInputBase-root': { fontFamily: FONT }, '& .MuiInputLabel-root': { fontFamily: FONT } }}
+                />
+                <Box>
                   <FormSelect
                     label="Gender"
                     options={genderOptions}
@@ -493,10 +474,8 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                     onChange={(opt) => setFormData(prev => ({ ...prev, gender: opt?.value || '' }))}
                     placeholder="Select gender"
                   />
-                </div>
-
-                {/* Age Range */}
-                <div>
+                </Box>
+                <Box>
                   <FormSelect
                     label="Age Range"
                     options={ageRangeOptions}
@@ -504,36 +483,28 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                     onChange={(opt) => setFormData(prev => ({ ...prev, ageRange: opt?.value || '' }))}
                     placeholder="Select age range"
                   />
-                </div>
-
-                {/* Citizenship */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="text-sm font-medium text-gray-700">Citizenship</label>
-                    {quickOnboardingMode && formData.citizenship === 'Nigerian Citizen' && (
-                      <span className="text-xs text-green-600 font-normal">(Default)</span>
-                    )}
-                  </div>
+                </Box>
+                <Box>
                   <FormSelect
-                    label=""
+                    label="Citizenship"
                     options={citizenshipOptions}
                     defaultSelected={formData.citizenship}
                     onChange={(opt) => setFormData(prev => ({ ...prev, citizenship: opt?.value || '' }))}
                     placeholder="Select citizenship"
                   />
-                </div>
-              </div>
-            </div>
+                </Box>
+              </Box>
+            </Box>
+
+            <Divider />
 
             {/* Voting Location */}
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin size={18} />
+            <Box>
+              <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: '#1e40af', mb: 2 }}>
                 Voting Location
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* State of Origin */}
-                <div>
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <Box>
                   <FormSelect
                     label="State of Origin"
                     options={states}
@@ -541,48 +512,27 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                     onChange={(opt) => setFormData(prev => ({ ...prev, stateOfOrigin: opt?.value || '' }))}
                     placeholder="Select state of origin"
                   />
-                </div>
-
-                {/* Voting State */}
-                <div>
+                </Box>
+                <Box>
                   <FormSelect
                     label="Voting State"
                     options={states}
                     defaultSelected={formData.votingState}
-                    onChange={(opt) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        votingState: opt?.value || '',
-                        votingLGA: '',
-                        votingWard: '',
-                        votingPU: ''
-                      }));
-                    }}
+                    onChange={(opt) => setFormData(prev => ({ ...prev, votingState: opt?.value || '', votingLGA: '', votingWard: '', votingPU: '' }))}
                     placeholder="Select voting state"
                   />
-                </div>
-
-                {/* Voting LGA */}
-                <div>
+                </Box>
+                <Box>
                   <FormSelect
                     label="Voting LGA"
                     options={getLgas(formData.votingState || '')}
                     defaultSelected={formData.votingLGA}
-                    onChange={(opt) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        votingLGA: opt?.value || '',
-                        votingWard: '',
-                        votingPU: ''
-                      }));
-                    }}
+                    onChange={(opt) => setFormData(prev => ({ ...prev, votingLGA: opt?.value || '', votingWard: '', votingPU: '' }))}
                     disabled={!formData.votingState}
                     placeholder="Select voting LGA"
                   />
-                </div>
-
-                {/* Voting Ward */}
-                <div>
+                </Box>
+                <Box>
                   <FormSelect
                     label="Voting Ward"
                     options={getWards(formData.votingState || '', formData.votingLGA || '')}
@@ -591,173 +541,137 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                     disabled={!formData.votingLGA}
                     placeholder="Select voting ward"
                   />
-                </div>
-
-                {/* Voting Polling Unit */}
-                <div>
+                </Box>
+                <Box>
                   <FormSelect
-                    label="Voting Polling Unit"
+                    label="Polling Unit"
                     options={getPollingUnits(formData.votingState || '', formData.votingLGA || '', formData.votingWard || '')}
                     defaultSelected={formData.votingPU}
                     onChange={(opt) => setFormData(prev => ({ ...prev, votingPU: opt?.value || '' }))}
                     disabled={!formData.votingWard}
                     placeholder="Select polling unit"
                   />
-                </div>
-
-                {/* Voter Registration Status */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="text-sm font-medium text-gray-700">Registered Voter?</label>
-                    {quickOnboardingMode && formData.isVoter === 'Yes' && (
-                      <span className="text-xs text-green-600 font-normal">(Default)</span>
-                    )}
-                  </div>
+                </Box>
+                <Box>
                   <FormSelect
-                    label=""
+                    label="Registered Voter?"
                     options={yesNoOptions}
                     defaultSelected={formData.isVoter}
                     onChange={(opt) => setFormData(prev => ({ ...prev, isVoter: opt?.value || '' }))}
                     placeholder="Select voter status"
                   />
-                </div>
-
-                {/* Will Vote */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="text-sm font-medium text-gray-700">Will vote in next election?</label>
-                    {quickOnboardingMode && formData.willVote === 'Yes' && (
-                      <span className="text-xs text-green-600 font-normal">(Default)</span>
-                    )}
-                  </div>
+                </Box>
+                <Box sx={{ gridColumn: '1 / -1' }}>
                   <FormSelect
-                    label=""
+                    label="Will vote in next election?"
                     options={yesNoOptions}
                     defaultSelected={formData.willVote}
                     onChange={(opt) => setFormData(prev => ({ ...prev, willVote: opt?.value || '' }))}
                     placeholder="Select voting intention"
                   />
-                </div>
-              </div>
-            </div>
+                </Box>
+              </Box>
+            </Box>
+
+            <Divider />
 
             {/* Bank Account Details */}
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Shield size={18} />
+            <Box>
+              <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: '#7c3aed', mb: 0.5 }}>
                 Bank Account Details (Optional)
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
+              </Typography>
+              <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: '#6b7280', mb: 2 }}>
                 Bank details for future payments and reimbursements
-              </p>
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* Bank Name */}
-                <div>
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <Box>
                   <FormSelect
                     label="Bank Name"
-                    options={NIGERIAN_BANKS.map((bank, index) => ({
-                      id: index,
-                      label: bank,
-                      value: bank
-                    }))}
+                    options={NIGERIAN_BANKS.map((bank, index) => ({ id: index, label: bank, value: bank }))}
                     defaultSelected={formData.bankName}
                     onChange={(opt) => setFormData(prev => ({ ...prev, bankName: opt?.value || '' }))}
                     placeholder="Select bank"
                   />
-                </div>
+                </Box>
+                <TextField
+                  label="Account Number"
+                  value={formData.bankAccountNumber || ''}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    if (value.length <= 10) setFormData(prev => ({ ...prev, bankAccountNumber: value }));
+                  }}
+                  size="small"
+                  fullWidth
+                  inputProps={{ maxLength: 10 }}
+                  helperText={formData.bankAccountNumber && formData.bankAccountNumber.length !== 10 ? 'Must be 10 digits' : ''}
+                  sx={{ '& .MuiInputBase-root': { fontFamily: FONT }, '& .MuiInputLabel-root': { fontFamily: FONT } }}
+                />
+                <TextField
+                  label="Account Name"
+                  value={formData.bankAccountName || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bankAccountName: e.target.value }))}
+                  size="small"
+                  fullWidth
+                  sx={{ gridColumn: '1 / -1', '& .MuiInputBase-root': { fontFamily: FONT }, '& .MuiInputLabel-root': { fontFamily: FONT } }}
+                />
+              </Box>
+            </Box>
 
-                {/* Bank Account Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Account Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.bankAccountNumber || ''}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, ''); // Only allow numbers
-                      if (value.length <= 10) {
-                        setFormData(prev => ({ ...prev, bankAccountNumber: value }));
-                      }
-                    }}
-                    placeholder="10-digit account number"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    maxLength={10}
-                  />
-                  {formData.bankAccountNumber && formData.bankAccountNumber.length !== 10 && (
-                    <p className="text-xs text-amber-600 mt-1">Account number must be 10 digits</p>
-                  )}
-                </div>
-
-                {/* Bank Account Name */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Account Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.bankAccountName || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, bankAccountName: e.target.value }))}
-                    placeholder="Enter account holder name"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-              </div>
-            </div>
+            <Divider />
 
             {/* Admin Options */}
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Admin Options</h3>
-              <div className="space-y-3">
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={formData.emailVerified}
-                    onChange={(e) => setFormData(prev => ({ ...prev, emailVerified: e.target.checked }))}
-                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                  />
-                  <span className="text-sm text-gray-700">Mark email as verified</span>
-                </label>
+            <Box>
+              <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: '#111827', mb: 1.5 }}>
+                Admin Options
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.emailVerified}
+                      onChange={(e) => setFormData(prev => ({ ...prev, emailVerified: e.target.checked }))}
+                      size="small"
+                      sx={{ color: PRIMARY, '&.Mui-checked': { color: PRIMARY } }}
+                    />
+                  }
+                  label={<Typography sx={{ fontFamily: FONT, fontSize: '0.82rem' }}>Mark email as verified</Typography>}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.autoGenerateVotingBloc}
+                      onChange={(e) => setFormData(prev => ({ ...prev, autoGenerateVotingBloc: e.target.checked }))}
+                      size="small"
+                      sx={{ color: PRIMARY, '&.Mui-checked': { color: PRIMARY } }}
+                    />
+                  }
+                  label={<Typography sx={{ fontFamily: FONT, fontSize: '0.82rem' }}>Auto-generate voting bloc for user</Typography>}
+                />
+              </Box>
+            </Box>
+          </Box>
 
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={formData.autoGenerateVotingBloc}
-                    onChange={(e) => setFormData(prev => ({ ...prev, autoGenerateVotingBloc: e.target.checked }))}
-                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                  />
-                  <span className="text-sm text-gray-700">Auto-generate voting bloc for user</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-6 border-t">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create User'
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+          {/* Fixed Footer (inside form for submit) */}
+          <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button
+              variant="outlined"
+              onClick={handleClose}
+              sx={{ fontFamily: FONT, textTransform: 'none', borderColor: '#d1d5db', color: '#374151', '&:hover': { borderColor: '#9ca3af', bgcolor: '#f9fafb' } }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
+              sx={{ fontFamily: FONT, textTransform: 'none', bgcolor: PRIMARY, '&:hover': { bgcolor: '#005530' } }}
+            >
+              {loading ? 'Creating...' : 'Create User'}
+            </Button>
+          </Box>
+        </form>
+      </Box>
 
       {/* Toast */}
       {toast && (
@@ -767,7 +681,7 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
           onClose={() => setToast(null)}
         />
       )}
-    </div>
+    </Drawer>
   );
 };
 

@@ -31,7 +31,7 @@ import UserProfileCard from "../../components/UserProfileCard";
 
 import { getOwnedVotingBlocs } from "../../services/votingBlocService";
 import DashboardHeader from "./components/DashboardHeader";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 
 const DashboardOverview = lazy(() => import("./overview/DashboardOverview"));
 const LeaderboardPage = lazy(() => import("./votingBloc/LeaderboardPage"));
@@ -355,6 +355,18 @@ export default function DashboardPage() {
             </div>
           ))}
         </nav>
+        {/* Admin Panel link — only visible to admin/coordinator users */}
+        {(profile?.role === 'admin' || isCoordinator) && (
+          <div className="mt-4 px-1">
+            <Link
+              to="/pbx/dashboard"
+              className="flex items-center gap-3 px-3 py-2 text-sm text-gray-500 hover:text-[#006837] hover:bg-[#8cc63f]/10 rounded-lg transition-colors duration-200"
+            >
+              <ShieldCheck size={18} />
+              Admin Panel
+            </Link>
+          </div>
+        )}
       </aside>
 
       {/* Main Content */}

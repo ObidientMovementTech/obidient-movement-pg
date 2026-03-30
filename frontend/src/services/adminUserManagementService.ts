@@ -231,5 +231,28 @@ export const adminUserManagementService = {
       responseType: 'text' // Important for CSV data
     });
     return response;
+  },
+
+  // KYC Management
+  async getKYCSubmissions(params: Record<string, any> = {}) {
+    const response = await axios.get(`${API_BASE}/kyc/all`, {
+      params: { limit: 20, ...params },
+      withCredentials: true
+    });
+    return response.data;
+  },
+
+  async approveKYC(userId: string) {
+    const response = await axios.patch(`${API_BASE}/kyc/${userId}/approve`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  },
+
+  async rejectKYC(userId: string, reason: string) {
+    const response = await axios.patch(`${API_BASE}/kyc/${userId}/reject`, { reason }, {
+      withCredentials: true
+    });
+    return response.data;
   }
 };

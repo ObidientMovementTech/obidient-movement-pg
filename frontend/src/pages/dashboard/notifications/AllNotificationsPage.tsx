@@ -1,13 +1,24 @@
 import { useState, useEffect } from "react";
-import { Bell, Check, CheckCheck, Trash2, ArrowLeft, Clock, Filter, X, ChevronRight, Megaphone } from "lucide-react";
+import { useNavigate } from "react-router";
+import {
+  Bell, Check, CheckCheck, Trash2, ArrowLeft, Clock, Filter, X, ChevronRight, Megaphone,
+} from "lucide-react";
+import {
+  Box, Typography, IconButton, Button, Chip, CircularProgress, Dialog, Checkbox,
+} from "@mui/material";
 import {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
-  deleteSelectedNotifications
+  deleteSelectedNotifications,
 } from "../../../services/notificationService";
 import NotificationDetailModal from "../../../components/modals/NotificationDetailModal";
+
+const FONT = '"Poppins", sans-serif';
+const PRIMARY = "#006837";
+const PRIMARY_LIGHT = "rgba(0,104,55,0.06)";
+const ACCENT = "#8cc63f";
 
 interface Notification {
   _id: string;
@@ -23,6 +34,7 @@ interface AllNotificationsPageProps {
 }
 
 export default function AllNotificationsPage({ setActivePage }: AllNotificationsPageProps) {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all"); // all, unread, read
@@ -229,282 +241,504 @@ export default function AllNotificationsPage({ setActivePage }: AllNotifications
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="container mx-auto max-w-4xl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActivePage && setActivePage("Overview")}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+    <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+      {/* ─── Header ─── */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { md: 'center' },
+          justifyContent: 'space-between',
+          mb: 4,
+          gap: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <IconButton
+            onClick={() => (setActivePage ? setActivePage('Overview') : navigate('/dashboard'))}
+            size="small"
+            sx={{ color: '#6f7a70' }}
           >
-            <ArrowLeft size={20} className="text-gray-600" />
-          </button>
-          <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
-            <Bell className="text-[#006837]" /> Notifications
+            <ArrowLeft size={20} />
+          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Bell size={22} color={PRIMARY} />
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontWeight: 800,
+                fontSize: '1.5rem',
+                color: '#1a1c1c',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Notifications
+            </Typography>
             {unreadCount > 0 && (
-              <span className="bg-[#8cc63f] text-white text-xs px-2 py-1 rounded-full">
-                {unreadCount} new
-              </span>
+              <Chip
+                label={`${unreadCount} new`}
+                size="small"
+                sx={{
+                  fontFamily: FONT,
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  height: 22,
+                  bgcolor: ACCENT,
+                  color: '#fff',
+                  borderRadius: 3,
+                }}
+              />
             )}
-          </h1>
-        </div>
+          </Box>
+        </Box>
 
-        <div className="flex items-center gap-2">
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
           {isDeleting ? (
             <>
-              <button
+              <Button
+                size="small"
                 onClick={confirmDeleteSelected}
                 disabled={isDeletingSelected || selectedNotifications.length === 0}
-                className={`flex items-center gap-1 px-3 py-1.5 text-sm 
-                  ${selectedNotifications.length === 0
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-red-50 text-red-600 hover:bg-red-100'} 
-                  border border-red-100 rounded-md transition-colors`}
+                startIcon={<Trash2 size={14} />}
+                sx={{
+                  fontFamily: FONT,
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  color: selectedNotifications.length === 0 ? '#bec9be' : '#ba1a1a',
+                  bgcolor: selectedNotifications.length === 0 ? '#f3f3f4' : '#ffdad6',
+                  '&:hover': { bgcolor: '#ffc9c6' },
+                }}
               >
-                <Trash2 size={16} />
-                <span>{isDeletingSelected ? 'Deleting...' : `Delete (${selectedNotifications.length})`}</span>
-              </button>
-              <button
+                {isDeletingSelected ? 'Deleting...' : `Delete (${selectedNotifications.length})`}
+              </Button>
+              <Button
+                size="small"
                 onClick={toggleDeleteMode}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 transition-colors"
+                startIcon={<X size={14} />}
+                sx={{
+                  fontFamily: FONT,
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  color: '#6f7a70',
+                  bgcolor: '#f3f3f4',
+                  '&:hover': { bgcolor: '#e8e8e8' },
+                }}
               >
-                <X size={16} />
-                <span>Cancel</span>
-              </button>
+                Cancel
+              </Button>
             </>
           ) : (
             <>
               {unreadCount > 0 && (
-                <button
+                <Button
+                  size="small"
                   onClick={handleMarkAllAsRead}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[#f8fcf9] text-[#006837] border border-[#006837]/20 rounded-md hover:bg-[#8cc63f]/10 transition-colors"
+                  startIcon={<CheckCheck size={14} />}
+                  sx={{
+                    fontFamily: FONT,
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2,
+                    color: PRIMARY,
+                    bgcolor: PRIMARY_LIGHT,
+                    border: `1px solid rgba(0,104,55,0.15)`,
+                    '&:hover': { bgcolor: 'rgba(0,104,55,0.1)' },
+                  }}
                 >
-                  <CheckCheck size={16} />
-                  <span>Mark all as read</span>
-                </button>
+                  Mark all read
+                </Button>
               )}
-
               {notifications.length > 0 && (
-                <button
+                <Button
+                  size="small"
                   onClick={toggleDeleteMode}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                  startIcon={<Trash2 size={14} />}
+                  sx={{
+                    fontFamily: FONT,
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2,
+                    color: '#6f7a70',
+                    bgcolor: '#f3f3f4',
+                    '&:hover': { bgcolor: '#e8e8e8' },
+                  }}
                 >
-                  <Trash2 size={16} />
-                  <span>Delete</span>
-                </button>
+                  Delete
+                </Button>
               )}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 2,
+                  bgcolor: '#f3f3f4',
+                }}
+              >
+                <Filter size={14} color="#6f7a70" />
+                <Box
+                  component="select"
+                  value={filter}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilter(e.target.value)}
+                  sx={{
+                    fontFamily: FONT,
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    color: '#6f7a70',
+                    bgcolor: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    pr: 1,
+                  }}
+                >
+                  <option value="all">All</option>
+                  <option value="unread">Unread</option>
+                  <option value="read">Read</option>
+                </Box>
+              </Box>
             </>
           )}
+        </Box>
+      </Box>
 
-          <div className="relative inline-block">
-            <button
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-            >
-              <Filter size={16} />
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="bg-transparent appearance-none focus:outline-none pr-6"
-              >
-                <option value="all">All</option>
-                <option value="unread">Unread</option>
-                <option value="read">Read</option>
-              </select>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications List */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* ─── Notifications List ─── */}
+      <Box
+        sx={{
+          bgcolor: '#fff',
+          borderRadius: 3,
+          overflow: 'hidden',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        }}
+      >
         {isLoading ? (
-          <div className="p-12 text-center">
-            <div className="flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-[#006837] border-t-transparent rounded-full animate-spin"></div>
-            </div>
-            <p className="mt-2 text-gray-600 text-sm">Loading notifications...</p>
-          </div>
+          <Box sx={{ py: 8, textAlign: 'center' }}>
+            <CircularProgress size={28} sx={{ color: PRIMARY }} />
+            <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: '#6f7a70', mt: 2 }}>
+              Loading notifications...
+            </Typography>
+          </Box>
         ) : filteredNotifications.length === 0 ? (
-          <div className="py-16 px-4 text-center">
-            <div className="w-16 h-16 bg-[#f8fcf9] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#8cc63f]/20">
-              <Bell size={28} className="text-[#8cc63f]" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No notifications</h3>
-            <p className="text-gray-500 max-w-sm mx-auto">
-              {filter === "unread"
+          <Box sx={{ py: 8, px: 4, textAlign: 'center' }}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                bgcolor: PRIMARY_LIGHT,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2.5,
+              }}
+            >
+              <Bell size={28} color={ACCENT} />
+            </Box>
+            <Typography
+              sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '1.1rem', color: '#1a1c1c', mb: 1 }}
+            >
+              No notifications
+            </Typography>
+            <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: '#6f7a70', maxWidth: 340, mx: 'auto' }}>
+              {filter === 'unread'
                 ? "You've read all your notifications. Good job staying up to date!"
-                : filter === "read"
-                  ? "You don't have any read notifications yet."
-                  : "You don't have any notifications yet. We'll notify you when there's something new."}
-            </p>
-          </div>
+                : filter === 'read'
+                ? "You don't have any read notifications yet."
+                : "You don't have any notifications yet. We'll notify you when there's something new."}
+            </Typography>
+          </Box>
         ) : (
           <>
-            <div className="border-b border-gray-100">
-              <div className="flex justify-between items-center px-4 py-3 bg-gray-50">
-                <p className="text-gray-500 text-sm">
-                  Showing {filteredNotifications.length} {filter !== "all" ? `${filter} ` : ""}notifications
-                </p>
-                {isDeleting && (
-                  <div className="flex items-center gap-1 text-red-600 text-sm">
-                    <Trash2 size={14} />
-                    <span>Select notifications to delete</span>
-                  </div>
+            {/* Count bar */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                px: 3,
+                py: 1.5,
+                bgcolor: '#f9f9f9',
+                borderBottom: '1px solid rgba(0,0,0,0.04)',
+              }}
+            >
+              <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#6f7a70' }}>
+                Showing {filteredNotifications.length} {filter !== 'all' ? `${filter} ` : ''}notifications
+              </Typography>
+              {isDeleting && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#ba1a1a' }}>
+                  <Trash2 size={13} />
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', fontWeight: 600 }}>
+                    Select to delete
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Items */}
+            {filteredNotifications.map((notification, idx) => (
+              <Box
+                key={notification._id}
+                sx={{
+                  position: 'relative',
+                  px: 3,
+                  py: 2,
+                  display: 'flex',
+                  gap: 2,
+                  alignItems: 'flex-start',
+                  bgcolor: selectedNotifications.includes(notification._id)
+                    ? '#eef2ff'
+                    : !notification.read
+                    ? PRIMARY_LIGHT
+                    : '#fff',
+                  borderBottom: idx < filteredNotifications.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                  transition: 'background 0.15s',
+                  '&:hover': { bgcolor: !notification.read ? 'rgba(0,104,55,0.08)' : '#f9f9f9' },
+                  ...(
+                    !notification.read
+                      ? { borderLeft: `3px solid ${ACCENT}` }
+                      : { borderLeft: '3px solid transparent' }
+                  ),
+                }}
+              >
+                {/* Left: checkbox or icon */}
+                {isDeleting ? (
+                  <Checkbox
+                    checked={selectedNotifications.includes(notification._id)}
+                    onChange={() => toggleSelectNotification(notification._id)}
+                    size="small"
+                    sx={{
+                      color: '#bec9be',
+                      '&.Mui-checked': { color: PRIMARY },
+                      mt: 0.25,
+                    }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 2.5,
+                      bgcolor: notification.type === 'adminBroadcast' ? '#fff7ed' : '#f3f3f4',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      mt: 0.25,
+                    }}
+                  >
+                    {getTypeIcon(notification.type)}
+                  </Box>
                 )}
-              </div>
-            </div>
-            <ul className="divide-y divide-gray-100">
-              {filteredNotifications.map((notification) => (
-                <li
-                  key={notification._id}
-                  className={`relative ${!notification.read ? 'bg-[#f8fcf9]' : ''} 
-                    ${selectedNotifications.includes(notification._id) ? 'bg-blue-50' : ''}
-                    hover:bg-gray-50 transition-all duration-200`}
-                >
-                  {!notification.read && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#8cc63f]"></div>}
-                  <div className="px-4 sm:px-6 py-4">
-                    <div className="flex items-start gap-3 sm:gap-4">
-                      {isDeleting ? (
-                        <div className="flex-shrink-0 mt-1">
-                          <div className="h-10 flex items-center justify-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedNotifications.includes(notification._id)}
-                              onChange={() => toggleSelectNotification(notification._id)}
-                              className="h-5 w-5 rounded border-gray-300 text-[#006837] focus:ring-[#006837]"
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex-shrink-0 mt-1">
-                          <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                            {getTypeIcon(notification.type)}
-                          </div>
-                        </div>
-                      )}
 
-                      <div className="flex-grow min-w-0">
-                        {/* Clickable content area */}
-                        <div
-                          onClick={() => !isDeleting && handleOpenNotification(notification)}
-                          className={`${!isDeleting ? 'cursor-pointer' : ''}`}
+                {/* Content */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box
+                    onClick={() => !isDeleting && handleOpenNotification(notification)}
+                    sx={{ cursor: !isDeleting ? 'pointer' : 'default' }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        alignItems: { sm: 'center' },
+                        justifyContent: 'space-between',
+                        gap: 0.5,
+                        mb: 0.5,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                        <Typography
+                          noWrap
+                          sx={{
+                            fontFamily: FONT,
+                            fontWeight: !notification.read ? 700 : 500,
+                            fontSize: '0.88rem',
+                            color: '#1a1c1c',
+                          }}
                         >
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-1 gap-1">
-                            <h3 className={`font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'} pr-2 truncate`}>
-                              {notification.title}
-                              {!notification.read && (
-                                <span className="ml-2 inline-block w-2 h-2 bg-[#8cc63f] rounded-full"></span>
-                              )}
-                              {notification.type === 'adminBroadcast' && (
-                                <span className="ml-2 inline-block text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
-                                  General Broadcast
-                                </span>
-                              )}
-                            </h3>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-xs text-gray-400 whitespace-nowrap bg-gray-50 px-2 py-1 rounded-full flex items-center gap-1">
-                                <Clock size={12} />
-                                {formatTimeAgo(new Date(notification.createdAt))}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2 line-clamp-2 sm:line-clamp-1">
-                            {notification.message}
-                          </p>
-                          {!isDeleting && (
-                            <div className="flex items-center text-[#006837] text-xs font-medium mb-2">
-                              <span>View full message</span>
-                              <ChevronRight size={14} />
-                            </div>
-                          )}
-                        </div>
+                          {notification.title}
+                        </Typography>
+                        {!notification.read && (
+                          <Box
+                            sx={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: '50%',
+                              bgcolor: ACCENT,
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        {notification.type === 'adminBroadcast' && (
+                          <Chip
+                            label="Broadcast"
+                            size="small"
+                            sx={{
+                              fontFamily: FONT,
+                              fontSize: '0.58rem',
+                              fontWeight: 700,
+                              height: 18,
+                              borderRadius: 1.5,
+                              bgcolor: '#fff7ed',
+                              color: '#c2410c',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                      </Box>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Clock size={11} color="#bec9be" />
+                        <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: '#bec9be' }}>
+                          {formatTimeAgo(new Date(notification.createdAt))}
+                        </Typography>
+                      </Box>
+                    </Box>
 
-                        <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-                          <span className="text-xs text-gray-400 hidden sm:inline">
-                            {formatDate(notification.createdAt)}
-                          </span>
-                          <div className="flex flex-wrap gap-2 ml-auto">
-                            {!notification.read && !isDeleting && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMarkAsRead(notification._id);
-                                }}
-                                className="flex items-center gap-1 px-2 py-1 text-xs text-[#006837] hover:bg-[#8cc63f]/10 rounded transition-colors"
-                              >
-                                <Check size={14} />
-                                <span>Mark as read</span>
-                              </button>
-                            )}
-                            {isDeleting ? (
-                              <button
-                                onClick={() => toggleSelectNotification(notification._id)}
-                                className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${selectedNotifications.includes(notification._id) ? 'bg-red-100 text-red-600' : 'text-[#006837] hover:bg-[#8cc63f]/10'}`}
-                              >
-                                {selectedNotifications.includes(notification._id) ? (
-                                  <X size={14} />
-                                ) : (
-                                  <Trash2 size={14} />
-                                )}
-                                <span>{selectedNotifications.includes(notification._id) ? 'Selected' : 'Delete'}</span>
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  confirmDeleteNotification(notification._id);
-                                }}
-                                className="flex items-center gap-1 px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded transition-colors"
-                              >
-                                <Trash2 size={14} />
-                                <span>Delete</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    <Typography
+                      noWrap
+                      sx={{
+                        fontFamily: FONT,
+                        fontSize: '0.82rem',
+                        color: '#6f7a70',
+                        mb: 0.75,
+                      }}
+                    >
+                      {notification.message}
+                    </Typography>
+
+                    {!isDeleting && (
+                      <Box
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.25,
+                          color: PRIMARY,
+                          mb: 0.5,
+                        }}
+                      >
+                        <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', fontWeight: 600 }}>
+                          View full message
+                        </Typography>
+                        <ChevronRight size={14} />
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Actions row */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, mt: 0.5 }}>
+                    {!notification.read && !isDeleting && (
+                      <Typography
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkAsRead(notification._id);
+                        }}
+                        sx={{
+                          fontFamily: FONT,
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          color: PRIMARY,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          '&:hover': { bgcolor: PRIMARY_LIGHT },
+                        }}
+                      >
+                        <Check size={13} /> Mark as read
+                      </Typography>
+                    )}
+                    {!isDeleting && (
+                      <Typography
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmDeleteNotification(notification._id);
+                        }}
+                        sx={{
+                          fontFamily: FONT,
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          color: '#ba1a1a',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          '&:hover': { bgcolor: '#ffdad6' },
+                        }}
+                      >
+                        <Trash2 size={13} /> Delete
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            ))}
           </>
         )}
-      </div>
+      </Box>
 
-      {/* Delete Selected Notifications Button */}
+      {/* ─── Bottom bar for bulk delete ─── */}
       {isDeleting && selectedNotifications.length > 0 && (
-        <div className="mt-4">
-          <button
+        <Box sx={{ mt: 2 }}>
+          <Button
+            fullWidth
             onClick={confirmDeleteSelected}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm bg-red-100 text-red-600 border border-red-300 rounded-md hover:bg-red-200 transition-colors"
+            startIcon={isDeletingSelected ? <CircularProgress size={14} color="inherit" /> : <Trash2 size={14} />}
+            sx={{
+              fontFamily: FONT,
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 2.5,
+              py: 1.25,
+              color: '#ba1a1a',
+              bgcolor: '#ffdad6',
+              '&:hover': { bgcolor: '#ffc9c6' },
+            }}
           >
-            {isDeletingSelected ? (
-              <>
-                <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                <span>Deleting...</span>
-              </>
-            ) : (
-              <>
-                <Trash2 size={16} />
-                <span>Delete selected notifications</span>
-              </>
-            )}
-          </button>
-        </div>
+            {isDeletingSelected ? 'Deleting...' : 'Delete selected notifications'}
+          </Button>
+        </Box>
       )}
 
-      {/* Notification Settings Link */}
-      <div className="mt-6 text-center">
-        <button
-          onClick={() => setActivePage && setActivePage("Account Settings")}
-          className="text-[#006837] hover:underline text-sm"
+      {/* ─── Preferences link ─── */}
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography
+          onClick={() => (setActivePage ? setActivePage('Account Settings') : navigate('/dashboard/profile'))}
+          sx={{
+            fontFamily: FONT,
+            fontSize: '0.82rem',
+            color: PRIMARY,
+            cursor: 'pointer',
+            '&:hover': { textDecoration: 'underline' },
+          }}
         >
           Manage notification preferences
-        </button>
-      </div>
+        </Typography>
+      </Box>
 
-      {/* Notification Detail Modal */}
+      {/* ─── Notification Detail Modal (uses MUI Dialog portal) ─── */}
       {selectedNotification && (
         <NotificationDetailModal
           notification={selectedNotification}
@@ -514,75 +748,102 @@ export default function AllNotificationsPage({ setActivePage }: AllNotifications
         />
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && pendingDeleteId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Notification</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this notification?
-              {pendingDeleteId && (
-                <span className="block mt-2 p-3 bg-gray-50 text-sm rounded border border-gray-100">
-                  <strong className="block text-gray-800 mb-1">
-                    {notifications.find(n => n._id === pendingDeleteId)?.title}
-                  </strong>
-                  <span className="text-gray-600 line-clamp-2">
-                    {notifications.find(n => n._id === pendingDeleteId)?.message}
-                  </span>
-                </span>
-              )}
-            </p>
+      {/* ─── Delete Confirmation ─── */}
+      <Dialog
+        open={showDeleteConfirm && !!pendingDeleteId}
+        onClose={() => { setShowDeleteConfirm(false); setPendingDeleteId(null); }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, boxShadow: '0 24px 64px rgba(0,0,0,0.12)' } }}
+      >
+        <Box sx={{ p: 3 }}>
+          <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '1.05rem', color: '#1a1c1c', mb: 1 }}>
+            Delete Notification
+          </Typography>
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.88rem', color: '#6f7a70', mb: 1.5 }}>
+            Are you sure you want to delete this notification?
+          </Typography>
+          {pendingDeleteId && (() => {
+            const n = notifications.find((n) => n._id === pendingDeleteId);
+            return n ? (
+              <Box sx={{ p: 2, bgcolor: '#f9f9f9', borderRadius: 2, mb: 3 }}>
+                <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.82rem', color: '#1a1c1c', mb: 0.5 }}>
+                  {n.title}
+                </Typography>
+                <Typography
+                  noWrap
+                  sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#6f7a70' }}
+                >
+                  {n.message}
+                </Typography>
+              </Box>
+            ) : null;
+          })()}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button
+              onClick={() => { setShowDeleteConfirm(false); setPendingDeleteId(null); }}
+              sx={{
+                fontFamily: FONT, fontSize: '0.82rem', fontWeight: 600, textTransform: 'none',
+                borderRadius: 2, color: '#6f7a70', bgcolor: '#f3f3f4', '&:hover': { bgcolor: '#e8e8e8' },
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteNotification}
+              sx={{
+                fontFamily: FONT, fontSize: '0.82rem', fontWeight: 600, textTransform: 'none',
+                borderRadius: 2, color: '#fff', bgcolor: '#ba1a1a', '&:hover': { bgcolor: '#93000a' },
+              }}
+            >
+              Delete
+            </Button>
+          </Box>
+        </Box>
+      </Dialog>
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setPendingDeleteId(null);
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteNotification}
-                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Delete Confirmation Modal */}
-      {showBulkDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Notifications</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <span className="font-medium">{selectedNotifications.length}</span> selected notification{selectedNotifications.length === 1 ? '' : 's'}?
-              <span className="block mt-3 text-red-600 text-sm">
-                This action cannot be undone.
-              </span>
-            </p>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowBulkDeleteConfirm(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteSelected}
-                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-              >
-                Delete {selectedNotifications.length} notification{selectedNotifications.length === 1 ? '' : 's'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* ─── Bulk Delete Confirmation ─── */}
+      <Dialog
+        open={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, boxShadow: '0 24px 64px rgba(0,0,0,0.12)' } }}
+      >
+        <Box sx={{ p: 3 }}>
+          <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '1.05rem', color: '#1a1c1c', mb: 1 }}>
+            Delete Notifications
+          </Typography>
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.88rem', color: '#6f7a70', mb: 0.5 }}>
+            Are you sure you want to delete{' '}
+            <Box component="span" sx={{ fontWeight: 600 }}>{selectedNotifications.length}</Box>{' '}
+            selected notification{selectedNotifications.length === 1 ? '' : 's'}?
+          </Typography>
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#ba1a1a', mb: 3 }}>
+            This action cannot be undone.
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button
+              onClick={() => setShowBulkDeleteConfirm(false)}
+              sx={{
+                fontFamily: FONT, fontSize: '0.82rem', fontWeight: 600, textTransform: 'none',
+                borderRadius: 2, color: '#6f7a70', bgcolor: '#f3f3f4', '&:hover': { bgcolor: '#e8e8e8' },
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteSelected}
+              sx={{
+                fontFamily: FONT, fontSize: '0.82rem', fontWeight: 600, textTransform: 'none',
+                borderRadius: 2, color: '#fff', bgcolor: '#ba1a1a', '&:hover': { bgcolor: '#93000a' },
+              }}
+            >
+              Delete {selectedNotifications.length} notification{selectedNotifications.length === 1 ? '' : 's'}
+            </Button>
+          </Box>
+        </Box>
+      </Dialog>
+    </Box>
   );
 }

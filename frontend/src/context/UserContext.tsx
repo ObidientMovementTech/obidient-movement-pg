@@ -58,6 +58,7 @@ export interface UserProfile {
   role: 'user' | 'admin';
   kycStatus: 'unsubmitted' | 'pending' | 'approved' | 'rejected';
   kycRejectionReason?: string;
+  adcStatus?: 'not_registered' | 'pending' | 'verified' | 'rejected';
   personalInfo: PersonalInfo;
   onboardingData: OnboardingData;
   userName?: string;

@@ -681,6 +681,7 @@ export const getCurrentUser = async (req, res) => {
       profileImage: user.profileImage,
       role: user.role,
       kycStatus: user.kycStatus,
+      adcStatus: user.adcStatus || 'not_registered',
 
       // Flattened personal info fields (direct from users table)
       userName: user.userName,

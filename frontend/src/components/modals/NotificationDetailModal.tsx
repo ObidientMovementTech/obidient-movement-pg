@@ -1,4 +1,7 @@
-import { X, Clock, Megaphone } from "lucide-react";
+import { Dialog, Box, Typography, IconButton, Chip } from '@mui/material';
+import { X, Clock, Megaphone } from 'lucide-react';
+
+const FONT = '"Poppins", sans-serif';
 
 interface NotificationDetailModalProps {
   notification: {
@@ -23,55 +26,171 @@ export default function NotificationDetailModal({
   if (!notification) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-              {getTypeIcon(notification.type)}
-            </div>
-            <h3 className="font-semibold text-lg text-gray-800">{notification.title}</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-            aria-label="Close"
+    <Dialog
+      open
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          overflow: 'hidden',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.16)',
+          maxHeight: '85vh',
+        },
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          px: 3,
+          py: 2.5,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 2,
+          bgcolor: '#fff',
+          borderBottom: '1px solid rgba(0,0,0,0.06)',
+        }}
+      >
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            borderRadius: 3,
+            bgcolor: notification.type === 'adminBroadcast' ? '#fff7ed' : 'rgba(0,104,55,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {getTypeIcon(notification.type)}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontFamily: FONT,
+              fontWeight: 800,
+              fontSize: '1.1rem',
+              color: '#1a1c1c',
+              lineHeight: 1.3,
+              letterSpacing: '-0.01em',
+            }}
           >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto flex-grow">
+            {notification.title}
+          </Typography>
           {notification.type === 'adminBroadcast' && (
-            <div className="mb-4 p-3 bg-orange-50 border border-orange-100 rounded-md flex items-center gap-2 text-orange-600">
-              <Megaphone size={16} />
-              <span className="text-sm font-medium">This is an official platform announcement from the administration.</span>
-            </div>
+            <Chip
+              icon={<Megaphone size={12} />}
+              label="Official Announcement"
+              size="small"
+              sx={{
+                mt: 0.75,
+                fontFamily: FONT,
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                height: 22,
+                borderRadius: 1.5,
+                bgcolor: '#fff7ed',
+                color: '#c2410c',
+                '& .MuiChip-icon': { color: '#c2410c' },
+              }}
+            />
           )}
-          <div className="prose max-w-none">
-            <div className="whitespace-pre-wrap break-words">{notification.message}</div>
-          </div>
-        </div>
+        </Box>
+        <IconButton
+          onClick={onClose}
+          size="small"
+          sx={{
+            color: '#6f7a70',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
+          }}
+        >
+          <X size={18} />
+        </IconButton>
+      </Box>
 
-        {/* Footer */}
-        <div className="p-4 border-t bg-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock size={14} className="text-gray-500" />
-            <span className="text-sm text-gray-500">
-              {formatDate(notification.createdAt)}
-            </span>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-md transition-colors"
+      {/* Body */}
+      <Box
+        sx={{
+          px: 3,
+          py: 3,
+          overflowY: 'auto',
+          flex: 1,
+          bgcolor: '#fff',
+        }}
+      >
+        {notification.type === 'adminBroadcast' && (
+          <Box
+            sx={{
+              mb: 2.5,
+              p: 2,
+              bgcolor: '#fff7ed',
+              borderRadius: 2.5,
+              border: '1px solid #fed7aa',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}
           >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+            <Megaphone size={16} color="#c2410c" />
+            <Typography
+              sx={{ fontFamily: FONT, fontSize: '0.8rem', fontWeight: 600, color: '#c2410c' }}
+            >
+              This is an official platform announcement from the administration.
+            </Typography>
+          </Box>
+        )}
+
+        <Typography
+          sx={{
+            fontFamily: FONT,
+            fontSize: '0.92rem',
+            color: '#1a1c1c',
+            lineHeight: 1.75,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}
+        >
+          {notification.message}
+        </Typography>
+      </Box>
+
+      {/* Footer */}
+      <Box
+        sx={{
+          px: 3,
+          py: 2,
+          bgcolor: '#f9f9f9',
+          borderTop: '1px solid rgba(0,0,0,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Clock size={14} color="#6f7a70" />
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#6f7a70' }}>
+            {formatDate(notification.createdAt)}
+          </Typography>
+        </Box>
+        <Typography
+          onClick={onClose}
+          sx={{
+            fontFamily: FONT,
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            color: '#6f7a70',
+            cursor: 'pointer',
+            px: 2,
+            py: 0.75,
+            borderRadius: 2,
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
+          }}
+        >
+          Close
+        </Typography>
+      </Box>
+    </Dialog>
   );
 }

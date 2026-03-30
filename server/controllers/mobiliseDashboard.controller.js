@@ -38,6 +38,45 @@ const locationNamesMatch = (name1, name2) => {
   return normalizeLocationName(name1) === normalizeLocationName(name2);
 };
 
+/**
+ * Find a state key in detailedData using case-insensitive matching
+ * Returns the actual key as stored in the data, or null
+ */
+const findStateKey = (detailedData, targetStateName) => {
+  if (!detailedData || !targetStateName) return null;
+  // Try exact match first
+  if (detailedData[targetStateName]) return targetStateName;
+  // Try case-insensitive match
+  const normalized = normalizeLocationName(targetStateName);
+  for (const key of Object.keys(detailedData)) {
+    if (normalizeLocationName(key) === normalized) return key;
+  }
+  return null;
+};
+
+/**
+ * Find an LGA key within a state's lgas using case-insensitive matching
+ * Returns the actual key as stored in the data, or null
+ */
+const findLgaKey = (stateData, targetLgaName) => {
+  if (!stateData?.lgas || !targetLgaName) return null;
+  if (stateData.lgas[targetLgaName]) return targetLgaName;
+  const normalized = normalizeLocationName(targetLgaName);
+  for (const key of Object.keys(stateData.lgas)) {
+    if (normalizeLocationName(key) === normalized) return key;
+  }
+  return null;
+};
+
+/** Empty stats object for when no data exists yet */
+const EMPTY_STATS = {
+  obidientRegisteredVoters: 0,
+  obidientVotersWithPVC: 0,
+  obidientVotersWithoutPVC: 0,
+  pvcWithStatus: 0,
+  pvcWithoutStatus: 0
+};
+
 
 /**
  * Get user's designation level and assigned location
@@ -180,20 +219,14 @@ export const getNationalData = async (req, res) => {
       const votersWithPVC = stateData.votersWithPVC || 0;
       const votersWithoutPVC = stateData.votersWithoutPVC || 0;
 
-      // Mock INEC data - in production, this should come from INEC API
-      const estimatedINECVoters = Math.round(totalObidient * (Math.random() * 15 + 20)); // 20-35x multiplier
-
       return {
         id: stateData.state.toLowerCase().replace(/\s+/g, '-'),
         name: stateData.state,
         code: stateData.state.substring(0, 2).toUpperCase(),
         level: 'state',
-        inecRegisteredVoters: estimatedINECVoters,
         obidientRegisteredVoters: totalObidient,
         obidientVotersWithPVC: votersWithPVC,
         obidientVotersWithoutPVC: votersWithoutPVC,
-        unconvertedVoters: Math.max(0, estimatedINECVoters - totalObidient),
-        conversionRate: estimatedINECVoters > 0 ? Number(((totalObidient / estimatedINECVoters) * 100).toFixed(2)) : 0,
         pvcWithStatus: votersWithPVC,
         pvcWithoutStatus: votersWithoutPVC
       };
@@ -201,27 +234,18 @@ export const getNationalData = async (req, res) => {
 
     // Calculate national totals
     const nationalStats = statesData.reduce((acc, state) => ({
-      inecRegisteredVoters: acc.inecRegisteredVoters + state.inecRegisteredVoters,
       obidientRegisteredVoters: acc.obidientRegisteredVoters + state.obidientRegisteredVoters,
       obidientVotersWithPVC: acc.obidientVotersWithPVC + state.obidientVotersWithPVC,
       obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + state.obidientVotersWithoutPVC,
-      unconvertedVoters: acc.unconvertedVoters + state.unconvertedVoters,
       pvcWithStatus: acc.pvcWithStatus + state.pvcWithStatus,
       pvcWithoutStatus: acc.pvcWithoutStatus + state.pvcWithoutStatus
     }), {
-      inecRegisteredVoters: 0,
       obidientRegisteredVoters: 0,
       obidientVotersWithPVC: 0,
       obidientVotersWithoutPVC: 0,
-      unconvertedVoters: 0,
       pvcWithStatus: 0,
       pvcWithoutStatus: 0
     });
-
-    // Add conversion rate to national stats
-    nationalStats.conversionRate = nationalStats.inecRegisteredVoters > 0
-      ? Number(((nationalStats.obidientRegisteredVoters / nationalStats.inecRegisteredVoters) * 100).toFixed(2))
-      : 0;
 
     res.json({
       success: true,
@@ -293,13 +317,23 @@ export const getStateData = async (req, res) => {
     // Get detailed voter data for the state
     const detailedData = await getObidientVotersDetailed();
 
-    const stateData = detailedData[stateName];
+    const matchedStateKey = findStateKey(detailedData, stateName);
+    const stateData = matchedStateKey ? detailedData[matchedStateKey] : null;
 
     if (!stateData) {
-      console.log(`❌ No data found for state: ${stateName}`);
-      return res.status(404).json({
-        success: false,
-        message: `No data found for state: ${stateName}`
+      console.log(`⚠️ No voter data yet for state: ${stateName} — returning empty dashboard`);
+      // Return empty dashboard instead of 404 so coordinators see a blank dashboard
+      return res.json({
+        success: true,
+        data: {
+          level: 'state',
+          stats: { ...EMPTY_STATS },
+          items: [],
+          breadcrumbs: [
+            { level: 'national', name: 'National Overview' },
+            { level: 'state', name: stateName, id: stateId }
+          ]
+        }
       });
     }
 
@@ -311,9 +345,6 @@ export const getStateData = async (req, res) => {
       const votersWithPVC = lgaData.obidientVotersWithPVC || 0;
       const votersWithoutPVC = lgaData.obidientVotersWithoutPVC || 0;
 
-      // Mock INEC data for LGA
-      const estimatedINECVoters = Math.round(totalObidient * (Math.random() * 15 + 20));
-
       const lgaResult = {
         id: `${stateId}-${lgaName.toLowerCase().replace(/\s+/g, '-')}`,
         name: lgaName,
@@ -321,12 +352,9 @@ export const getStateData = async (req, res) => {
         level: 'lga',
         stateId: stateId,
         stateName: stateName,
-        inecRegisteredVoters: estimatedINECVoters,
         obidientRegisteredVoters: totalObidient,
         obidientVotersWithPVC: votersWithPVC,
         obidientVotersWithoutPVC: votersWithoutPVC,
-        unconvertedVoters: Math.max(0, estimatedINECVoters - totalObidient),
-        conversionRate: estimatedINECVoters > 0 ? Number(((totalObidient / estimatedINECVoters) * 100).toFixed(2)) : 0,
         pvcWithStatus: votersWithPVC,
         pvcWithoutStatus: votersWithoutPVC
       };
@@ -337,26 +365,18 @@ export const getStateData = async (req, res) => {
 
     // Calculate state totals
     const stateStats = lgasData.reduce((acc, lga) => ({
-      inecRegisteredVoters: acc.inecRegisteredVoters + lga.inecRegisteredVoters,
       obidientRegisteredVoters: acc.obidientRegisteredVoters + lga.obidientRegisteredVoters,
       obidientVotersWithPVC: acc.obidientVotersWithPVC + lga.obidientVotersWithPVC,
       obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + lga.obidientVotersWithoutPVC,
-      unconvertedVoters: acc.unconvertedVoters + lga.unconvertedVoters,
       pvcWithStatus: acc.pvcWithStatus + lga.pvcWithStatus,
       pvcWithoutStatus: acc.pvcWithoutStatus + lga.pvcWithoutStatus
     }), {
-      inecRegisteredVoters: 0,
       obidientRegisteredVoters: 0,
       obidientVotersWithPVC: 0,
       obidientVotersWithoutPVC: 0,
-      unconvertedVoters: 0,
       pvcWithStatus: 0,
       pvcWithoutStatus: 0
     });
-
-    stateStats.conversionRate = stateStats.inecRegisteredVoters > 0
-      ? Number(((stateStats.obidientRegisteredVoters / stateStats.inecRegisteredVoters) * 100).toFixed(2))
-      : 0;
 
     res.json({
       success: true,
@@ -387,13 +407,38 @@ export const getStateData = async (req, res) => {
 export const getLGAData = async (req, res) => {
   try {
     const { lgaId } = req.params;
-    const parts = lgaId.split('-');
-    const stateId = parts[0];
-    const stateName = fromSlug(stateId);
 
-    // Reconstruct LGA name from slug (everything after the first part)
-    const lgaSlugPart = lgaId.replace(`${stateId}-`, '');
-    const lgaName = fromSlug(lgaSlugPart);
+    // Get detailed voter data early so we can use it for smart parsing
+    const detailedData = await getObidientVotersDetailed();
+
+    // Smart parsing: find the state slug by matching against known states
+    // This handles multi-word states like "cross-river" correctly
+    let stateId, stateName, lgaSlugPart, lgaName, matchedStateKey;
+
+    const stateKeys = Object.keys(detailedData);
+    let foundMatch = false;
+    for (const key of stateKeys) {
+      const slug = toSlug(key);
+      if (lgaId.startsWith(slug + '-')) {
+        matchedStateKey = key;
+        stateId = slug;
+        stateName = key;
+        lgaSlugPart = lgaId.substring(slug.length + 1);
+        lgaName = fromSlug(lgaSlugPart);
+        foundMatch = true;
+        break;
+      }
+    }
+
+    // Fallback: split on first hyphen (single-word state)
+    if (!foundMatch) {
+      const parts = lgaId.split('-');
+      stateId = parts[0];
+      stateName = fromSlug(stateId);
+      lgaSlugPart = lgaId.replace(`${stateId}-`, '');
+      lgaName = fromSlug(lgaSlugPart);
+      matchedStateKey = findStateKey(detailedData, stateName);
+    }
 
     // Check if user has access to this LGA using direct query
     const userId = req.user.userId || req.user.id;
@@ -447,27 +492,34 @@ export const getLGAData = async (req, res) => {
       }
     }
 
-    // Get detailed voter data
-    const detailedData = await getObidientVotersDetailed();
-    const stateData = detailedData[stateName];
+    // Get data for the state and LGA
+    const stateData = matchedStateKey ? detailedData[matchedStateKey] : null;
+    const lgaKey = stateData ? findLgaKey(stateData, lgaName) : null;
 
-    if (!stateData || !stateData.lgas[lgaName]) {
-      return res.status(404).json({
-        success: false,
-        message: `No data found for LGA: ${lgaName} in state: ${stateName}`
+    if (!stateData || !lgaKey) {
+      console.log(`⚠️ No voter data yet for LGA: ${lgaName} in state: ${stateName} — returning empty dashboard`);
+      return res.json({
+        success: true,
+        data: {
+          level: 'lga',
+          stats: { ...EMPTY_STATS },
+          items: [],
+          breadcrumbs: [
+            { level: 'national', name: 'National Overview' },
+            { level: 'state', name: stateName, id: stateId },
+            { level: 'lga', name: lgaName, id: lgaId }
+          ]
+        }
       });
     }
 
-    const lgaData = stateData.lgas[lgaName];
+    const lgaData = stateData.lgas[lgaKey];
 
     // Process Ward data
     const wardsData = Object.entries(lgaData.wards || {}).map(([wardName, wardData]) => {
       const totalObidient = wardData.obidientRegisteredVoters || 0;
       const votersWithPVC = wardData.obidientVotersWithPVC || 0;
       const votersWithoutPVC = wardData.obidientVotersWithoutPVC || 0;
-
-      // Mock INEC data for Ward
-      const estimatedINECVoters = Math.round(totalObidient * (Math.random() * 15 + 20));
 
       return {
         id: `${lgaId}-${wardName.toLowerCase().replace(/\s+/g, '-')}`,
@@ -478,12 +530,9 @@ export const getLGAData = async (req, res) => {
         lgaName: lgaName,
         stateId: stateId,
         stateName: stateName,
-        inecRegisteredVoters: estimatedINECVoters,
         obidientRegisteredVoters: totalObidient,
         obidientVotersWithPVC: votersWithPVC,
         obidientVotersWithoutPVC: votersWithoutPVC,
-        unconvertedVoters: Math.max(0, estimatedINECVoters - totalObidient),
-        conversionRate: estimatedINECVoters > 0 ? Number(((totalObidient / estimatedINECVoters) * 100).toFixed(2)) : 0,
         pvcWithStatus: votersWithPVC,
         pvcWithoutStatus: votersWithoutPVC
       };
@@ -491,26 +540,18 @@ export const getLGAData = async (req, res) => {
 
     // Calculate LGA totals
     const lgaStats = wardsData.reduce((acc, ward) => ({
-      inecRegisteredVoters: acc.inecRegisteredVoters + ward.inecRegisteredVoters,
       obidientRegisteredVoters: acc.obidientRegisteredVoters + ward.obidientRegisteredVoters,
       obidientVotersWithPVC: acc.obidientVotersWithPVC + ward.obidientVotersWithPVC,
       obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + ward.obidientVotersWithoutPVC,
-      unconvertedVoters: acc.unconvertedVoters + ward.unconvertedVoters,
       pvcWithStatus: acc.pvcWithStatus + ward.pvcWithStatus,
       pvcWithoutStatus: acc.pvcWithoutStatus + ward.pvcWithoutStatus
     }), {
-      inecRegisteredVoters: 0,
       obidientRegisteredVoters: 0,
       obidientVotersWithPVC: 0,
       obidientVotersWithoutPVC: 0,
-      unconvertedVoters: 0,
       pvcWithStatus: 0,
       pvcWithoutStatus: 0
     });
-
-    lgaStats.conversionRate = lgaStats.inecRegisteredVoters > 0
-      ? Number(((lgaStats.obidientRegisteredVoters / lgaStats.inecRegisteredVoters) * 100).toFixed(2))
-      : 0;
 
     res.json({
       success: true,
@@ -543,59 +584,80 @@ export const getWardData = async (req, res) => {
   try {
     const { wardId } = req.params;
 
-    // Parse ward ID to extract components
-    // Format: stateId-lgaSlug-wardSlug
-    // Note: lgaSlug and wardSlug can contain hyphens, so we need to split carefully
-    const wardIdParts = wardId.split('-');
-    if (wardIdParts.length < 3) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid ward ID format. Expected: stateId-lgaSlug-wardSlug'
-      });
-    }
+    // Get detailed voter data early for smart parsing
+    const detailedData = await getObidientVotersDetailed();
 
-    // The first part is always the state
-    const stateId = wardIdParts[0];
-
-    // Find the LGA and ward parts by looking for the pattern that matches our data
-    // We'll try different combinations to find the right split
-    let lgaSlug, wardSlug, stateName, lgaName, wardName;
+    // Smart parsing: find state slug, LGA slug, ward slug by matching against known data
+    let stateId, lgaSlug, wardSlug, stateName, lgaName, wardName;
+    let matchedStateKey, matchedLgaKey, matchedWardKey;
     let foundValidCombination = false;
 
-    // Try different split points to find valid state-lga-ward combination
-    for (let i = 1; i < wardIdParts.length - 1; i++) {
-      const testLgaSlug = wardIdParts.slice(1, i + 1).join('-');
-      const testWardSlug = wardIdParts.slice(i + 1).join('-');
+    // Try to match state from known keys (handles multi-word states)
+    for (const stKey of Object.keys(detailedData)) {
+      const stSlug = toSlug(stKey);
+      if (!wardId.startsWith(stSlug + '-')) continue;
 
-      const testStateName = fromSlug(stateId);
-      const testLgaName = fromSlug(testLgaSlug);
-      const testWardName = fromSlug(testWardSlug);
+      const remainder = wardId.substring(stSlug.length + 1); // e.g. "aguata-igbo-ukwu-i"
+      const stateObj = detailedData[stKey];
+      if (!stateObj?.lgas) continue;
 
-      // Check if this combination exists in our data
-      try {
-        const detailedData = await getObidientVotersDetailed();
-        if (detailedData[testStateName] &&
-          detailedData[testStateName].lgas[testLgaName] &&
-          detailedData[testStateName].lgas[testLgaName].wards[testWardName]) {
+      // Try to match LGA from known keys within this state
+      for (const lgKey of Object.keys(stateObj.lgas)) {
+        const lgSlug = toSlug(lgKey);
+        if (!remainder.startsWith(lgSlug + '-')) continue;
 
-          lgaSlug = testLgaSlug;
-          wardSlug = testWardSlug;
-          stateName = testStateName;
-          lgaName = testLgaName;
-          wardName = testWardName;
-          foundValidCombination = true;
-          break;
+        const wardRemainder = remainder.substring(lgSlug.length + 1); // e.g. "igbo-ukwu-i"
+        const lgaObj = stateObj.lgas[lgKey];
+        if (!lgaObj?.wards) continue;
+
+        // Try to match ward from known keys within this LGA
+        for (const wdKey of Object.keys(lgaObj.wards)) {
+          if (toSlug(wdKey) === wardRemainder) {
+            matchedStateKey = stKey;
+            matchedLgaKey = lgKey;
+            matchedWardKey = wdKey;
+            stateId = stSlug;
+            lgaSlug = lgSlug;
+            wardSlug = wardRemainder;
+            stateName = stKey;
+            lgaName = lgKey;
+            wardName = wdKey;
+            foundValidCombination = true;
+            break;
+          }
         }
-      } catch (error) {
-        console.log(`🔍 Testing combination failed: ${testStateName}-${testLgaName}-${testWardName}`);
-        continue;
+        if (foundValidCombination) break;
       }
+      if (foundValidCombination) break;
     }
 
     if (!foundValidCombination) {
-      return res.status(404).json({
-        success: false,
-        message: `Invalid ward ID format or data not found: ${wardId}`
+      // Fallback parsing for breadcrumbs when no data exists
+      const wardIdParts = wardId.split('-');
+      const fbState = fromSlug(wardIdParts[0]);
+      const fbLga = wardIdParts.length >= 3 ? fromSlug(wardIdParts.slice(1, -1).join('-')) : '';
+      const fbWard = wardIdParts.length >= 3 ? fromSlug(wardIdParts[wardIdParts.length - 1]) : '';
+
+      stateId = wardIdParts[0];
+      lgaSlug = wardIdParts.length >= 3 ? wardIdParts.slice(1, -1).join('-') : '';
+      stateName = fbState;
+      lgaName = fbLga;
+      wardName = fbWard;
+
+      console.log(`⚠️ No voter data for ward: ${wardId} — returning empty dashboard`);
+      return res.json({
+        success: true,
+        data: {
+          level: 'ward',
+          stats: { ...EMPTY_STATS },
+          items: [],
+          breadcrumbs: [
+            { level: 'national', name: 'National Overview' },
+            { level: 'state', name: fbState, id: wardIdParts[0] },
+            { level: 'lga', name: fbLga, id: `${wardIdParts[0]}-${lgaSlug}` },
+            { level: 'ward', name: fbWard, id: wardId }
+          ]
+        }
       });
     }
 
@@ -641,18 +703,9 @@ export const getWardData = async (req, res) => {
       }
     }
 
-    // Get detailed voter data
-    const detailedData = await getObidientVotersDetailed();
-    const stateData = detailedData[stateName];
-
-    if (!stateData || !stateData.lgas[lgaName] || !stateData.lgas[lgaName].wards[wardName]) {
-      return res.status(404).json({
-        success: false,
-        message: `No data found for Ward: ${wardName} in LGA: ${lgaName}, State: ${stateName}`
-      });
-    }
-
-    const wardData = stateData.lgas[lgaName].wards[wardName];
+    // We already have detailedData from the smart parsing above
+    // Use the matched keys directly
+    const wardData = detailedData[matchedStateKey].lgas[matchedLgaKey].wards[matchedWardKey];
 
     // Process Polling Unit data
     const pollingUnitsData = Object.entries(wardData.pollingUnits || {}).map(([puName, puData]) => {
@@ -660,11 +713,8 @@ export const getWardData = async (req, res) => {
       const votersWithPVC = puData.obidientVotersWithPVC || 0;
       const votersWithoutPVC = puData.obidientVotersWithoutPVC || 0;
 
-      // Mock INEC data for Polling Unit
-      const estimatedINECVoters = Math.round(totalObidient * (Math.random() * 15 + 20));
-
       return {
-        id: `${wardId}-${puName.toLowerCase().replace(/\s+/g, '-')}`,
+        id: `${wardId}-${puName.toLowerCase().replace(/\\s+/g, '-')}`,
         name: puName,
         code: puData.polling_unit_code || `PU-${puName.substring(0, 3).toUpperCase()}`,
         level: 'pu',
@@ -674,48 +724,28 @@ export const getWardData = async (req, res) => {
         lgaName: lgaName,
         stateId: stateId,
         stateName: stateName,
-        inecRegisteredVoters: estimatedINECVoters,
         obidientRegisteredVoters: totalObidient,
         obidientVotersWithPVC: votersWithPVC,
         obidientVotersWithoutPVC: votersWithoutPVC,
-        unconvertedVoters: Math.max(0, estimatedINECVoters - totalObidient),
-        conversionRate: estimatedINECVoters > 0 ? Number(((totalObidient / estimatedINECVoters) * 100).toFixed(2)) : 0,
         pvcWithStatus: votersWithPVC,
-        pvcWithoutStatus: votersWithoutPVC,
-        realData: {
-          totalObidientUsers: totalObidient,
-          votersWithPVC: votersWithPVC,
-          votersWithoutPVC: votersWithoutPVC,
-          votersWithPhone: puData.voters_with_phone || 0,
-          votersWithEmail: puData.voters_with_email || 0,
-          pvcCompletionRate: totalObidient > 0 ? ((votersWithPVC / totalObidient) * 100) : 0,
-          isRealData: true
-        }
+        pvcWithoutStatus: votersWithoutPVC
       };
     });
 
     // Calculate Ward totals
     const wardStats = pollingUnitsData.reduce((acc, pu) => ({
-      inecRegisteredVoters: acc.inecRegisteredVoters + pu.inecRegisteredVoters,
       obidientRegisteredVoters: acc.obidientRegisteredVoters + pu.obidientRegisteredVoters,
       obidientVotersWithPVC: acc.obidientVotersWithPVC + pu.obidientVotersWithPVC,
       obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + pu.obidientVotersWithoutPVC,
-      unconvertedVoters: acc.unconvertedVoters + pu.unconvertedVoters,
       pvcWithStatus: acc.pvcWithStatus + pu.pvcWithStatus,
       pvcWithoutStatus: acc.pvcWithoutStatus + pu.pvcWithoutStatus
     }), {
-      inecRegisteredVoters: 0,
       obidientRegisteredVoters: 0,
       obidientVotersWithPVC: 0,
       obidientVotersWithoutPVC: 0,
-      unconvertedVoters: 0,
       pvcWithStatus: 0,
       pvcWithoutStatus: 0
     });
-
-    wardStats.conversionRate = wardStats.inecRegisteredVoters > 0
-      ? Number(((wardStats.obidientRegisteredVoters / wardStats.inecRegisteredVoters) * 100).toFixed(2))
-      : 0;
 
     res.json({
       success: true,

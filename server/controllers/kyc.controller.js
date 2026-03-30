@@ -480,18 +480,55 @@ export const editKYC = async (req, res) => {
 // Admin: Get all KYC submissions
 export const getAllKYC = async (req, res) => {
   try {
-    // Get users with KYC submissions using PostgreSQL query
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    const status = req.query.status || '';
+
+    // Build WHERE conditions
+    const conditions = [`u."kycStatus" != 'unsubmitted'`];
+    const params = [];
+    let paramIndex = 1;
+
+    if (status && status !== 'all') {
+      conditions.push(`u."kycStatus" = $${paramIndex}`);
+      params.push(status);
+      paramIndex++;
+    }
+
+    if (search) {
+      conditions.push(`(u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR u.phone ILIKE $${paramIndex})`);
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) FROM users u ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    // Get paginated results
+    const dataParams = [...params, limit, offset];
     const result = await query(`
       SELECT 
         u.id as "_id",
         u.name,
         u.email, 
         u.phone,
+        u."profileImage",
         u."kycStatus",
         u."kycRejectionReason",
+        u."votingState",
+        u."votingLGA",
         u."createdAt",
         pi."firstName",
         pi."lastName", 
+        pi."userName",
         pi."phoneNumber",
         pi.gender,
         pi.lga,
@@ -509,22 +546,40 @@ export const getAllKYC = async (req, res) => {
       FROM users u
       LEFT JOIN "userPersonalInfo" pi ON u.id = pi."userId"
       LEFT JOIN "userKycInfo" kyc ON u.id = kyc."userId"
-      WHERE u."kycStatus" != 'unsubmitted'
-      ORDER BY u."createdAt" DESC
+      ${whereClause}
+      ORDER BY 
+        CASE u."kycStatus" WHEN 'pending' THEN 0 WHEN 'draft' THEN 1 WHEN 'rejected' THEN 2 WHEN 'approved' THEN 3 END,
+        u."createdAt" DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `, dataParams);
+
+    // Get stats
+    const statsResult = await query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE "kycStatus" = 'approved') as approved,
+        COUNT(*) FILTER (WHERE "kycStatus" = 'pending') as pending,
+        COUNT(*) FILTER (WHERE "kycStatus" = 'rejected') as rejected,
+        COUNT(*) FILTER (WHERE "kycStatus" = 'draft') as draft
+      FROM users
+      WHERE "kycStatus" != 'unsubmitted'
     `);
 
     // Transform data to match frontend expectations
-    const kycSubmissions = result.rows.map(row => ({
+    const submissions = result.rows.map(row => ({
       _id: row._id,
       name: row.name,
       email: row.email,
       phone: row.phone,
+      profileImage: row.profileImage,
       kycStatus: row.kycStatus,
       kycRejectionReason: row.kycRejectionReason,
+      votingState: row.votingState,
+      votingLGA: row.votingLGA,
       createdAt: row.createdAt,
       personalInfo: {
         firstName: row.firstName,
         lastName: row.lastName,
+        userName: row.userName,
         phoneNumber: row.phoneNumber,
         gender: row.gender,
         lga: row.lga,
@@ -544,7 +599,14 @@ export const getAllKYC = async (req, res) => {
       selfieImageUrl: row.selfieImageUrl
     }));
 
-    res.status(200).json(kycSubmissions);
+    res.status(200).json({
+      success: true,
+      data: {
+        submissions,
+        pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        stats: statsResult.rows[0]
+      }
+    });
   } catch (err) {
     console.error('Get all KYC error:', err);
     res.status(500).json({ message: 'Failed to fetch KYC submissions', error: err.message });
@@ -556,15 +618,19 @@ export const approveKYC = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
     }
 
-    user.kycStatus = 'approved';
-    user.kycRejectionReason = '';
+    const result = await query(
+      `UPDATE users SET "kycStatus" = 'approved', "kycRejectionReason" = '', "updatedAt" = NOW() WHERE id = $1 RETURNING id, "kycStatus"`,
+      [userId]
+    );
 
-    await user.save();
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     res.status(200).json({ message: 'KYC approved successfully' });
   } catch (err) {
@@ -579,19 +645,23 @@ export const rejectKYC = async (req, res) => {
     const { userId } = req.params;
     const { reason } = req.body;
 
-    if (!reason) {
+    if (!reason || !reason.trim()) {
       return res.status(400).json({ message: 'Rejection reason is required' });
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
     }
 
-    user.kycStatus = 'rejected';
-    user.kycRejectionReason = reason;
+    const result = await query(
+      `UPDATE users SET "kycStatus" = 'rejected', "kycRejectionReason" = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING id, "kycStatus"`,
+      [reason.trim(), userId]
+    );
 
-    await user.save();
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     res.status(200).json({ message: 'KYC rejected with reason provided' });
   } catch (err) {

@@ -110,10 +110,13 @@ const StateDashboard: React.FC = () => {
     return 'Other';
   };
 
-  // Performance categorization
-  const getPerformanceCategory = (conversionRate: number): 'high' | 'medium' | 'low' => {
-    if (conversionRate >= 70) return 'high';
-    if (conversionRate >= 40) return 'medium';
+  // Performance categorization based on PVC rate
+  const getPerformanceCategory = (item: any): 'high' | 'medium' | 'low' => {
+    const total = item.obidientRegisteredVoters || 0;
+    const withPvc = item.obidientVotersWithPVC || 0;
+    const pvcRate = total > 0 ? (withPvc / total) * 100 : 0;
+    if (pvcRate >= 70) return 'high';
+    if (pvcRate >= 40) return 'medium';
     return 'low';
   };
 
@@ -394,7 +397,7 @@ const StateDashboard: React.FC = () => {
     return num.toLocaleString();
   };
 
-  const getConversionColor = (rate: number): string => {
+  const getPvcColor = (rate: number): string => {
     if (rate >= 70) return 'text-green-600';
     if (rate >= 40) return 'text-yellow-600';
     return 'text-red-600';
@@ -419,13 +422,10 @@ const StateDashboard: React.FC = () => {
       );
     }
 
-    // Apply performance filter
+    // Apply performance filter (based on PVC rate)
     if (performanceFilter !== 'all') {
       filtered = filtered.filter((item: any) => {
-        const conversionRate = item.inecRegisteredVoters > 0
-          ? (item.obidientRegisteredVoters / item.inecRegisteredVoters) * 100
-          : 0;
-        return getPerformanceCategory(conversionRate) === performanceFilter;
+        return getPerformanceCategory(item) === performanceFilter;
       });
     }
 
@@ -443,17 +443,13 @@ const StateDashboard: React.FC = () => {
           aVal = a.name?.toLowerCase() || '';
           bVal = b.name?.toLowerCase() || '';
           break;
-        case 'inec':
-          aVal = a.inecRegisteredVoters || 0;
-          bVal = b.inecRegisteredVoters || 0;
-          break;
         case 'obidient':
           aVal = a.obidientRegisteredVoters || 0;
           bVal = b.obidientRegisteredVoters || 0;
           break;
-        case 'conversion':
-          aVal = a.inecRegisteredVoters > 0 ? (a.obidientRegisteredVoters / a.inecRegisteredVoters) * 100 : 0;
-          bVal = b.inecRegisteredVoters > 0 ? (b.obidientRegisteredVoters / b.inecRegisteredVoters) * 100 : 0;
+        case 'pvc':
+          aVal = a.obidientVotersWithPVC || 0;
+          bVal = b.obidientVotersWithPVC || 0;
           break;
         default:
           return 0;
@@ -582,12 +578,6 @@ const StateDashboard: React.FC = () => {
           <StatsCards
             currentStats={{
               ...nationalStats,
-              // Calculate any additional stats needed by the component
-              unconvertedVoters: nationalStats.inecRegisteredVoters - nationalStats.obidientRegisteredVoters,
-              conversionRate: nationalStats.inecRegisteredVoters > 0
-                ? (nationalStats.obidientRegisteredVoters / nationalStats.inecRegisteredVoters) * 100
-                : 0,
-              // Adding PVC data if available
               pvcWithStatus: nationalStats.obidientVotersWithPVC || 0,
               pvcWithoutStatus: nationalStats.obidientVotersWithoutPVC || 0
             }}
@@ -665,9 +655,9 @@ const StateDashboard: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Performance</option>
-                <option value="high">High (≥70%)</option>
-                <option value="medium">Medium (40-69%)</option>
-                <option value="low">Low (&lt;40%)</option>
+                <option value="high">High PVC (≥70%)</option>
+                <option value="medium">Medium PVC (40-69%)</option>
+                <option value="low">Low PVC (&lt;40%)</option>
               </select>
             </div>
 
@@ -683,9 +673,8 @@ const StateDashboard: React.FC = () => {
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="name">Name</option>
-                  <option value="inec">Registered</option>
                   <option value="obidient">Obidients</option>
-                  <option value="conversion">Rate</option>
+                  <option value="pvc">With PVC</option>
                 </select>
                 <button
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -825,13 +814,13 @@ const StateDashboard: React.FC = () => {
                     Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Registered
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Obidient Voters
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Conversion Rate
+                    With PVC
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PVC Rate
                   </th>
                   {currentView === 'national' && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -845,9 +834,9 @@ const StateDashboard: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredAndSortedData.map((item: any, index) => {
-                  const conversionRate = item.inecRegisteredVoters > 0
-                    ? (item.obidientRegisteredVoters / item.inecRegisteredVoters) * 100
-                    : 0;
+                  const total = item.obidientRegisteredVoters || 0;
+                  const withPvc = item.obidientVotersWithPVC || 0;
+                  const pvcRate = total > 0 ? (withPvc / total) * 100 : 0;
 
                   return (
                     <tr key={index} className="hover:bg-gray-50">
@@ -855,14 +844,14 @@ const StateDashboard: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900">{item.name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatNumber(item.inecRegisteredVoters || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatNumber(item.obidientRegisteredVoters || 0)}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatNumber(withPvc)}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-sm font-medium ${getConversionColor(conversionRate)}`}>
-                          {conversionRate.toFixed(1)}%
+                        <span className={`text-sm font-medium ${getPvcColor(pvcRate)}`}>
+                          {pvcRate.toFixed(1)}%
                         </span>
                       </td>
                       {currentView === 'national' && (

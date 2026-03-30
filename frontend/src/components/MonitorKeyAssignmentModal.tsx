@@ -1,7 +1,22 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { X, Key, Loader2, MapPin, Calendar, AlertTriangle } from 'lucide-react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  IconButton,
+  Box,
+  Grid,
+  Alert,
+  Checkbox,
+  Divider,
+  CircularProgress,
+  Chip,
+} from '@mui/material';
+import { X, Key, MapPin, Calendar, AlertTriangle } from 'lucide-react';
 import { monitorKeyService } from '../services/monitorKeyService.ts';
-// import { electionService } from '../services/electionService.ts';
 
 interface Election {
   election_id: string;
@@ -30,276 +45,315 @@ interface MonitorKeyAssignmentModalProps {
   onSuccess: () => void;
 }
 
-const MonitorKeyAssignmentModal = ({ isOpen, onClose, user, onSuccess }: MonitorKeyAssignmentModalProps) => {
+const ELIGIBLE = [
+  'National Coordinator',
+  'State Coordinator',
+  'LGA Coordinator',
+  'Ward Coordinator',
+  'Polling Unit Agent',
+  'Vote Defender',
+];
+
+const MonitorKeyAssignmentModal = ({
+  isOpen,
+  onClose,
+  user,
+  onSuccess,
+}: MonitorKeyAssignmentModalProps) => {
   const [loading, setLoading] = useState(false);
   const [elections, setElections] = useState<Election[]>([]);
-  const [selectedElections, setSelectedElections] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
 
-  const monitoringLocation = useMemo(() => {
-    return {
+  const loc = useMemo(
+    () => ({
       state: user.votingState || user.assignedState || '',
       lga: user.votingLGA || user.assignedLGA || '',
       ward: user.votingWard || user.assignedWard || '',
-      pollingUnit: user.votingPU || ''
-    };
-  }, [user]);
+      pu: user.votingPU || '',
+    }),
+    [user],
+  );
 
-  const locationIssues = useMemo(() => {
-    const issues: string[] = [];
-    const designation = user.designation || '';
+  const issues = useMemo(() => {
+    const arr: string[] = [];
+    const d = user.designation || '';
+    if (!loc.state && d !== 'National Coordinator') arr.push('No voting state');
+    if (
+      ['LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Vote Defender'].includes(d) &&
+      !loc.lga
+    )
+      arr.push('No voting LGA');
+    if (
+      ['Ward Coordinator', 'Polling Unit Agent', 'Vote Defender'].includes(d) &&
+      !loc.ward
+    )
+      arr.push('No voting ward');
+    if (['Polling Unit Agent', 'Vote Defender'].includes(d) && !loc.pu)
+      arr.push('No polling unit');
+    return arr;
+  }, [loc, user.designation]);
 
-    if (!monitoringLocation.state && designation !== 'National Coordinator') {
-      issues.push('No voting state on file');
-    }
-
-    if (['LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Vote Defender'].includes(designation) && !monitoringLocation.lga) {
-      issues.push('No voting LGA on file');
-    }
-
-    if (['Ward Coordinator', 'Polling Unit Agent', 'Vote Defender'].includes(designation) && !monitoringLocation.ward) {
-      issues.push('No voting ward on file');
-    }
-
-    if (['Polling Unit Agent', 'Vote Defender'].includes(designation) && !monitoringLocation.pollingUnit) {
-      issues.push('No polling unit on file');
-    }
-
-    return issues;
-  }, [monitoringLocation, user.designation]);
+  const canAssign = ELIGIBLE.includes(user.designation || '');
 
   const fetchElections = useCallback(async () => {
     try {
-      const response = await monitorKeyService.getActiveElections();
-      setElections(response.data || []);
-    } catch (error) {
-      console.error('Error fetching elections:', error);
+      const r = await monitorKeyService.getActiveElections();
+      setElections(r.data || []);
+    } catch (e) {
+      console.error('Error fetching elections:', e);
     }
   }, []);
 
   useEffect(() => {
     if (isOpen) {
       fetchElections();
-      setSelectedElections([]);
+      setSelected([]);
     }
   }, [fetchElections, isOpen, user.id]);
 
-  const canAssignKey = () => {
-    const eligibleDesignations = [
-      'National Coordinator',
-      'State Coordinator',
-      'LGA Coordinator',
-      'Ward Coordinator',
-      'Polling Unit Agent',
-      'Vote Defender'
-    ];
-    return eligibleDesignations.includes(user.designation || '');
-  };
-
-  const handleAssignKey = async () => {
-    // Validate user ID
-    if (!user.id) {
-      alert('Invalid user ID');
-      console.error('Monitor key assignment failed: Invalid user ID');
-      return;
-    }
-
-    // Validate election selection
-    if (!selectedElections || selectedElections.length === 0) {
-      alert('Please select at least one election');
-      console.error('Monitor key assignment failed: No elections selected');
-      return;
-    }
-
-    if (locationIssues.length > 0) {
-      alert(`Cannot assign monitoring access yet. Missing information: ${locationIssues.join(', ')}`);
-      return;
-    }
-
+  const handleAssign = async () => {
+    if (!user.id || !selected.length || issues.length > 0) return;
     setLoading(true);
     try {
-      const payload = {
-        electionIds: selectedElections,
+      await monitorKeyService.assignMonitorKey(user.id, {
+        electionIds: selected,
         key_status: 'active' as const,
-        election_access_level: user.designation || undefined
-      };
-
-      console.log('Assigning monitor key with data:', payload);
-
-      const response = await monitorKeyService.assignMonitorKey(user.id, payload);
-      console.log('Monitor key assignment response:', response);
-
+        election_access_level: user.designation || undefined,
+      });
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Error assigning monitor key:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to assign monitor key';
-      alert(errorMessage);
+      alert(error.response?.data?.message || 'Failed to assign monitor key');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  const toggle = (id: string) =>
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+
+  const locationCards = [
+    { label: 'State', value: loc.state },
+    { label: 'LGA', value: loc.lga },
+    { label: 'Ward', value: loc.ward },
+    { label: 'Polling Unit', value: loc.pu },
+  ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-3">
-            <Key className="h-6 w-6 text-blue-600" />
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Assign Monitor Key
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Grant {user.name} access to election monitoring
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <X size={24} />
-          </button>
-        </div>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      scroll="paper"
+      PaperProps={{ sx: { borderRadius: 3 } }}
+    >
+      <DialogTitle
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          pb: 1,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Key size={20} color="#3b82f6" />
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+              Assign Monitor Key
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Grant {user.name} monitoring access
+            </Typography>
+          </Box>
+        </Box>
+        <IconButton onClick={onClose} size="small">
+          <X size={18} />
+        </IconButton>
+      </DialogTitle>
 
-        <div className="p-6 space-y-6">
-          {/* User Info */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 dark:text-white mb-2">User Information</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Name:</span>
-                <span className="ml-2 text-gray-900 dark:text-white">{user.name}</span>
-              </div>
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Designation:</span>
-                <span className="ml-2 text-gray-900 dark:text-white">
-                  {user.designation || 'Not assigned'}
-                </span>
-              </div>
-            </div>
-          </div>
+      <Divider />
 
-          {/* Eligibility Check */}
-          {!canAssignKey() && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-              <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-                This user's designation "{user.designation}" is not eligible for monitoring access.
-                Only Coordinators, Polling Unit Agents, and Vote Defenders can be assigned monitor keys.
-              </p>
-            </div>
-          )}
+      <DialogContent sx={{ pt: 2 }}>
+        {/* User Info */}
+        <Box sx={{ bgcolor: 'grey.50', borderRadius: 2, p: 2, mb: 2 }}>
+          <Grid container spacing={1}>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary">
+                Name
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {user.name}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary">
+                Designation
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {user.designation || 'Not assigned'}
+              </Typography>
+            </Grid>
+          </Grid>
+        </Box>
 
-          {canAssignKey() && (
-            <>
-              {/* Monitoring Location */}
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-                  <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-                  Monitoring Location (from profile)
-                </h3>
+        {!canAssign && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Designation &ldquo;{user.designation}&rdquo; is not eligible for monitoring
+            access.
+          </Alert>
+        )}
 
-                {locationIssues.length > 0 && (
-                  <div className="mb-4 flex items-start space-x-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-200">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Missing location details</p>
-                      <ul className="list-disc list-inside">
-                        {locationIssues.map(issue => (
-                          <li key={issue}>{issue}</li>
-                        ))}
-                      </ul>
-                      <p className="mt-2 text-xs">Update the volunteer's voting information before assigning monitoring access.</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
-                    <p className="text-gray-500 dark:text-gray-400">State</p>
-                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.state || 'Not set'}</p>
-                  </div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
-                    <p className="text-gray-500 dark:text-gray-400">LGA</p>
-                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.lga || 'Not set'}</p>
-                  </div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
-                    <p className="text-gray-500 dark:text-gray-400">Ward</p>
-                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.ward || 'Not set'}</p>
-                  </div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-700">
-                    <p className="text-gray-500 dark:text-gray-400">Polling Unit</p>
-                    <p className="font-medium text-gray-900 dark:text-white">{monitoringLocation.pollingUnit || 'Not set'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Election Selection */}
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-green-600" />
-                  Election Access
-                </h3>
-                {elections.length === 0 ? (
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">No active elections available</p>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {elections.map((election) => (
-                      <label key={election.election_id} className="flex items-start space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedElections.includes(election.election_id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedElections(prev => [...prev, election.election_id]);
-                            } else {
-                              setSelectedElections(prev => prev.filter(id => id !== election.election_id));
-                            }
-                          }}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {election.election_name}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            {election.state} • {election.election_type} • {new Date(election.election_date).toLocaleDateString()}
-                          </div>
-                          <div className="text-xs text-blue-600 dark:text-blue-400 capitalize">
-                            {election.status}
-                          </div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          {canAssignKey() && (
-            <button
-              onClick={handleAssignKey}
-              disabled={loading || selectedElections.length === 0}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+        {canAssign && (
+          <>
+            {/* Location */}
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                mb: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+              }}
             >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              <span>{loading ? 'Assigning...' : 'Assign Monitor Key'}</span>
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+              <MapPin size={16} /> Monitoring Location
+            </Typography>
+
+            {issues.length > 0 && (
+              <Alert
+                severity="error"
+                sx={{ mb: 2 }}
+                icon={<AlertTriangle size={18} />}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
+                  Missing location details
+                </Typography>
+                {issues.map((i) => (
+                  <Typography key={i} variant="caption" component="div">
+                    &bull; {i}
+                  </Typography>
+                ))}
+              </Alert>
+            )}
+
+            <Grid container spacing={1.5} sx={{ mb: 3 }}>
+              {locationCards.map(({ label, value }) => (
+                <Grid size={{ xs: 6 }} key={label}>
+                  <Box
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      p: 1.5,
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      {label}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {value || 'Not set'}
+                    </Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+
+            {/* Elections */}
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                mb: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+              }}
+            >
+              <Calendar size={16} /> Election Access
+            </Typography>
+
+            {elections.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No active elections available
+              </Typography>
+            ) : (
+              <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                {elections.map((el) => (
+                  <Box
+                    key={el.election_id}
+                    onClick={() => toggle(el.election_id)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 1,
+                      p: 1.5,
+                      mb: 1,
+                      border: '1px solid',
+                      borderColor: selected.includes(el.election_id)
+                        ? 'primary.main'
+                        : 'divider',
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      bgcolor: selected.includes(el.election_id)
+                        ? 'primary.light'
+                        : 'transparent',
+                      '&:hover': { bgcolor: 'grey.50' },
+                    }}
+                  >
+                    <Checkbox
+                      checked={selected.includes(el.election_id)}
+                      size="small"
+                      sx={{ p: 0, mt: 0.25 }}
+                    />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {el.election_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {el.state} &middot; {el.election_type} &middot;{' '}
+                        {new Date(el.election_date).toLocaleDateString()}
+                      </Typography>
+                      <Chip
+                        label={el.status}
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                        sx={{
+                          ml: 1,
+                          textTransform: 'capitalize',
+                          height: 20,
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </>
+        )}
+      </DialogContent>
+
+      <Divider />
+
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        {canAssign && (
+          <Button
+            variant="contained"
+            onClick={handleAssign}
+            disabled={loading || selected.length === 0}
+            startIcon={
+              loading ? <CircularProgress size={16} /> : <Key size={16} />
+            }
+          >
+            {loading ? 'Assigning...' : 'Assign Monitor Key'}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
   );
 };
 
