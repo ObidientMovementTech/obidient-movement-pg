@@ -11,6 +11,7 @@ import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import AdminRoute from "./components/AdminRoute.tsx";
 import PbxRoute from "./components/pbx/PbxRoute.tsx";
 import ChatWidget from "./components/pbx/ChatWidget.tsx";
+import InstallPrompt from "./components/pwa/InstallPrompt.tsx";
 
 // Contexts (these are lightweight)
 import { ThemeProvider } from "./context/ThemeContexts.tsx";
@@ -113,6 +114,7 @@ const RootLayout = () => (
   <>
     <Outlet />
     <ChatWidget />
+    <InstallPrompt />
   </>
 );
 
@@ -414,4 +416,11 @@ if (import.meta.hot) {
   // In production
   const root = ReactDOM.createRoot(container);
   root.render(renderApp());
+}
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  });
 }
