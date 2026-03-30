@@ -90,7 +90,7 @@ const NewsPostPage = () => {
     publisher: {
       '@type': 'Organization',
       name: 'Obidient Movement',
-      logo: { '@type': 'ImageObject', url: 'https://member.obidients.com/obidientLogoGreen.svg' },
+      logo: { '@type': 'ImageObject', url: `${import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173'}/obidientLogoGreen.svg` },
     },
   };
 
@@ -101,7 +101,7 @@ const NewsPostPage = () => {
         description={post.excerpt || stripHtml(post.content)}
         ogImage={post.featured_image_url || undefined}
         ogType="article"
-        canonical={`https://member.obidients.com/news/${post.slug}`}
+        canonical={`${import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173'}/news/${post.slug}`}
         article={{
           publishedTime: post.published_at || post.created_at,
           author: post.author_name,

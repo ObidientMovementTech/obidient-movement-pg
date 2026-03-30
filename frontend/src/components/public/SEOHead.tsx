@@ -17,7 +17,7 @@ interface SEOHeadProps {
 
 const SITE_NAME = 'Obidient Movement';
 const DEFAULT_OG_IMAGE = '/obidientLogoGreen.svg';
-const BASE_URL = 'https://member.obidients.com';
+const BASE_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
 
 const SEOHead = ({
   title,

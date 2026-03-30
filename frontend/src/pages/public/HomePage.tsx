@@ -6,12 +6,14 @@ import voteAppImg from '../../assets/images/po4.jpg';
 import rallyImg from '../../assets/images/po5.jpeg';
 import leaderImg from '../../assets/images/po2.webp';
 
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+
 const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'Obidient Movement',
-  url: 'https://member.obidients.com',
-  logo: 'https://member.obidients.com/obidientLogoGreen.svg',
+  url: FRONTEND_URL,
+  logo: `${FRONTEND_URL}/obidientLogoGreen.svg`,
   description:
     'The Obidient Movement empowers Nigerians for democratic participation, accountability, and national progress.',
   address: {
