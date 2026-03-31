@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: 'prompt',
-        includeAssets: ['obi-icon.svg', 'obidientLogoGreen.svg', 'obidientLogo.svg', 'fav.png'],
+        includeAssets: ['obi-icon.svg', 'obidientLogoGreen.svg', 'obidientLogo.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
           name: 'Obidient Movement',
           short_name: 'Obidient',
@@ -25,18 +25,13 @@ export default defineConfig(({ mode }) => {
           categories: ['social', 'politics', 'news'],
           icons: [
             {
-              src: '/obi-icon.svg',
-              sizes: 'any',
-              type: 'image/svg+xml',
+              src: '/pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/fav.png',
-              sizes: '64x64',
-              type: 'image/png',
-            },
-            {
-              src: '/logo.png',
+              src: '/pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable',
