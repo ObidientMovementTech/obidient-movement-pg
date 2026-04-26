@@ -339,6 +339,57 @@ class VotingBloc {
     return await VotingBloc.findById(result.rows[0].id, true);
   }
 
+  // Find voting bloc by join code - lightweight version for public page
+  static async findByJoinCodePublic(joinCode) {
+    const client = await getClient();
+    try {
+      // Single query: bloc + creator + member count
+      const result = await client.query(
+        `SELECT vb.*, 
+          u.id as "creatorId", u.name as "creatorName", u.email as "creatorEmail", u."profileImage" as "creatorProfileImage",
+          (SELECT COUNT(*) FROM "votingBlocMembers" WHERE "votingBlocId" = vb.id)::int as "memberCount"
+         FROM "votingBlocs" vb
+         LEFT JOIN users u ON vb.creator = u.id
+         WHERE vb."joinCode" = $1`,
+        [joinCode]
+      );
+
+      if (result.rows.length === 0) return null;
+
+      const row = result.rows[0];
+
+      // Get toolkits (lightweight - usually few rows)
+      const toolkitsResult = await client.query(
+        'SELECT * FROM "votingBlocToolkits" WHERE "votingBlocId" = $1 ORDER BY "createdAt"',
+        [row.id]
+      );
+
+      // Get just the member user IDs (for isMember check on frontend)
+      const memberIdsResult = await client.query(
+        `SELECT "userId" FROM "votingBlocMembers" WHERE "votingBlocId" = $1 AND "memberType" = 'platform'`,
+        [row.id]
+      );
+
+      const votingBloc = new VotingBloc(row);
+      votingBloc.toolkits = toolkitsResult.rows;
+      votingBloc.totalMembers = row.memberCount;
+      votingBloc.creator = {
+        id: row.creatorId,
+        name: row.creatorName,
+        email: row.creatorEmail,
+        profileImage: row.creatorProfileImage,
+      };
+      votingBloc.members = memberIdsResult.rows.map(r => r.userId);
+      votingBloc.memberDetails = [];
+      votingBloc.manualMembers = [];
+      votingBloc.memberMetadata = [];
+
+      return votingBloc;
+    } finally {
+      client.release();
+    }
+  }
+
   // Search voting blocs
   static async search(searchOptions = {}) {
     const {
@@ -422,6 +473,7 @@ class VotingBloc {
       locationLga,
       locationWard,
       status = 'active',
+      period,
       limit = 100,
       offset = 0
     } = searchOptions;
@@ -460,6 +512,15 @@ class VotingBloc {
       paramCount++;
     }
 
+    // Build period filter for member join date
+    let memberWhereClause = '';
+    const memberValues = [];
+    if (period === 'week') {
+      memberWhereClause = `WHERE "joinDate" >= NOW() - INTERVAL '7 days'`;
+    } else if (period === 'month') {
+      memberWhereClause = `WHERE "joinDate" >= NOW() - INTERVAL '30 days'`;
+    }
+
     // Optimized query using pre-aggregated member counts and including profile images
     const result = await query(
       `WITH MemberCounts AS (
@@ -467,6 +528,7 @@ class VotingBloc {
            "votingBlocId",
            COUNT("userId") as "memberCount"
          FROM "votingBlocMembers"
+         ${memberWhereClause}
          GROUP BY "votingBlocId"
        )
        SELECT 

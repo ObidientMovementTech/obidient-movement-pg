@@ -171,10 +171,8 @@ const GetStartedPage = () => {
         }
       }
       // Add specific handling for common error types
-      else if (error.errorType === 'EMAIL_EXISTS') {
-        errorMessage = "An account with this email already exists. Please use a different email or try logging in.";
-      } else if (error.errorType === 'PHONE_EXISTS') {
-        errorMessage = "An account with this phone number already exists. Please use a different phone number.";
+      else if (error.errorType === 'ACCOUNT_EXISTS') {
+        errorMessage = "An account with these details already exists. Please use different credentials or try logging in.";
       } else if (error.errorType === 'NETWORK_ERROR') {
         errorMessage = "Connection error. Please check your internet connection and try again.";
       }

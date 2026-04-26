@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getRecaptchaToken } from "../utils/recaptcha.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -20,7 +21,8 @@ export const registerUser = async (data: {
   };
 }) => {
   try {
-    const response = await axios.post(`${API_BASE}/auth/register`, data, {
+    const recaptchaToken = await getRecaptchaToken('register');
+    const response = await axios.post(`${API_BASE}/auth/register`, { ...data, recaptchaToken }, {
       withCredentials: true,
     });
     return response.data;
@@ -49,7 +51,8 @@ export const loginUser = async (data: {
   password: string;
 }) => {
   try {
-    const response = await axios.post(`${API_BASE}/auth/login`, data, {
+    const recaptchaToken = await getRecaptchaToken('login');
+    const response = await axios.post(`${API_BASE}/auth/login`, { ...data, recaptchaToken }, {
       withCredentials: true,
     });
     return response.data;

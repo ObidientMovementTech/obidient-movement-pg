@@ -1,4 +1,5 @@
-import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import s3Client from "../config/aws.js";
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
@@ -94,6 +95,30 @@ export const deleteFromS3 = async (fileUrl) => {
   } catch (error) {
     throw new Error("S3 delete failed: " + error.message);
   }
+};
+
+/**
+ * Generates a short-lived signed URL for private S3 objects.
+ * Use for KYC documents and other sensitive files.
+ * @param {string} fileUrl - The public S3 URL or S3 key
+ * @param {number} expiresIn - TTL in seconds (default 300 = 5 min)
+ * @returns {Promise<string>} - Signed URL
+ */
+export const getSignedFileUrl = async (fileUrl, expiresIn = 300) => {
+  let key;
+  if (fileUrl.startsWith('http')) {
+    const url = new URL(fileUrl);
+    key = url.pathname.substring(1);
+  } else {
+    key = fileUrl;
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: process.env.AWS_STORAGE_BUCKET_NAME,
+    Key: key,
+  });
+
+  return getSignedUrl(s3Client, command, { expiresIn });
 };
 
 /**

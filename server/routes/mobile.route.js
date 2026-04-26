@@ -16,9 +16,11 @@ import {
   updateMobileFeed,
   deleteMobileFeed,
   updatePushSettings,
+  sendTestPush,
   uploadMobileFeedImage,
   getMobileNotifications,
   markMobileNotificationRead,
+  getUnifiedFeed,
   getCurrentUserProfile
 } from '../controllers/mobile.controller.js';
 
@@ -44,6 +46,8 @@ router.get('/user/profile', protect, getCurrentUserProfile);
 
 // Feeds/Alerts
 router.get('/feeds', protect, getMobileFeeds);
+// Unified feed (mobile_feeds + broadcast notifications)
+router.get('/feeds/unified', protect, getUnifiedFeed);
 router.post('/feeds', protect, isAdmin, createMobileFeed); // For admin users
 router.put('/feeds/:id', protect, isAdmin, updateMobileFeed); // Update feed (admin only)
 router.delete('/feeds/:id', protect, isAdmin, deleteMobileFeed); // Delete feed (admin only)
@@ -60,6 +64,7 @@ router.get('/messages/unread-count', protect, getUnreadMessageCount);
 // Push Notifications
 router.post('/push/register-token', protect, registerPushToken);
 router.put('/push/settings', protect, updatePushSettings);
+router.post('/push/test', protect, sendTestPush);
 
 // Notifications (unified system)
 router.get('/notifications', protect, getMobileNotifications);

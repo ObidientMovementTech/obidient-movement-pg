@@ -380,7 +380,29 @@ export default function AccountSettings({ profile }: AccountSettingsProps) {
             </div>
           </div>
         </div>
-      </div>      {/* Data Privacy Section */}
+      </div>
+
+      {/* Chat & Privacy Section */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
+          <h3 className="text-lg font-medium text-gray-800">Chat & Privacy</h3>
+        </div>
+        <div className="p-6">
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Manage who can message you, control read receipts, typing indicators, and view your blocked users list.
+            </p>
+            <button
+              onClick={() => navigate('/settings/chat-privacy')}
+              className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 transition text-sm font-medium"
+            >
+              Chat Privacy Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Privacy Section */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
           <h3 className="text-lg font-medium text-gray-800">Data & Privacy</h3>

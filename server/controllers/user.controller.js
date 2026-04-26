@@ -305,7 +305,7 @@ export const changePassword = async (req, res) => {
     }
 
     // Hash new password
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
     // Update password
@@ -876,5 +876,128 @@ export const getPollingUnitMembers = async (req, res) => {
       success: false,
       message: 'Failed to get polling unit members'
     });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════
+// GET /api/users/chat-settings — Get user's chat privacy settings
+// ══════════════════════════════════════════════════════════════════
+export const getChatSettings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Upsert: create row with defaults if it doesn't exist, then return it
+    const result = await query(
+      `INSERT INTO user_chat_settings (user_id)
+       VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId]
+    );
+
+    const settings = await query(
+      `SELECT who_can_dm, read_receipts, show_online_status,
+              show_typing_indicator, allow_message_requests
+       FROM user_chat_settings WHERE user_id = $1`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      settings: settings.rows[0],
+    });
+  } catch (error) {
+    console.error('getChatSettings error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch chat settings' });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════
+// PATCH /api/users/chat-settings — Update user's chat privacy settings
+// ══════════════════════════════════════════════════════════════════
+export const updateChatSettings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      who_can_dm,
+      read_receipts,
+      show_online_status,
+      show_typing_indicator,
+      allow_message_requests,
+    } = req.body;
+
+    // Validate who_can_dm if provided
+    const validDmOptions = ['everyone', 'coordinators_only', 'nobody'];
+    if (who_can_dm !== undefined && !validDmOptions.includes(who_can_dm)) {
+      return res.status(400).json({
+        success: false,
+        message: 'who_can_dm must be one of: everyone, coordinators_only, nobody',
+      });
+    }
+
+    // Validate booleans
+    const boolFields = { read_receipts, show_online_status, show_typing_indicator, allow_message_requests };
+    for (const [field, value] of Object.entries(boolFields)) {
+      if (value !== undefined && typeof value !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message: `${field} must be a boolean`,
+        });
+      }
+    }
+
+    // Ensure row exists (upsert defaults)
+    await query(
+      `INSERT INTO user_chat_settings (user_id)
+       VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId]
+    );
+
+    // Build dynamic SET clause for only provided fields
+    const updates = [];
+    const values = [userId];
+    let paramIdx = 2;
+
+    if (who_can_dm !== undefined) {
+      updates.push(`who_can_dm = $${paramIdx++}`);
+      values.push(who_can_dm);
+    }
+    if (read_receipts !== undefined) {
+      updates.push(`read_receipts = $${paramIdx++}`);
+      values.push(read_receipts);
+    }
+    if (show_online_status !== undefined) {
+      updates.push(`show_online_status = $${paramIdx++}`);
+      values.push(show_online_status);
+    }
+    if (show_typing_indicator !== undefined) {
+      updates.push(`show_typing_indicator = $${paramIdx++}`);
+      values.push(show_typing_indicator);
+    }
+    if (allow_message_requests !== undefined) {
+      updates.push(`allow_message_requests = $${paramIdx++}`);
+      values.push(allow_message_requests);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields to update' });
+    }
+
+    const result = await query(
+      `UPDATE user_chat_settings
+       SET ${updates.join(', ')}
+       WHERE user_id = $1
+       RETURNING who_can_dm, read_receipts, show_online_status,
+                 show_typing_indicator, allow_message_requests`,
+      values
+    );
+
+    res.json({
+      success: true,
+      settings: result.rows[0],
+    });
+  } catch (error) {
+    console.error('updateChatSettings error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update chat settings' });
   }
 };

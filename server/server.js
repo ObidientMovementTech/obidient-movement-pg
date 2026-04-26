@@ -38,8 +38,12 @@ import blogRoutes from './routes/blog.route.js';
 import chatRoutes from './routes/chat.route.js';
 import conversationRoutes from './routes/conversation.route.js';
 import roomRoutes from './routes/room.route.js';
+import blockRoutes from './routes/block.route.js';
 import appSettingsRoutes from './routes/appSettings.route.js';
 import adcRoutes from './routes/adc.route.js';
+import reactionRoutes from './routes/reaction.route.js';
+import nigeriaLocationsRoutes from './routes/nigeriaLocations.routes.js';
+import coordinatorRoutes from './routes/coordinator.routes.js';
 import { initSocket } from './config/socket.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
@@ -53,6 +57,23 @@ import {
 
 // Load env variables
 dotenv.config();
+
+// ── Security: validate critical environment variables at startup ──
+(function validateEnv() {
+  const required = ['JWT_SECRET'];
+  const missing = required.filter(k => !process.env[k]);
+  if (missing.length) {
+    console.error(`FATAL: Missing required env vars: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+  if (process.env.JWT_SECRET.length < 32) {
+    console.error('FATAL: JWT_SECRET must be at least 32 characters');
+    process.exit(1);
+  }
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET === process.env.JWT_SECRET) {
+    console.warn('WARNING: SESSION_SECRET should be different from JWT_SECRET');
+  }
+})();
 
 const app = express();
 const httpServer = createServer(app);
@@ -72,13 +93,20 @@ app.use(hpp());
 app.set('trust proxy', 1);
 
 // Basic middlewares
-app.use(cors({
-  origin: [
-    CLIENT_URL,
+const allowedOrigins = [CLIENT_URL];
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push(
     'http://192.168.0.111:8081', // Metro bundler for mobile development
     'http://localhost:8081',      // Metro bundler localhost
     'http://10.0.2.2:8081'        // Metro bundler for emulator
-  ],
+  );
+}
+if (process.env.ADDITIONAL_ORIGINS) {
+  allowedOrigins.push(...process.env.ADDITIONAL_ORIGINS.split(',').map(o => o.trim()));
+}
+
+app.use(cors({
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Onboarding-Token']
@@ -96,10 +124,20 @@ app.use(
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
   })
 );
+
+// ── Global unhandled rejection / uncaught exception handlers ──
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection', { reason: String(reason) });
+});
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception', { error: error.message });
+  process.exit(1);
+});
 
 // Initialize Passport
 app.use(passport.initialize());
@@ -135,9 +173,13 @@ app.use('/auth/onboarding', onboardingRoutes); // Onboarding system with Google 
 app.use('/api/blog', blogRoutes); // Blog system (public + admin)
 app.use('/api/chat', chatRoutes); // Chat coordinator chain + rate limiting
 app.use('/api/conversations', conversationRoutes); // Real-time chat conversations
+app.use('/users', blockRoutes); // User blocking (under /users/:id/block)
 app.use('/api/rooms', roomRoutes); // Community rooms (location-based group chat)
 app.use('/api/settings', appSettingsRoutes); // App settings (mobilization pack, etc.)
 app.use('/api/adc', adcRoutes); // ADC membership registration
+app.use('/api/reactions', reactionRoutes); // Reactions (like, love, smile, meh)
+app.use('/api/nigeria-locations', nigeriaLocationsRoutes); // Public Nigeria location hierarchy
+app.use('/api/coordinator', coordinatorRoutes); // Coordinator assignment (search, assign, remove, subordinates)
 
 // Placeholder route
 app.get('/', (req, res) => {

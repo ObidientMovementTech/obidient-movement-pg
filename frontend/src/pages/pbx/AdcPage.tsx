@@ -233,7 +233,7 @@ export default function AdcPage() {
                 <TableRow key={user.id} hover>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Avatar src={user.profileImage || undefined} sx={{ width: 36, height: 36, bgcolor: PRIMARY }}>
+                      <Avatar src={user.profileImage || undefined} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 36, height: 36, bgcolor: PRIMARY }}>
                         {user.name?.[0]?.toUpperCase()}
                       </Avatar>
                       <Box>
@@ -295,7 +295,7 @@ export default function AdcPage() {
             {/* Content */}
             <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                <Avatar src={drawerUser.profileImage || undefined} sx={{ width: 48, height: 48, bgcolor: PRIMARY }}>
+                <Avatar src={drawerUser.profileImage || undefined} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 48, height: 48, bgcolor: PRIMARY }}>
                   {drawerUser.name?.[0]?.toUpperCase()}
                 </Avatar>
                 <Box>

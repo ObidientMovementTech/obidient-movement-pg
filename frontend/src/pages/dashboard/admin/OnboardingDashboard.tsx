@@ -1056,6 +1056,7 @@ const OnboardingDashboard: React.FC = () => {
                           <img
                             src={agent.profileImage}
                             alt={agent.name}
+                            referrerPolicy="no-referrer"
                             className="w-16 h-16 rounded-full object-cover border-2 border-purple-200"
                           />
                         ) : (

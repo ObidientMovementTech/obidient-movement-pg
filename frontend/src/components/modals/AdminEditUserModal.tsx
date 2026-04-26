@@ -304,7 +304,7 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
       <Box sx={{ px: 3, py: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {editModal.user?.profileImage ? (
-            <Avatar src={editModal.user.profileImage} sx={{ width: 40, height: 40 }} />
+            <Avatar src={editModal.user.profileImage} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 40, height: 40 }} />
           ) : (
             <Avatar sx={{ width: 40, height: 40, bgcolor: '#e5e7eb', color: '#6b7280' }}>
               <Users size={20} />

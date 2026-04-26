@@ -71,9 +71,7 @@ export const leaveVotingBloc = async (id: string) => {
 };
 
 export const getVotingBlocByJoinCode = async (joinCode: string) => {
-  // Add cache-busting timestamp to ensure fresh data
-  const timestamp = new Date().getTime();
-  const res = await axios.get(`${API_BASE}/voting-blocs/join-code/${joinCode}?_t=${timestamp}`, {
+  const res = await axios.get(`${API_BASE}/voting-blocs/join-code/${joinCode}`, {
     withCredentials: true,
   });
   return res.data;

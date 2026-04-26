@@ -1,8 +1,12 @@
-import { useRef, useEffect } from 'react';
-import { Box, Typography, Avatar, Badge, IconButton, Chip, CircularProgress } from '@mui/material';
-import { ArrowLeft, ChevronDown, MessageSquare } from 'lucide-react';
+import { useRef, useEffect, useState } from 'react';
+import {
+  Box, Typography, Avatar, Badge, IconButton, Chip, CircularProgress,
+  Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button,
+} from '@mui/material';
+import { ArrowLeft, ChevronDown, MessageSquare, MoreVertical, Ban } from 'lucide-react';
 import { FONT, PRIMARY, PRIMARY_LIGHT, SURFACE_LOW } from '../types';
 import { richDesignation, convToProfile } from '../utils';
+import { useBlock } from '../../../../context/BlockContext';
 import type { ProfileInfo } from '../types';
 import type { Conversation, Message } from '../../../../services/conversationService';
 import MessageBubble from './MessageBubble';
@@ -24,6 +28,12 @@ interface Props {
   onInputChange: (v: string) => void;
   onLoadMore: () => void;
   onProfileClick: (p: ProfileInfo) => void;
+  // Reactions, replies, deletion
+  replyingTo?: Message | null;
+  onReply?: (msg: Message) => void;
+  onCancelReply?: () => void;
+  onReact?: (messageId: string, emoji: string) => void;
+  onDelete?: (messageId: string, mode: 'for_me' | 'for_everyone') => void;
 }
 
 export default function ConversationChat({
@@ -41,8 +51,34 @@ export default function ConversationChat({
   onInputChange,
   onLoadMore,
   onProfileClick,
+  replyingTo,
+  onReply,
+  onCancelReply,
+  onReact,
+  onDelete,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
+  const { isBlocked, blockUser, unblockUser } = useBlock();
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+
+  const blocked = conversation ? isBlocked(conversation.participant_id) : false;
+
+  const handleBlock = async () => {
+    if (!conversation) return;
+    setBlockLoading(true);
+    try {
+      if (blocked) {
+        await unblockUser(conversation.participant_id);
+      } else {
+        await blockUser(conversation.participant_id);
+      }
+    } catch { /* silent */ }
+    setBlockLoading(false);
+    setConfirmOpen(false);
+    setMenuAnchor(null);
+  };
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -97,6 +133,7 @@ export default function ConversationChat({
         >
           <Avatar
             src={conversation.participant_image || undefined}
+            imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{
               width: 44,
               height: 44,
@@ -149,7 +186,84 @@ export default function ConversationChat({
             {typingText || (isOnline ? 'Active now' : '')}
           </Typography>
         </Box>
+
+        {/* Block menu */}
+        <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+          <MoreVertical size={18} color="#6f7a70" />
+        </IconButton>
+        <Menu
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor)}
+          onClose={() => setMenuAnchor(null)}
+          PaperProps={{ sx: { borderRadius: 3, minWidth: 160, fontFamily: FONT } }}
+        >
+          <MenuItem
+            onClick={() => { setMenuAnchor(null); blocked ? handleBlock() : setConfirmOpen(true); }}
+            sx={{ fontFamily: FONT, fontSize: '0.82rem', gap: 1, color: blocked ? '#737373' : '#ef4444' }}
+          >
+            <Ban size={15} />
+            {blocked ? 'Unblock' : 'Block User'}
+          </MenuItem>
+        </Menu>
       </Box>
+
+      {/* Blocked banner */}
+      {blocked && (
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            bgcolor: '#fef2f2',
+            borderBottom: '1px solid rgba(239,68,68,0.1)',
+          }}
+        >
+          <Ban size={14} color="#ef4444" />
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#ef4444', flex: 1 }}>
+            You blocked this user. They can't send you messages.
+          </Typography>
+          <Typography
+            onClick={handleBlock}
+            sx={{
+              fontFamily: FONT,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: PRIMARY,
+              cursor: 'pointer',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+          >
+            Unblock
+          </Typography>
+        </Box>
+      )}
+
+      {/* Block confirmation dialog */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs">
+        <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '1rem' }}>
+          Block {conversation?.participant_name}?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ fontFamily: FONT, fontSize: '0.85rem' }}>
+            They won't be able to send you direct messages. You can unblock them anytime.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)} sx={{ fontFamily: FONT, textTransform: 'none', color: '#737373' }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleBlock}
+            variant="contained"
+            disabled={blockLoading}
+            sx={{ fontFamily: FONT, textTransform: 'none', bgcolor: '#ef4444', '&:hover': { bgcolor: '#dc2626' } }}
+          >
+            {blockLoading ? 'Blocking…' : 'Block'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Messages */}
       <Box
@@ -214,6 +328,21 @@ export default function ConversationChat({
                 senderImage={msg.sender_image}
                 showAvatar={showAvatar}
                 showDateSeparator={showDate}
+                reactions={msg.reactions}
+                replyToSenderName={msg.reply_to_sender_name}
+                replyToContent={msg.reply_to_content}
+                deletedAt={msg.deleted_at}
+                onReact={onReact ? (emoji) => onReact(msg.id, emoji) : undefined}
+                onReply={onReply ? () => onReply(msg) : undefined}
+                onDelete={onDelete ? (mode) => onDelete(msg.id, mode) : undefined}
+                onContextMenu={
+                  !msg.deleted_at && onReply
+                    ? (e) => {
+                        e.preventDefault();
+                        onReply(msg);
+                      }
+                    : undefined
+                }
               />
             );
           })
@@ -257,7 +386,18 @@ export default function ConversationChat({
       </Box>
 
       {/* Input */}
-      <MessageInput value={messageInput} onChange={onInputChange} onSend={onSend} disabled={sending} />
+      <MessageInput
+        value={messageInput}
+        onChange={onInputChange}
+        onSend={onSend}
+        disabled={sending}
+        replyTo={
+          replyingTo
+            ? { senderName: replyingTo.sender_name, content: replyingTo.content }
+            : null
+        }
+        onCancelReply={onCancelReply}
+      />
     </Box>
   );
 }

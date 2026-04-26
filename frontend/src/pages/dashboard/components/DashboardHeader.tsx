@@ -315,8 +315,7 @@ export default function DashboardHeader({ title, isSidebarOpen, toggleSidebar, s
                         window.location.href = '/auth/login';
                       } catch (error) {
                         console.error('Logout failed:', error);
-                        // Fallback to local logout if API call fails
-                        localStorage.removeItem('token');
+                        // Fallback redirect if API call fails
                         window.location.href = '/auth/login';
                       }
                     }}

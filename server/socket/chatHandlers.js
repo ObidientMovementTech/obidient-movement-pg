@@ -1,4 +1,5 @@
 import { query } from '../config/db.js';
+import { reVerifySocket } from '../config/socket.js';
 
 // Typing throttle: Map<`${convId}:${userId}`, lastEmitTimestamp>
 const typingThrottle = new Map();
@@ -13,6 +14,7 @@ export function registerChatHandlers(io, socket) {
   // ── Join a conversation room (when user opens a chat) ─────────
   socket.on('conversation:join', async (conversationId) => {
     if (!conversationId || typeof conversationId !== 'string') return;
+    if (!reVerifySocket(socket)) return;
 
     // Verify user is a participant before allowing room join
     try {
@@ -34,9 +36,12 @@ export function registerChatHandlers(io, socket) {
     socket.leave(`conv:${conversationId}`);
   });
 
-  // ── Typing start (throttled server-side) ──────────────────────
+  // ── Typing start (throttled, block-aware, settings-aware) ───
   socket.on('typing:start', (conversationId) => {
     if (!conversationId || typeof conversationId !== 'string') return;
+
+    // Respect user's typing indicator setting
+    if (socket.chatSettings?.show_typing_indicator === false) return;
 
     const key = `${conversationId}:${userId}`;
     const now = Date.now();
@@ -46,6 +51,7 @@ export function registerChatHandlers(io, socket) {
     typingThrottle.set(key, now);
 
     // Broadcast to other participants in this conversation
+    // Block filtering happens at the recipient level via socket middleware
     socket.to(`conv:${conversationId}`).emit('typing:start', {
       userId,
       conversationId,
@@ -56,6 +62,8 @@ export function registerChatHandlers(io, socket) {
   socket.on('typing:stop', (conversationId) => {
     if (!conversationId || typeof conversationId !== 'string') return;
 
+    if (socket.chatSettings?.show_typing_indicator === false) return;
+
     // Clear throttle entry
     typingThrottle.delete(`${conversationId}:${userId}`);
 
@@ -65,9 +73,10 @@ export function registerChatHandlers(io, socket) {
     });
   });
 
-  // ── Mark messages as read ─────────────────────────────────────
+  // ── Mark messages as read (block-aware, settings-aware) ──────
   socket.on('message:read', async (conversationId) => {
     if (!conversationId || typeof conversationId !== 'string') return;
+    if (!reVerifySocket(socket)) return;
 
     try {
       const now = new Date().toISOString();
@@ -80,12 +89,14 @@ export function registerChatHandlers(io, socket) {
         [now, conversationId, userId]
       );
 
-      // Notify other participants that messages have been read
-      socket.to(`conv:${conversationId}`).emit('message:read', {
-        userId,
-        conversationId,
-        readAt: now,
-      });
+      // Only send read receipt if user has read_receipts enabled
+      if (socket.chatSettings?.read_receipts !== false) {
+        socket.to(`conv:${conversationId}`).emit('message:read', {
+          userId,
+          conversationId,
+          readAt: now,
+        });
+      }
     } catch (err) {
       console.error('[Socket] message:read error:', err.message);
     }

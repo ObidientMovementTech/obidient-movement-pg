@@ -38,6 +38,7 @@ export default function ProfileHero({
               <motion.img
                 src={profile.profileImage}
                 alt="Profile"
+                referrerPolicy="no-referrer"
                 className="object-cover w-full h-full"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

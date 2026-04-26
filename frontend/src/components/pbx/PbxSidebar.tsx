@@ -126,6 +126,7 @@ function SidebarContent() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
           <Avatar
             src={profile?.profileImage}
+            imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{ width: 36, height: 36, bgcolor: 'primary.main', fontSize: '0.875rem' }}
           >
             {profile?.name?.[0] || '?'}

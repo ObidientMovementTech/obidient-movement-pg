@@ -49,7 +49,6 @@ export const submitKYCData = async (
     const res = await axios.post(`${API_BASE}/kyc/submit`, payload, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
       withCredentials: true,
     });
@@ -74,7 +73,6 @@ export const savePersonalInfoStep = async (personalInfo: any) => {
     const res = await axios.patch(`${API_BASE}/kyc/save-step/personal-info`, payload, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
       withCredentials: true,
     });
@@ -109,7 +107,6 @@ export const saveValidIDStep = async (validID: {
     const res = await axios.patch(`${API_BASE}/kyc/save-step/valid-id`, payload, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
       withCredentials: true,
     });
@@ -145,7 +142,6 @@ export const saveSelfieStep = async (selfieBase64: string) => {
     const res = await axios.patch(`${API_BASE}/kyc/save-step/selfie`, payload, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
       withCredentials: true,
     });
@@ -163,9 +159,6 @@ export const saveSelfieStep = async (selfieBase64: string) => {
 export const getUserKYC = async () => {
   try {
     const res = await axios.get(`${API_BASE}/kyc/me`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
       withCredentials: true,
     });
     return res.data;
@@ -202,7 +195,6 @@ export const editKYCData = async (
     const res = await axios.patch(`${API_BASE}/kyc/edit`, payload, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
       withCredentials: true,
     });

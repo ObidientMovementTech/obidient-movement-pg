@@ -1,4 +1,5 @@
 import { query, getClient } from '../config/db.js';
+import crypto from 'crypto';
 import { sendVoteDefenderKeyAssignedEmail } from '../utils/emailHandler.js';
 import {
   deriveMonitoringScopeFromUser,
@@ -20,7 +21,7 @@ const generateMonitorKey = (designation, state, year = new Date().getFullYear())
   }[designation] || 'VD';
 
   const stateCode = state ? state.substring(0, 3).toUpperCase() : 'GEN';
-  const randomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const randomCode = crypto.randomBytes(3).toString('hex').substring(0, 4).toUpperCase();
 
   return `${designationCode}-${year}-${stateCode}-${randomCode}`;
 };

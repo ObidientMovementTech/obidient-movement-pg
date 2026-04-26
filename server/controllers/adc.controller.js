@@ -1,11 +1,37 @@
 import { query } from '../config/db.js';
 import { uploadBufferToS3 } from '../utils/s3Upload.js';
 
+// Allowed MIME types and size limit for image uploads
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+
 // Helper: upload base64 image to S3
 const uploadBase64ToS3 = async (base64String, filename, folder) => {
+  // Extract and validate MIME type
+  const mimeMatch = base64String.match(/^data:([^;]+);base64,/);
+  const declaredMime = mimeMatch ? mimeMatch[1] : null;
+  if (declaredMime && !ALLOWED_IMAGE_TYPES.includes(declaredMime)) {
+    throw new Error(`Invalid image type: ${declaredMime}. Allowed: JPEG, PNG, WebP`);
+  }
+
   const base64Data = base64String.replace(/^data:image\/[a-z]+;base64,/, '');
   const buffer = Buffer.from(base64Data, 'base64');
-  return uploadBufferToS3(buffer, filename, { folder, contentType: 'image/jpeg' });
+
+  if (buffer.length > MAX_IMAGE_SIZE) {
+    throw new Error(`Image too large (${(buffer.length / 1024 / 1024).toFixed(1)}MB). Maximum allowed: 5MB`);
+  }
+
+  // Validate magic bytes
+  const m = buffer.slice(0, 4);
+  const isJPEG = m[0] === 0xFF && m[1] === 0xD8;
+  const isPNG = m[0] === 0x89 && m[1] === 0x50 && m[2] === 0x4E && m[3] === 0x47;
+  const isWebP = m[0] === 0x52 && m[1] === 0x49 && m[2] === 0x46 && m[3] === 0x46;
+  if (!isJPEG && !isPNG && !isWebP) {
+    throw new Error('File does not appear to be a valid image (JPEG, PNG, or WebP)');
+  }
+
+  const contentType = isJPEG ? 'image/jpeg' : isPNG ? 'image/png' : 'image/webp';
+  return uploadBufferToS3(buffer, filename, { folder, contentType });
 };
 
 // ──── Submit ADC membership card (user) ────

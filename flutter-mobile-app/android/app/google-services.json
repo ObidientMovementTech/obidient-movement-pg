@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "43580263425",
+    "project_id": "obidient-movement-mobile",
+    "storage_bucket": "obidient-movement-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43580263425:android:3c7e139e91cfe245274400",
+        "android_client_info": {
+          "package_name": "com.obidientmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASrVyXZnSqwNe4og04naVt6smmDHDw_10"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43580263425:android:0fbaee46ebde8938274400",
+        "android_client_info": {
+          "package_name": "com.obidientmovement.obidient_movement"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASrVyXZnSqwNe4og04naVt6smmDHDw_10"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

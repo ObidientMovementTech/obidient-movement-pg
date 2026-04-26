@@ -1,5 +1,5 @@
 import { Box, TextField, IconButton, Typography } from '@mui/material';
-import { Send } from 'lucide-react';
+import { Send, X, Reply } from 'lucide-react';
 import { FONT, PRIMARY, SURFACE_LOW } from '../types';
 
 interface Props {
@@ -9,9 +9,11 @@ interface Props {
   disabled?: boolean;
   placeholder?: string;
   error?: string | null;
+  replyTo?: { senderName: string; content: string } | null;
+  onCancelReply?: () => void;
 }
 
-export default function MessageInput({ value, onChange, onSend, disabled, placeholder, error }: Props) {
+export default function MessageInput({ value, onChange, onSend, disabled, placeholder, error, replyTo, onCancelReply }: Props) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -29,6 +31,53 @@ export default function MessageInput({ value, onChange, onSend, disabled, placeh
         bgcolor: '#fff',
       }}
     >
+      {/* Reply preview */}
+      {replyTo && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 1.5,
+            py: 0.75,
+            mb: 1,
+            bgcolor: 'rgba(0,104,55,0.04)',
+            borderLeft: `3px solid ${PRIMARY}`,
+            borderRadius: '0 8px 8px 0',
+          }}
+        >
+          <Reply size={14} color={PRIMARY} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: PRIMARY,
+                lineHeight: 1.2,
+              }}
+            >
+              {replyTo.senderName}
+            </Typography>
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontSize: '0.75rem',
+                color: '#6f7a70',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {replyTo.content}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onCancelReply} sx={{ p: 0.25 }}>
+            <X size={14} color="#6f7a70" />
+          </IconButton>
+        </Box>
+      )}
+
       {error && (
         <Box
           sx={{

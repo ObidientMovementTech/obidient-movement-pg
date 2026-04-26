@@ -12,14 +12,11 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-// Create axios instance with auth
+// Create axios instance with cookie-based auth
 const createAuthAxios = () => {
-  const token = localStorage.getItem('token');
   return axios.create({
     baseURL: API_BASE,
-    headers: {
-      Authorization: token ? `Bearer ${token}` : ''
-    }
+    withCredentials: true,
   });
 };
 

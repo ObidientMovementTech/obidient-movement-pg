@@ -769,7 +769,7 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Avatar src={user.profileImage} sx={{ width: 36, height: 36, fontSize: '0.8rem', bgcolor: 'primary.main' }}>
+                      <Avatar src={user.profileImage} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 36, height: 36, fontSize: '0.8rem', bgcolor: 'primary.main' }}>
                         {(user.name || user.firstName || '?')[0]}
                       </Avatar>
                       <Box sx={{ minWidth: 0 }}>

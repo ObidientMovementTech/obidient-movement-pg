@@ -5,6 +5,7 @@ import Toast from "../../components/Toast.js";
 import { loginUser, verify2FALogin, resendVerificationEmail } from "../../services/authService.js";
 import Login2FAModal from "../../components/modals/Login2FAModal.js";
 import { useUserContext } from "../../context/UserContext.js";
+import { isProfileComplete } from "../../utils/profileCompleteness.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -146,19 +147,23 @@ export default function LoginPage() {
 
       // Wait a small moment to allow state propagation
       setTimeout(() => {
+        // Check profile completeness — gate before dashboard
+        const currentProfile = profile;
+        const needsCompletion = currentProfile && !isProfileComplete(currentProfile);
+
         if (redirectAfterLogin) {
           if (redirectAfterLogin.startsWith("/cause/")) {
             localStorage.removeItem("support-cause-code");
           }
-          navigate(redirectAfterLogin);
+          navigate(needsCompletion ? "/complete-profile" : redirectAfterLogin);
           return;
         }
         const causeCode = localStorage.getItem("support-cause-code");
-        if (causeCode) {
+        if (causeCode && !needsCompletion) {
           localStorage.removeItem("support-cause-code");
           navigate(`/cause/${causeCode}`);
         } else {
-          navigate("/dashboard");
+          navigate(needsCompletion ? "/complete-profile" : "/dashboard");
         }
       }, 200);
     } catch (error: any) {
@@ -199,22 +204,27 @@ export default function LoginPage() {
       displayToast("Login successful!", "success");
       setShow2FAModal(false);
       await refreshProfile();
+
       const redirectAfterLogin = postLoginRedirect;
       setPostLoginRedirect(null);
+
       setTimeout(() => {
+        const currentProfile = profile;
+        const needsCompletion = currentProfile && !isProfileComplete(currentProfile);
+
         if (redirectAfterLogin) {
           if (redirectAfterLogin.startsWith("/cause/")) {
             localStorage.removeItem("support-cause-code");
           }
-          navigate(redirectAfterLogin);
+          navigate(needsCompletion ? "/complete-profile" : redirectAfterLogin);
           return;
         }
         const causeCode = localStorage.getItem("support-cause-code");
-        if (causeCode) {
+        if (causeCode && !needsCompletion) {
           localStorage.removeItem("support-cause-code");
           navigate(`/cause/${causeCode}`);
         } else {
-          navigate("/dashboard");
+          navigate(needsCompletion ? "/complete-profile" : "/dashboard");
         }
       }, 200);
     } catch (err: any) {

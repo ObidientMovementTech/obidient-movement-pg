@@ -52,7 +52,11 @@ export const sendSmsMessage = async ({ to, message, senderId, enqueue = false, m
     params.messageId = messageId;
   }
 
-  return sms.send(params);
+  // Wrap in a timeout to prevent indefinite hangs
+  return Promise.race([
+    sms.send(params),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Africa\'s Talking SMS request timed out after 30s')), 30000))
+  ]);
 };
 
 export const initiateVoiceCall = async ({ to, callerId, clientRequestId, queueName }) => {
@@ -70,5 +74,9 @@ export const initiateVoiceCall = async ({ to, callerId, clientRequestId, queueNa
     params.queueName = queueName;
   }
 
-  return voice.call(params);
+  // Wrap in a timeout to prevent indefinite hangs
+  return Promise.race([
+    voice.call(params),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Africa\'s Talking Voice request timed out after 30s')), 30000))
+  ]);
 };

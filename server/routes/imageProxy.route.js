@@ -19,8 +19,12 @@ router.get('/proxy-image', async (req, res) => {
 
     console.log('🖼️ Proxying image:', url);
 
-    // Fetch the image from S3
-    const response = await fetch(url);
+    // Fetch the image from S3 with timeout
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(fetchTimeout);
 
     if (!response.ok) {
       return res.status(response.status).json({ error: 'Failed to fetch image' });

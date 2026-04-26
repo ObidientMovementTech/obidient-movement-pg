@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useUser } from '../../../../context/UserContext';
-import { useSocket, type ChatMessage, type TypingEvent, type ConversationUpdate } from '../../../../context/SocketContext';
+import { useSocket, type ChatMessage, type TypingEvent, type ConversationUpdate, type ReactionUpdateEvent, type MessageDeletedEvent } from '../../../../context/SocketContext';
 import {
   getConversations,
   getOrCreateConversation,
   getMessages,
   sendMessage as apiSendMessage,
+  toggleReaction as apiToggleReaction,
+  deleteMessage as apiDeleteMessage,
   getChatContacts,
   type Conversation,
   type Message,
@@ -35,6 +37,7 @@ export function useDirectMessages() {
   const [search, setSearch] = useState('');
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   // Contacts dialog
   const [showContacts, setShowContacts] = useState(false);
@@ -43,13 +46,37 @@ export function useDirectMessages() {
     subordinates: [],
   });
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [pendingParticipant, setPendingParticipant] = useState<ChatContact | null>(null);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const activeConversation = useMemo(
-    () => conversations.find((c) => c.id === activeConvId) ?? null,
-    [conversations, activeConvId]
-  );
+  const activeConversation = useMemo(() => {
+    if (activeConvId) return conversations.find((c) => c.id === activeConvId) ?? null;
+    if (pendingParticipant) {
+      return {
+        id: 'pending',
+        type: 'direct' as const,
+        last_message_at: null,
+        last_message_preview: null,
+        created_at: new Date().toISOString(),
+        unread_count: 0,
+        last_read_at: null,
+        participant_id: pendingParticipant.id,
+        participant_name: pendingParticipant.name,
+        participant_email: pendingParticipant.email,
+        participant_image: pendingParticipant.profileImage,
+        participant_designation: pendingParticipant.designation,
+        participant_assigned_state: null,
+        participant_assigned_lga: null,
+        participant_assigned_ward: null,
+        participant_voting_state: null,
+        participant_voting_lga: null,
+        participant_voting_ward: null,
+        participant_voting_pu: null,
+      } satisfies Conversation;
+    }
+    return null;
+  }, [conversations, activeConvId, pendingParticipant]);
 
   // ── Load conversations ──
   const loadConversations = useCallback(async () => {
@@ -116,6 +143,12 @@ export function useDirectMessages() {
             sender_id: msg.sender_id,
             sender_name: msg.sender_name,
             sender_image: msg.sender_image,
+            reply_to_id: msg.reply_to_id ?? null,
+            reply_to_content: msg.reply_to_content ?? null,
+            reply_to_sender_name: msg.reply_to_sender_name ?? null,
+            reply_to_sender_id: msg.reply_to_sender_id ?? null,
+            reactions: msg.reactions ?? [],
+            deleted_at: msg.deleted_at ?? null,
           }];
         });
       }
@@ -175,27 +208,67 @@ export function useDirectMessages() {
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
 
+    const handleReactionUpdated = (data: ReactionUpdateEvent) => {
+      if (data.conversationId !== activeConvId) return;
+      setMessages((prev) =>
+        prev.map((m) => m.id === data.messageId ? { ...m, reactions: data.reactions } : m)
+      );
+    };
+
+    const handleMessageDeleted = (data: MessageDeletedEvent) => {
+      if (data.conversationId !== activeConvId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId
+            ? { ...m, deleted_at: new Date().toISOString(), content: 'This message was deleted' }
+            : m
+        )
+      );
+    };
+
+    socket.on('reaction:updated', handleReactionUpdated);
+    socket.on('message:deleted', handleMessageDeleted);
+
     return () => {
       socket.off('message:new', handleNewMessage);
       socket.off('conversation:updated', handleConversationUpdated);
       socket.off('conversation:created', handleConversationCreated);
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
+      socket.off('reaction:updated', handleReactionUpdated);
+      socket.off('message:deleted', handleMessageDeleted);
     };
   }, [socket, activeConvId, profile?._id, loadConversations]);
 
   // ── Actions ──
   const handleSend = async () => {
-    if (!activeConvId || !messageInput.trim() || sending) return;
     const content = messageInput.trim();
+    if (!content || sending) return;
+    if (!activeConvId && !pendingParticipant) return;
+
+    const replyToId = replyingTo?.id;
     setMessageInput('');
+    setReplyingTo(null);
     setSending(true);
 
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    emitStopTyping(activeConvId);
-
     try {
-      const data = await apiSendMessage(activeConvId, content);
+      let convId = activeConvId;
+
+      // Lazy creation: create conversation on first message send
+      if (!convId && pendingParticipant) {
+        const createData = await getOrCreateConversation(pendingParticipant.id);
+        convId = createData.conversationId;
+        setActiveConvId(convId);
+        setPendingParticipant(null);
+        joinConversation(convId!);
+      }
+
+      if (!convId) return;
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      emitStopTyping(convId);
+
+      const data = await apiSendMessage(convId, content, replyToId);
       if (data.message) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === data.message.id)) return prev;
@@ -208,23 +281,15 @@ export function useDirectMessages() {
             sender_id: data.message.sender_id,
             sender_name: data.message.sender_name,
             sender_image: data.message.sender_image,
+            reply_to_id: data.message.reply_to_id ?? null,
+            reply_to_content: data.message.reply_to_content ?? null,
+            reply_to_sender_name: data.message.reply_to_sender_name ?? null,
+            reply_to_sender_id: data.message.reply_to_sender_id ?? null,
+            reactions: data.message.reactions ?? [],
+            deleted_at: data.message.deleted_at ?? null,
           }];
         });
-        const preview = content.length > 100 ? content.slice(0, 100) + '...' : content;
-        setConversations((prev) => {
-          const idx = prev.findIndex((c) => c.id === activeConvId);
-          if (idx === -1) return prev;
-          const updated = [...prev];
-          updated[idx] = {
-            ...updated[idx],
-            last_message_at: data.message.created_at,
-            last_message_preview: preview,
-            unread_count: 0,
-          };
-          const [item] = updated.splice(idx, 1);
-          updated.unshift(item);
-          return updated;
-        });
+        await loadConversations();
       }
     } catch (err) {
       console.error('Failed to send message', err);
@@ -244,6 +309,46 @@ export function useDirectMessages() {
     }, 3000);
   };
 
+  const handleToggleReaction = async (messageId: string, emoji: string) => {
+    if (!activeConvId) return;
+    try {
+      const data = await apiToggleReaction(activeConvId, messageId, emoji);
+      setMessages((prev) =>
+        prev.map((m) => m.id === messageId ? { ...m, reactions: data.reactions } : m)
+      );
+    } catch (err) {
+      console.error('Failed to toggle reaction', err);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string, mode: 'for_me' | 'for_everyone') => {
+    if (!activeConvId) return;
+    try {
+      await apiDeleteMessage(activeConvId, messageId, mode);
+      if (mode === 'for_me') {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, deleted_at: new Date().toISOString(), content: 'This message was deleted' }
+              : m
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Failed to delete message', err);
+    }
+  };
+
+  const handleReply = (message: Message) => {
+    setReplyingTo(message);
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
+
   const selectConversation = (id: string) => {
     setActiveConvId(id);
     setMobileShowChat(true);
@@ -252,6 +357,7 @@ export function useDirectMessages() {
   const goBackToList = () => {
     setMobileShowChat(false);
     setActiveConvId(null);
+    setPendingParticipant(null);
   };
 
   const handleLoadMore = async () => {
@@ -275,16 +381,22 @@ export function useDirectMessages() {
     }
   };
 
-  const startConversation = async (participantId: string) => {
+  const startConversation = (participantId: string) => {
     setShowContacts(false);
-    try {
-      const data = await getOrCreateConversation(participantId);
-      if (data.created) await loadConversations();
-      setActiveConvId(data.conversationId);
+    // Check local conversations first
+    const existing = conversations.find((c) => c.participant_id === participantId);
+    if (existing) {
+      setActiveConvId(existing.id);
+      setPendingParticipant(null);
       setMobileShowChat(true);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Cannot start conversation';
-      alert(msg);
+    } else {
+      // Find contact info from loaded contacts
+      const allContacts = [...contacts.coordinators, ...contacts.subordinates];
+      const contact = allContacts.find((c) => c.id === participantId);
+      setPendingParticipant(contact ?? { id: participantId, name: 'User', email: '', phone: null, profileImage: null, designation: '' });
+      setActiveConvId(null);
+      setMessages([]);
+      setMobileShowChat(true);
     }
   };
 
@@ -319,6 +431,7 @@ export function useDirectMessages() {
     isConnected,
     onlineUsers,
     profileId: profile?._id,
+    replyingTo,
     // Contacts
     showContacts,
     contacts,
@@ -327,6 +440,10 @@ export function useDirectMessages() {
     setSearch,
     setMessageInput: handleInputChange,
     handleSend,
+    handleToggleReaction,
+    handleDeleteMessage,
+    handleReply,
+    cancelReply,
     selectConversation,
     goBackToList,
     handleLoadMore,

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { protect, isAdmin, authorize } from '../middlewares/auth.middleware.js';
+import { protect, isAdmin, authorize, optionalAuth } from '../middlewares/auth.middleware.js';
 import { parseFileUpload } from '../utils/s3Upload.js';
 import {
   getPublishedPosts,
@@ -18,14 +18,14 @@ const router = Router();
 
 // ── Public endpoints (no auth required) ─────────────────────────────────────
 
-// GET /api/blog/posts — List published posts (paginated)
-router.get('/posts', getPublishedPosts);
+// GET /api/blog/posts — List published posts (paginated, optionalAuth for user reactions)
+router.get('/posts', optionalAuth, getPublishedPosts);
 
 // GET /api/blog/posts/categories — Get available categories
 router.get('/posts/categories', getCategories);
 
 // GET /api/blog/posts/:slug — Get a single published post by slug
-router.get('/posts/:slug', getPostBySlug);
+router.get('/posts/:slug', optionalAuth, getPostBySlug);
 
 // ── Admin / Coordinator endpoints (auth required) ───────────────────────────
 

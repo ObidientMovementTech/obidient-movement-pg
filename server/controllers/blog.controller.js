@@ -1,4 +1,5 @@
 import BlogPost from '../models/blogPost.model.js';
+import Reaction from '../models/reaction.model.js';
 import { uploadBufferToS3 } from '../utils/s3Upload.js';
 
 // Predefined blog categories
@@ -40,6 +41,21 @@ export const getPublishedPosts = async (req, res) => {
     const { category } = req.query;
 
     const data = await BlogPost.listPublished({ page, limit, category: category || null });
+
+    // Attach reaction counts (and user's reaction if authenticated)
+    const postIds = data.posts.map(p => String(p.id));
+    const countsMap = postIds.length ? await Reaction.getForTargetBatch('blog_post', postIds) : {};
+    let userReactionsMap = {};
+    if (req.user && postIds.length) {
+      userReactionsMap = await Reaction.getUserReactionsBatch(req.user.id, 'blog_post', postIds);
+    }
+
+    data.posts = data.posts.map(p => ({
+      ...p,
+      reactions: countsMap[String(p.id)] || { like: 0, love: 0, smile: 0, meh: 0, total: 0 },
+      userReaction: userReactionsMap[String(p.id)] || null,
+    }));
+
     res.json(data);
   } catch (error) {
     console.error('Error fetching published posts:', error);
@@ -59,7 +75,14 @@ export const getPostBySlug = async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
-    res.json({ post });
+    // Attach reaction counts + user's reaction
+    const counts = await Reaction.getForTarget('blog_post', post.id);
+    let userReaction = null;
+    if (req.user) {
+      userReaction = await Reaction.getUserReaction(req.user.id, 'blog_post', post.id);
+    }
+
+    res.json({ post: { ...post, reactions: counts, userReaction } });
   } catch (error) {
     console.error('Error fetching post by slug:', error);
     res.status(500).json({ message: 'Failed to fetch post' });

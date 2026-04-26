@@ -22,6 +22,7 @@ export function richDesignation(p: {
 /** Map a Conversation to ProfileInfo */
 export function convToProfile(c: Conversation): ProfileInfo {
   return {
+    id: c.participant_id,
     name: c.participant_name,
     image: c.participant_image,
     designation: c.participant_designation,
@@ -38,6 +39,7 @@ export function convToProfile(c: Conversation): ProfileInfo {
 /** Map a RoomMessage to ProfileInfo */
 export function msgToProfile(m: RoomMessage): ProfileInfo {
   return {
+    id: m.sender_id,
     name: m.sender_name,
     image: m.sender_image,
     designation: m.sender_designation,

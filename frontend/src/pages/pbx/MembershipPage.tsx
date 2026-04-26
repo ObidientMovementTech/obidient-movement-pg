@@ -266,7 +266,7 @@ export default function MembershipPage() {
                     <TableRow key={user._id} hover sx={{ cursor: 'pointer' }} onClick={() => openDrawer(user)}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Avatar src={user.profileImage} sx={{ width: 32, height: 32, fontSize: '0.75rem', bgcolor: PRIMARY }}>
+                          <Avatar src={user.profileImage} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 32, height: 32, fontSize: '0.75rem', bgcolor: PRIMARY }}>
                             {user.name?.[0] || '?'}
                           </Avatar>
                           <Box>
@@ -338,7 +338,7 @@ export default function MembershipPage() {
 
               {/* User Profile */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 2.5 }}>
-                <Avatar src={drawerUser.profileImage} sx={{ width: 56, height: 56, bgcolor: PRIMARY, fontSize: '1.25rem' }}>
+                <Avatar src={drawerUser.profileImage} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 56, height: 56, bgcolor: PRIMARY, fontSize: '1.25rem' }}>
                   {drawerUser.name?.[0]}
                 </Avatar>
                 <Box>

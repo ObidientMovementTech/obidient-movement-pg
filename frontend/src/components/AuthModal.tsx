@@ -109,13 +109,11 @@ export default function AuthModal({
       }
 
       // Handle specific error types
-      if (error.errorType === 'EMAIL_NOT_FOUND' || error.errorType === 'PHONE_NOT_FOUND') {
-        errorMessage = error.message || 'No account found with these credentials. Please check your email/phone or sign up for a new account.';
+      if (error.errorType === 'INVALID_CREDENTIALS') {
+        errorMessage = 'Invalid credentials. Please check your email/phone and password.';
       } else if (error.errorType === 'EMAIL_NOT_VERIFIED') {
         errorMessage = 'Please verify your email address before logging in. Check your inbox for a verification email.';
         setShowResendVerification(true);
-      } else if (error.errorType === 'INVALID_PASSWORD') {
-        errorMessage = 'Incorrect password. Please check your password and try again.';
       } else if (error.errorType === 'NETWORK_ERROR') {
         errorMessage = 'Connection error. Please check your internet connection and try again.';
       }
@@ -227,10 +225,8 @@ export default function AuthModal({
       }
 
       // Handle specific error types
-      if (error.errorType === 'EMAIL_EXISTS') {
-        errorMessage = 'An account with this email already exists. Please use a different email or try logging in.';
-      } else if (error.errorType === 'PHONE_EXISTS') {
-        errorMessage = 'An account with this phone number already exists. Please use a different phone number.';
+      if (error.errorType === 'ACCOUNT_EXISTS') {
+        errorMessage = 'An account with these details already exists. Please use different credentials or try logging in.';
       } else if (error.errorType === 'NETWORK_ERROR') {
         errorMessage = 'Connection error. Please check your internet connection and try again.';
       }

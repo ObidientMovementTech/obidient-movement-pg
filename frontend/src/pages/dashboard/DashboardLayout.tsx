@@ -4,19 +4,11 @@ import {
   AppBar,
   Toolbar,
   Box,
-  Button,
-  IconButton,
   Avatar,
   Menu,
   MenuItem,
   Divider,
-  Chip,
   Badge,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Typography,
   Container,
 } from '@mui/material';
@@ -30,66 +22,55 @@ import {
   CreditCard,
   ExternalLink,
   MessageSquare,
-  LayoutDashboard,
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { logoutUser } from '../../services/authService';
 import { getNotifications } from '../../services/notificationService';
 
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Dashboard', icon: Home, exact: true },
-  { path: '/dashboard/voting-bloc', label: 'My Voting Bloc', icon: Users },
-  { path: '/dashboard/chat', label: 'Chat', icon: MessageSquare },
-  { path: '/dashboard/notifications', label: 'Notifications', icon: Bell },
-  { path: '/dashboard/profile', label: 'Profile', icon: User },
+  { path: '/dashboard', label: 'Dashboard', exact: true },
+  { path: '/dashboard/voting-bloc', label: 'Voting Bloc' },
+  { path: '/dashboard/chat', label: 'Chat' },
+  { path: '/dashboard/notifications', label: 'Notifications', hasBadge: true },
+  { path: '/dashboard/profile', label: 'Profile' },
 ];
 
 const MOBILE_NAV = [
-  { path: '/dashboard', label: 'Home', icon: LayoutDashboard, exact: true },
-  { path: '/dashboard/voting-bloc', label: 'Blocs', icon: Users },
-  { path: '/dashboard/chat', label: 'Chat', icon: MessageSquare },
-  { path: '/dashboard/notifications', label: 'Alerts', icon: Bell },
-  { path: '/dashboard/profile', label: 'Profile', icon: User },
+  { path: '/dashboard', icon: Home, exact: true },
+  { path: '/dashboard/voting-bloc', icon: Users },
+  { path: '/dashboard/chat', icon: MessageSquare },
+  { path: '/dashboard/notifications', icon: Bell, hasBadge: true },
+  { path: '/dashboard/profile', icon: User },
 ];
 
 const FONT = '"Poppins", sans-serif';
 const PRIMARY = '#006837';
-const PRIMARY_LIGHT = 'rgba(0,104,55,0.08)';
 
 export default function DashboardLayout() {
   const { profile, isLoading, logout } = useUser();
   const location = useLocation();
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Auth guard
   useEffect(() => {
-    if (!isLoading && !profile) {
-      navigate('/auth/login');
-    }
+    if (!isLoading && !profile) navigate('/auth/login');
   }, [isLoading, profile, navigate]);
 
-  // Fetch unread notification count
   useEffect(() => {
     if (!profile) return;
     getNotifications()
-      .then((notifications: any[]) => {
-        setUnreadCount(notifications.filter((n: any) => !n.read).length);
-      })
+      .then((n: any[]) => setUnreadCount(n.filter((x: any) => !x.read).length))
       .catch(() => {});
   }, [profile, location.pathname]);
 
-  // Check for pending voting bloc join
   useEffect(() => {
     if (profile && !isLoading) {
       const pendingJoin = localStorage.getItem('pending-voting-bloc-join');
       if (pendingJoin) {
         try {
           const joinData = JSON.parse(pendingJoin);
-          const hoursDiff =
-            (Date.now() - new Date(joinData.timestamp).getTime()) / (1000 * 60 * 60);
+          const hoursDiff = (Date.now() - new Date(joinData.timestamp).getTime()) / (1000 * 60 * 60);
           if (hoursDiff < 24) {
             localStorage.removeItem('pending-voting-bloc-join');
             navigate(`/voting-bloc/${joinData.joinCode}`);
@@ -103,19 +84,9 @@ export default function DashboardLayout() {
     }
   }, [profile, isLoading, navigate]);
 
-  const isCoordinator =
-    profile?.designation &&
-    [
-      'National Coordinator',
-      'State Coordinator',
-      'LGA Coordinator',
-      'Ward Coordinator',
-    ].includes(profile.designation);
+  const isCoordinator = profile?.designation && ['National Coordinator', 'State Coordinator', 'LGA Coordinator', 'Ward Coordinator'].includes(profile.designation);
 
-  const isActive = (path: string, exact?: boolean) => {
-    if (exact) return location.pathname === path;
-    return location.pathname.startsWith(path);
-  };
+  const isActive = (path: string, exact?: boolean) => exact ? location.pathname === path : location.pathname.startsWith(path);
 
   const handleLogout = async () => {
     setAnchorEl(null);
@@ -134,117 +105,80 @@ export default function DashboardLayout() {
 
   if (isLoading || !profile) {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            border: '3px solid',
-            borderColor: PRIMARY,
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            '@keyframes spin': { to: { transform: 'rotate(360deg)' } },
-          }}
-        />
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff' }}>
+        <Box sx={{ width: 32, height: 32, border: '2px solid #e5e5e5', borderTopColor: PRIMARY, borderRadius: '50%', animation: 'spin 0.8s linear infinite', '@keyframes spin': { to: { transform: 'rotate(360deg)' } } }} />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#fafafa', display: 'flex', flexDirection: 'column', fontFamily: FONT }}>
-      {/* ─── AppBar ─── */}
-      <AppBar
-        position="sticky"
-        elevation={0}
-        sx={{
-          bgcolor: 'rgba(255,255,255,0.8)',
-          backdropFilter: 'blur(24px)',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Toolbar disableGutters sx={{ height: { xs: 64, md: 72 }, gap: 3 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#fff', display: 'flex', flexDirection: 'column', fontFamily: FONT }}>
+
+      {/* ─── Top Bar ─── */}
+      <AppBar position="sticky" elevation={0} sx={{ bgcolor: '#fff', borderBottom: '1px solid #f0f0f0' }}>
+        <Container maxWidth="lg" disableGutters sx={{ px: { xs: 2, md: 4 } }}>
+          <Toolbar disableGutters sx={{ height: { xs: 56, md: 56 }, gap: 0 }}>
+
             {/* Logo */}
-            <Box component={Link} to="/dashboard" sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', mr: { xs: 0, md: 4 } }}>
-              <img src="/obidientLogoGreen.svg" alt="Obidient Movement Logo" style={{ width: 192, height: 64 }} />
+            <Box component={Link} to="/dashboard" sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', mr: { xs: 0, md: 5 } }}>
+              <img src="/obidientLogoGreen.svg" alt="Obidient" style={{ height: 36 }} />
             </Box>
 
-            {/* Desktop Nav */}
-            <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1, flex: 1 }}>
+            {/* Desktop Nav — text only, no icons */}
+            <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0, flex: 1, ml: 1 }}>
               {NAV_ITEMS.map((item) => {
                 const active = isActive(item.path, item.exact);
-                const Icon = item.icon;
                 return (
-                  <Button
-                    key={item.path}
-                    component={Link}
-                    to={item.path}
-                    sx={{
-                      px: 2.5,
-                      py: 1.25,
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontFamily: FONT,
-                      fontWeight: active ? 600 : 500,
-                      fontSize: '0.875rem',
-                      letterSpacing: '-0.01em',
-                      color: active ? PRIMARY : 'text.secondary',
-                      bgcolor: active ? PRIMARY_LIGHT : 'transparent',
-                      '&:hover': { bgcolor: active ? PRIMARY_LIGHT : 'action.hover' },
-                    }}
-                    startIcon={
-                      item.label === 'Notifications' ? (
-                        <Badge badgeContent={unreadCount} color="error" max={99}>
-                          <Icon size={18} />
-                        </Badge>
-                      ) : (
-                        <Icon size={18} />
-                      )
-                    }
-                  >
-                    {item.label}
-                  </Button>
+                  <Box key={item.path} component={Link} to={item.path} sx={{ textDecoration: 'none', position: 'relative', px: 2, py: 2, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: FONT,
+                        fontSize: '0.82rem',
+                        fontWeight: active ? 500 : 400,
+                        color: active ? '#0a0a0a' : '#737373',
+                        letterSpacing: '-0.01em',
+                        transition: 'color 0.15s',
+                        '&:hover': { color: '#0a0a0a' },
+                      }}
+                    >
+                      {item.label}
+                    </Typography>
+                    {item.hasBadge && unreadCount > 0 && (
+                      <Box sx={{ width: 18, height: 18, borderRadius: '50%', bgcolor: '#ef4444', color: '#fff', fontSize: '0.6rem', fontWeight: 600, fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Box>
+                    )}
+                    {/* Active indicator — thin bottom line */}
+                    {active && (
+                      <Box sx={{ position: 'absolute', bottom: 0, left: 16, right: 16, height: 2, bgcolor: '#0a0a0a', borderRadius: 1 }} />
+                    )}
+                  </Box>
                 );
               })}
             </Box>
 
-            {/* Desktop Profile menu */}
+            {/* Desktop avatar */}
             <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center' }}>
-              <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
-                <Avatar
-                  src={profile.profileImage || undefined}
-                  alt={profile.name}
-                  sx={{ width: 36, height: 36, bgcolor: PRIMARY }}
-                >
+              <Box
+                onClick={(e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget)}
+                sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1.25, pl: 2, py: 1, borderRadius: 2, transition: 'background 0.15s', '&:hover': { bgcolor: '#fafafa' } }}
+              >
+                <Avatar src={profile.profileImage || undefined} alt={profile.name} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 30, height: 30, bgcolor: '#171717', fontSize: '0.75rem', fontWeight: 500, fontFamily: FONT }}>
                   {profile.name?.[0]}
                 </Avatar>
-              </IconButton>
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', fontWeight: 500, color: '#0a0a0a', display: { xs: 'none', lg: 'block' } }}>
+                  {profile.name?.split(' ')[0]}
+                </Typography>
+              </Box>
             </Box>
 
-            {/* Mobile — Notification + Avatar + Hamburger */}
-            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 0.5, ml: 'auto' }}>
-              <IconButton
-                component={Link}
-                to="/dashboard/notifications"
-                sx={{ p: 1 }}
-              >
-                <Badge badgeContent={unreadCount} color="error" max={99} variant="dot">
-                  <Bell size={20} color="#71717a" />
-                </Badge>
-              </IconButton>
+            {/* Mobile — just avatar */}
+            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', ml: 'auto' }}>
               <Avatar
                 src={profile.profileImage || undefined}
                 alt={profile.name}
-                sx={{ width: 32, height: 32, bgcolor: PRIMARY, border: '1px solid', borderColor: 'divider', cursor: 'pointer' }}
+                imgProps={{ referrerPolicy: 'no-referrer' }}
+                sx={{ width: 28, height: 28, bgcolor: '#171717', fontSize: '0.7rem', fontWeight: 500, fontFamily: FONT, cursor: 'pointer' }}
                 onClick={(e) => setAnchorEl(e.currentTarget)}
               >
                 {profile.name?.[0]}
@@ -254,104 +188,55 @@ export default function DashboardLayout() {
         </Container>
       </AppBar>
 
-      {/* ─── Profile Menu (shared desktop + mobile) ─── */}
+      {/* ─── Profile Menu ─── */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        slotProps={{ paper: { sx: { width: 260, mt: 1.5, borderRadius: 3, fontFamily: FONT } } }}
+        slotProps={{ paper: { sx: { width: 220, mt: 1, borderRadius: 2.5, border: '1px solid #f0f0f0', boxShadow: '0 8px 30px rgba(0,0,0,0.08)', fontFamily: FONT } } }}
       >
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Typography variant="subtitle2" sx={{ fontFamily: FONT, fontWeight: 600 }}>{profile.name}</Typography>
-          <Typography variant="caption" color="text.secondary" noWrap sx={{ fontFamily: FONT }}>
-            {profile.email}
-          </Typography>
-          <Box sx={{ mt: 1.5, display: 'flex', gap: 0.75 }}>
-            <Chip
-              label={profile.kycStatus}
-              size="small"
-              color={profile.kycStatus === 'approved' ? 'success' : 'warning'}
-              sx={{ textTransform: 'capitalize', fontSize: '0.7rem' }}
-            />
-            {profile.emailVerified && (
-              <Chip label="Email Verified" size="small" color="info" sx={{ fontSize: '0.7rem' }} />
-            )}
-          </Box>
+        <Box sx={{ px: 2, py: 1.5 }}>
+          <Typography sx={{ fontFamily: FONT, fontWeight: 500, fontSize: '0.84rem', color: '#0a0a0a' }}>{profile.name}</Typography>
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: '#a3a3a3' }} noWrap>{profile.email}</Typography>
         </Box>
-        <Divider />
-        <MenuItem component={Link} to="/dashboard/profile" onClick={() => setAnchorEl(null)}>
-          <User size={16} style={{ marginRight: 10 }} /> My Profile
+        <Divider sx={{ borderColor: '#f0f0f0' }} />
+        <MenuItem component={Link} to="/dashboard/profile" onClick={() => setAnchorEl(null)} sx={{ fontFamily: FONT, fontSize: '0.82rem', py: 1, color: '#525252' }}>
+          <User size={15} style={{ marginRight: 10, opacity: 0.5 }} /> Profile
         </MenuItem>
-        <MenuItem component={Link} to="/dashboard/card" onClick={() => setAnchorEl(null)}>
-          <CreditCard size={16} style={{ marginRight: 10 }} /> Membership Card
+        <MenuItem component={Link} to="/dashboard/card" onClick={() => setAnchorEl(null)} sx={{ fontFamily: FONT, fontSize: '0.82rem', py: 1, color: '#525252' }}>
+          <CreditCard size={15} style={{ marginRight: 10, opacity: 0.5 }} /> Membership Card
         </MenuItem>
         {(profile.role === 'admin' || isCoordinator) && (
-          <MenuItem component="a" href="/pbx/dashboard" target="_blank" rel="noopener noreferrer" onClick={() => setAnchorEl(null)}>
-            <ShieldCheck size={16} style={{ marginRight: 10 }} /> Admin Panel
-            <ExternalLink size={12} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+          <MenuItem component="a" href="/pbx/dashboard" target="_blank" rel="noopener noreferrer" onClick={() => setAnchorEl(null)} sx={{ fontFamily: FONT, fontSize: '0.82rem', py: 1, color: '#525252' }}>
+            <ShieldCheck size={15} style={{ marginRight: 10, opacity: 0.5 }} /> Admin Panel
+            <ExternalLink size={11} style={{ marginLeft: 'auto', opacity: 0.3 }} />
           </MenuItem>
         )}
-        <Divider />
-        <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-          <LogOut size={16} style={{ marginRight: 10 }} /> Logout
+        <Divider sx={{ borderColor: '#f0f0f0' }} />
+        <MenuItem onClick={handleLogout} sx={{ fontFamily: FONT, fontSize: '0.82rem', py: 1, color: '#dc2626' }}>
+          <LogOut size={15} style={{ marginRight: 10, opacity: 0.6 }} /> Log out
         </MenuItem>
       </Menu>
 
-      {/* ─── Mobile Drawer (kept for deep-link items) ─── */}
-      <Drawer
-        anchor="top"
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        slotProps={{ paper: { sx: { top: 64, borderRadius: '0 0 16px 16px', fontFamily: FONT } } }}
-        ModalProps={{ keepMounted: true }}
-      >
-        <List sx={{ py: 2, px: 0.5 }}>
-          <ListItemButton component={Link} to="/dashboard/card" onClick={() => setDrawerOpen(false)} sx={{ mx: 1.5, borderRadius: 2 }}>
-            <ListItemIcon sx={{ minWidth: 36 }}><CreditCard size={20} /></ListItemIcon>
-            <ListItemText primary="Membership Card" primaryTypographyProps={{ fontSize: '0.9rem', fontFamily: FONT }} />
-          </ListItemButton>
-          {(profile.role === 'admin' || isCoordinator) && (
-            <ListItemButton component="a" href="/pbx/dashboard" target="_blank" rel="noopener noreferrer" onClick={() => setDrawerOpen(false)} sx={{ mx: 1.5, borderRadius: 2 }}>
-              <ListItemIcon sx={{ minWidth: 36 }}><ShieldCheck size={20} /></ListItemIcon>
-              <ListItemText primary="Admin Panel" primaryTypographyProps={{ fontSize: '0.9rem', fontFamily: FONT }} />
-              <ExternalLink size={14} style={{ opacity: 0.4 }} />
-            </ListItemButton>
-          )}
-          <Divider sx={{ my: 1 }} />
-          <ListItemButton onClick={handleLogout} sx={{ mx: 1.5, borderRadius: 2, color: 'error.main' }}>
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><LogOut size={20} /></ListItemIcon>
-            <ListItemText primary="Logout" primaryTypographyProps={{ fontSize: '0.9rem', fontFamily: FONT }} />
-          </ListItemButton>
-        </List>
-      </Drawer>
-
       {/* ─── Content ─── */}
-      <Container maxWidth="lg" sx={{ flex: 1, py: { xs: 3, md: 6 }, px: { xs: 2.5, sm: 3, md: 4 }, pb: { xs: 12, md: 6 } }}>
-        <Outlet context={{ profile, refreshProfile: useUser().refreshProfile }} />
-      </Container>
+      <Box sx={{ flex: 1, bgcolor: '#fafafa' }}>
+        <Container maxWidth="lg" disableGutters sx={{ px: { xs: 2, sm: 2.5, md: 4 }, py: { xs: 3, md: 5 }, pb: { xs: 11, md: 5 } }}>
+          <Outlet context={{ profile, refreshProfile: useUser().refreshProfile }} />
+        </Container>
+      </Box>
 
-      {/* ─── Desktop Footer ─── */}
-      <Box
-        component="footer"
-        sx={{
-          display: { xs: 'none', md: 'block' },
-          bgcolor: '#fff',
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          py: 3.5,
-          mt: 'auto',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Typography variant="body2" color="text.secondary" align="center" sx={{ fontFamily: FONT }}>
+      {/* ─── Footer (desktop) ─── */}
+      <Box component="footer" sx={{ display: { xs: 'none', md: 'block' }, borderTop: '1px solid #f0f0f0', py: 3, mt: 'auto' }}>
+        <Container maxWidth="lg" disableGutters sx={{ px: 4 }}>
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: '#a3a3a3', textAlign: 'center' }}>
             © {new Date().getFullYear()} Obidient Movement
           </Typography>
         </Container>
       </Box>
 
-      {/* ─── Mobile Bottom Navigation ─── */}
+      {/* ─── Mobile Bottom Nav — icons only, minimal ─── */}
       <Box
         component="nav"
         sx={{
@@ -361,15 +246,12 @@ export default function DashboardLayout() {
           left: 0,
           right: 0,
           zIndex: 1300,
-          bgcolor: 'rgba(255,255,255,0.8)',
-          backdropFilter: 'blur(24px)',
-          borderTop: '1px solid',
-          borderColor: 'divider',
+          bgcolor: '#fff',
+          borderTop: '1px solid #f0f0f0',
           justifyContent: 'space-around',
           alignItems: 'center',
-          px: 1,
-          pt: 1,
-          pb: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))',
+          height: 52,
+          pb: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
         {MOBILE_NAV.map((item) => {
@@ -386,35 +268,24 @@ export default function DashboardLayout() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 textDecoration: 'none',
-                px: 1.5,
                 py: 0.75,
-                borderRadius: 3,
-                bgcolor: active ? PRIMARY_LIGHT : 'transparent',
-                color: active ? PRIMARY : '#a1a1aa',
-                transition: 'all 0.15s',
-                minWidth: 56,
+                flex: 1,
+                position: 'relative',
+                color: active ? '#0a0a0a' : '#a3a3a3',
+                transition: 'color 0.15s',
               }}
             >
-              {item.label === 'Alerts' ? (
-                <Badge badgeContent={unreadCount} color="error" max={99} variant="dot">
-                  <Icon size={22} />
+              {item.hasBadge && unreadCount > 0 ? (
+                <Badge variant="dot" color="error" overlap="circular" sx={{ '& .MuiBadge-dot': { width: 6, height: 6, minWidth: 6, top: 2, right: 2 } }}>
+                  <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
                 </Badge>
               ) : (
-                <Icon size={22} />
+                <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
               )}
-              <Typography
-                sx={{
-                  fontFamily: FONT,
-                  fontSize: '0.6rem',
-                  fontWeight: active ? 700 : 600,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  mt: 0.25,
-                  lineHeight: 1.2,
-                }}
-              >
-                {item.label}
-              </Typography>
+              {/* Active dot */}
+              {active && (
+                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#0a0a0a', mt: 0.5 }} />
+              )}
             </Box>
           );
         })}

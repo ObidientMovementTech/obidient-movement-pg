@@ -1073,6 +1073,7 @@ export default function AdminUserManagement() {
                           <img
                             src={user.profileImage}
                             alt={user.name}
+                            referrerPolicy="no-referrer"
                             className="h-8 w-8 rounded-full object-cover"
                           />
                         ) : (
@@ -1362,6 +1363,7 @@ export default function AdminUserManagement() {
                                 className="h-10 w-10 rounded-full object-cover"
                                 src={user.profileImage}
                                 alt={user.name}
+                                referrerPolicy="no-referrer"
                               />
                             ) : (
                               <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">

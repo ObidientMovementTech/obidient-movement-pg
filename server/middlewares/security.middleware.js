@@ -6,11 +6,22 @@ import { body, validationResult } from 'express-validator';
 import winston from 'winston';
 
 // Configure logger
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Strip stack traces in production to prevent info leakage
+const stripStackInProd = winston.format((info) => {
+  if (isProduction && info.stack) {
+    delete info.stack;
+  }
+  return info;
+});
+
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
+    stripStackInProd(),
     winston.format.json()
   ),
   defaultMeta: { service: 'obidient-api' },
@@ -20,7 +31,7 @@ const logger = winston.createLogger({
   ],
 });
 
-if (process.env.NODE_ENV !== 'production') {
+if (!isProduction) {
   logger.add(new winston.transports.Console({
     format: winston.format.simple()
   }));
@@ -122,9 +133,22 @@ export const helmetConfig = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://*.amazonaws.com",
+        "https://*.googleusercontent.com",
+        "https://lh3.googleusercontent.com",
+      ],
+      connectSrc: ["'self'", "wss:", "ws:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
       upgradeInsecureRequests: [],
     },
   },
@@ -364,14 +388,7 @@ export const handleValidationErrors = (req, res, next) => {
     logger.warn('Validation errors', {
       ip: req.ip,
       errors: errorMessages,
-      requestBody: req.body,
       timestamp: new Date().toISOString()
-    });
-
-    console.log('Validation errors for registration:', {
-      errors: errorMessages,
-      requestBody: req.body,
-      fieldErrors
     });
 
     return res.status(400).json({
@@ -417,7 +434,6 @@ export const detectSuspiciousActivity = (req, res, next) => {
               ip: req.ip,
               userAgent: req.get('User-Agent'),
               field: key,
-              value: obj[key],
               pattern: pattern.toString(),
               source: objName,
               timestamp: new Date().toISOString()

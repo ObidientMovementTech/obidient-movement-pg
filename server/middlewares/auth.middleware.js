@@ -10,52 +10,40 @@ export const protect = async (req, res, next) => {
   // Check for token in cookies or Authorization header
   if (req.cookies && req.cookies["cu-auth-token"]) {
     token = req.cookies["cu-auth-token"];
-    console.log("[VERCEL][AUTH] Found token in cookies");
   } else if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
   ) {
     token = req.headers.authorization.split(" ")[1];
-    console.log("[VERCEL][AUTH] Found token in Authorization header");
   }
 
   if (!token) {
-    console.log("[VERCEL][AUTH] No token provided");
     return res.status(401).json({ message: "Not authorized, no token" });
   }
 
   try {
-    console.log("[VERCEL][AUTH] Verifying token...");
-
-    // Important: Check what's in the token first to debug
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("[VERCEL][AUTH] Decoded token:", decoded);
 
     // Use the correct field for user ID based on how generateToken creates tokens
     const userId = decoded.id || decoded._id || decoded.userId;
 
     if (!userId) {
-      console.error("[VERCEL][AUTH] No user ID found in token:", decoded);
       return res.status(401).json({ message: "Invalid token structure" });
     }
 
     const user = await User.findById(userId);
 
     if (!user) {
-      console.log("[VERCEL][AUTH] User not found with ID:", userId);
       return res.status(401).json({ message: "User not found" });
     }
 
     // Check if email is verified
     if (!user.emailVerified) {
-      console.log(`[VERCEL][AUTH] User ${user.email} has unverified email`);
       return res.status(403).json({
         message: "Email verification required",
         emailVerified: false,
       });
     }
-
-    console.log(`[VERCEL][AUTH] Authentication successful for user ${user.email}`);
 
     // Set user ID in request object - use the same field structure across all middleware
     req.userId = userId;
@@ -63,7 +51,6 @@ export const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    console.error("[VERCEL][AUTH] Token verification error:", error.message);
     res.status(401).json({ message: "Not authorized, invalid token" });
   }
 };
@@ -108,25 +95,19 @@ export const authenticateUser = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    console.error("[VERCEL][AUTH] Auth check error:", error.message);
     res.status(401).json({ message: "Not authorized, invalid token" });
   }
 };
 
 export const isAdmin = (req, res, next) => {
-  console.log("[VERCEL][AUTH] Checking admin role. User:", req.user);
-
   if (!req.user) {
-    console.log("[VERCEL][AUTH] req.user is missing in isAdmin middleware");
     return res.status(403).json({ message: "Admin access only - User not found in request" });
   }
 
   if (req.user.role !== "admin") {
-    console.log(`[VERCEL][AUTH] User ${req.user.email} is not an admin. Role:`, req.user.role);
     return res.status(403).json({ message: "Admin access only" });
   }
 
-  console.log(`[VERCEL][AUTH] Admin check passed for ${req.user.email}`);
   next();
 };
 
@@ -143,6 +124,43 @@ export function isKYCVerified(req, res, next) {
 
 // Alias for protect - used in onboarding routes
 export const verifyToken = protect;
+
+/**
+ * Optional auth — attaches req.user if a valid token is present, but does NOT
+ * reject the request when no token or an invalid token is provided.
+ * Use for endpoints where authenticated users get extra data (e.g. userReaction)
+ * but unauthenticated users still get the public response.
+ */
+export const optionalAuth = async (req, res, next) => {
+  let token;
+
+  if (req.cookies && req.cookies['cu-auth-token']) {
+    token = req.cookies['cu-auth-token'];
+  } else if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) return next();
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id || decoded._id || decoded.userId;
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user) {
+        req.userId = userId;
+        req.user = user;
+      }
+    }
+  } catch {
+    // Invalid token — continue as unauthenticated
+  }
+
+  next();
+};
 
 // Role-based authorization middleware
 export const authorize = (allowedRoles = []) => {

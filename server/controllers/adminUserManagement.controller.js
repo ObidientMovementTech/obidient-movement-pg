@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { query, getClient } from '../config/db.js';
 import { generateOTP } from '../utils/otpUtils.js';
 import { sendOTPEmail, sendConfirmationEmail } from '../utils/emailHandler.js';
 import VotingBloc from '../models/votingBloc.model.js';
 import DefaultVotingBlocSettings from '../models/defaultVotingBlocSettings.model.js';
+import { auditLog } from '../utils/auditLog.js';
 
 export const adminUserManagementController = {
   // Get all users with pagination and filters - OPTIMIZED FOR LARGE DATASETS
@@ -386,6 +388,8 @@ export const adminUserManagementController = {
         message: `User role updated to ${role}`,
         data: result.rows[0]
       });
+
+      auditLog({ actorId: req.user.id, action: 'user.role_change', targetType: 'user', targetId: userId, details: { newRole: role, previousRole: result.rows[0].role !== role ? 'unknown' : role }, req });
 
     } catch (error) {
       console.error('Update user role error:', error);
@@ -1545,6 +1549,8 @@ export const adminUserManagementController = {
 
       const updatedUser = updateResult.rows[0];
 
+      auditLog({ actorId: req.user.id, action: 'user.designation_change', targetType: 'user', targetId: userId, details: { designation, assignedState, assignedLGA, assignedWard }, req });
+
       res.json({
         success: true,
         message: `Successfully updated designation for ${updatedUser.name}`,
@@ -1648,7 +1654,7 @@ const createAutoVotingBloc = async (user) => {
 
     // Generate join code
     const generateJoinCode = () => {
-      return Math.random().toString(36).slice(2, 10); // 8 characters
+      return crypto.randomBytes(4).toString('hex'); // 8 hex characters
     };
 
     votingBlocData.joinCode = generateJoinCode();

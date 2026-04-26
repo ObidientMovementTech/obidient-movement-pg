@@ -15,6 +15,7 @@ import {
   Phone,
   Share2,
   User,
+  Heart,
 } from "lucide-react";
 import { useUser } from "../../../context/UserContext";
 import { getOwnedVotingBlocs, getJoinedVotingBlocs } from "../../../services/votingBlocService";
@@ -60,6 +61,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const [twitterFollowModalOpen, setTwitterFollowModalOpen] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [ctaUrls, setCtaUrls] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
   const profileFirstName = useMemo(() => {
@@ -95,6 +97,79 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
       isMounted = false;
     };
   }, []);
+
+  // Fetch CTA link settings
+  useEffect(() => {
+    const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const keys = ['cta_volunteer_url', 'cta_run_for_office_url', 'cta_donate_url', 'cta_feedback_url'];
+    Promise.all(
+      keys.map((key) =>
+        fetch(`${API}/api/settings/${key}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => ({ key, value: d?.value || '' }))
+          .catch(() => ({ key, value: '' }))
+      )
+    ).then((results) => {
+      const urls: Record<string, string> = {};
+      results.forEach((r) => { if (r.value) urls[r.key] = r.value; });
+      setCtaUrls(urls);
+    });
+  }, []);
+
+  // Build CTA cards from fetched URLs (only show ones that have a URL set)
+  const ctaCards = useMemo(() => {
+    const definitions = [
+      {
+        key: 'cta_volunteer_url',
+        title: 'Ready to volunteer in a Directorate?',
+        description: "We're looking for committed citizens ready to build a New Nigeria.",
+        buttonText: 'Join a Directorate',
+        Icon: Users,
+        ButtonIcon: UserPlus,
+        iconBg: 'bg-green-100',
+        iconColor: 'text-green-600',
+        gradient: 'from-green-500 to-green-600',
+        hoverGradient: 'hover:from-green-600 hover:to-green-700',
+      },
+      {
+        key: 'cta_run_for_office_url',
+        title: 'Ready to Run for Public Office in 2027?',
+        description: 'Submit your interest to run for local, state, or national elective public office.',
+        buttonText: 'Submit your Interest',
+        Icon: Vote,
+        ButtonIcon: Vote,
+        iconBg: 'bg-blue-100',
+        iconColor: 'text-blue-600',
+        gradient: 'from-blue-500 to-blue-600',
+        hoverGradient: 'hover:from-blue-600 hover:to-blue-700',
+      },
+      {
+        key: 'cta_donate_url',
+        title: 'Support the Movement',
+        description: 'Your contribution helps us build a better Nigeria for everyone.',
+        buttonText: 'Donate Now',
+        Icon: Heart,
+        ButtonIcon: Heart,
+        iconBg: 'bg-purple-100',
+        iconColor: 'text-purple-600',
+        gradient: 'from-purple-500 to-purple-600',
+        hoverGradient: 'hover:from-purple-600 hover:to-purple-700',
+      },
+      {
+        key: 'cta_feedback_url',
+        title: 'Got feedback?',
+        description: 'This is your space to speak up.',
+        buttonText: 'Drop a feedback',
+        Icon: MessageSquare,
+        ButtonIcon: MessageSquare,
+        iconBg: 'bg-yellow-100',
+        iconColor: 'text-yellow-600',
+        gradient: 'from-yellow-500 to-yellow-600',
+        hoverGradient: 'hover:from-yellow-600 hover:to-yellow-700',
+      },
+    ];
+    return definitions.filter((d) => ctaUrls[d.key]);
+  }, [ctaUrls]);
 
   // Removed auto-popup modals - modals now only open via explicit user action
   // User feedback: automatic popups were distracting on dashboard load
@@ -235,6 +310,7 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
             <img
               src={profile?.profileImage || "/default-avatar.png"}
               alt={profile?.name}
+              referrerPolicy="no-referrer"
               className="w-16 h-16 md:w-20 md:h-20 rounded-full border-2 border-white object-cover shadow-md"
             />
             <div>
@@ -550,71 +626,35 @@ export default function DashboardOverview({ setActivePage }: DashboardOverviewPr
         </div>
       </div>
 
-      {/* Member Actions Promotional Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-        {/* Ready to Serve Card */}
-        <div className="bg-white rounded-lg border shadow-sm hover:shadow-md transition p-3 md:p-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-green-100 rounded-full flex-shrink-0">
-              <Users size={18} className="text-green-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm md:text-base font-medium text-gray-800 mb-1">Ready to volunteer in a Directorate?</h2>
-              <p className="text-xs md:text-sm font-normal text-gray-600 mb-3">We're looking for committed citizens ready to build a New Nigeria.</p>
-              <button
-                onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrFnoRGia5YiQasZ', '_blank')}
-                className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-medium rounded-md hover:from-green-600 hover:to-green-700 transition-colors duration-200 shadow-sm hover:shadow text-xs"
-              >
-                <UserPlus size={14} className="mr-1.5" />
-                Join a Directorate
-                <ArrowRight size={14} className="ml-1.5" />
-              </button>
-            </div>
-          </div>
+      {/* Member Actions — dynamic CTA section */}
+      {ctaCards.length > 0 && (
+        <div className={`grid grid-cols-1 ${ctaCards.length === 1 ? 'md:grid-cols-1 max-w-md' : ctaCards.length === 2 ? 'md:grid-cols-2' : ctaCards.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 lg:grid-cols-4'} gap-3 md:gap-4`}>
+          {ctaCards.map((card) => {
+            const { Icon, ButtonIcon } = card;
+            return (
+              <div key={card.key} className="bg-white rounded-lg border shadow-sm hover:shadow-md transition p-3 md:p-4">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 ${card.iconBg} rounded-full flex-shrink-0`}>
+                    <Icon size={18} className={card.iconColor} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-sm md:text-base font-medium text-gray-800 mb-1">{card.title}</h2>
+                    <p className="text-xs md:text-sm font-normal text-gray-600 mb-3">{card.description}</p>
+                    <button
+                      onClick={() => window.open(ctaUrls[card.key], '_blank', 'noopener,noreferrer')}
+                      className={`inline-flex items-center px-3 py-1.5 bg-gradient-to-r ${card.gradient} text-white font-medium rounded-md ${card.hoverGradient} transition-colors duration-200 shadow-sm hover:shadow text-xs`}
+                    >
+                      <ButtonIcon size={14} className="mr-1.5" />
+                      {card.buttonText}
+                      <ArrowRight size={14} className="ml-1.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-
-        {/* Ready to Run for Office Card */}
-        <div className="bg-white rounded-lg border shadow-sm hover:shadow-md transition p-3 md:p-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-blue-100 rounded-full flex-shrink-0">
-              <Vote size={18} className="text-blue-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm md:text-base font-medium text-gray-800 mb-1">Ready to Run for Public Office in 2027?</h2>
-              <p className="text-xs md:text-sm font-normal text-gray-600 mb-3">Submit your interest to run for local, state, or national elective public office.</p>
-              <button
-                onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrw5U5T2X5YuzkVo', '_blank')}
-                className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-md hover:from-blue-600 hover:to-blue-700 transition-colors duration-200 shadow-sm hover:shadow text-xs"
-              >
-                <Vote size={14} className="mr-1.5" />
-                Submit your Interest
-                <ArrowRight size={14} className="ml-1.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Got Feedback Card */}
-        <div className="bg-white rounded-lg border shadow-sm hover:shadow-md transition p-3 md:p-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-yellow-100 rounded-full flex-shrink-0">
-              <MessageSquare size={18} className="text-yellow-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm md:text-base font-medium text-gray-800 mb-1">Got feedback?</h2>
-              <p className="text-xs md:text-sm font-normal text-gray-600 mb-3">This is your space to speak up.</p>
-              <button
-                onClick={() => window.open('https://airtable.com/apppzNRujCOPHOs94/shrKjgILZBOktw58M', '_blank')}
-                className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-md hover:from-yellow-600 hover:to-yellow-700 transition-colors duration-200 shadow-sm hover:shadow text-xs"
-              >
-                <MessageSquare size={14} className="mr-1.5" />
-                Drop a feedback
-                <ArrowRight size={14} className="ml-1.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Feature Highlight */}
       <div>

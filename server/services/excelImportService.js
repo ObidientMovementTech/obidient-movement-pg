@@ -2,6 +2,7 @@ import multer from 'multer';
 import XLSX from 'xlsx';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import readline from 'readline';
 import { fileURLToPath } from 'url';
 
@@ -18,7 +19,7 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(4).toString('hex');
     cb(null, `inec-data-${uniqueSuffix}${path.extname(file.originalname)}`);
   }
 });

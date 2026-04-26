@@ -5,6 +5,7 @@ import {
   getRoomMessages,
   sendRoomMessage,
   deleteRoomMessage,
+  toggleRoomReaction,
   muteUser,
   unmuteUser,
   pinMessage,
@@ -31,6 +32,9 @@ router.get('/:id/members', protect, getRoomMembers);
 
 // Delete own message or admin moderation
 router.delete('/:id/messages/:msgId', protect, deleteRoomMessage);
+
+// Reactions
+router.post('/:id/messages/:msgId/reactions', protect, toggleRoomReaction);
 
 // Admin: moderation
 router.post('/:id/mute/:userId', protect, muteUser);

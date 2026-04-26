@@ -992,10 +992,10 @@ export const completeOnboarding = async (req, res) => {
     // NEW: Hash password if provided for new users
     let hashedPassword = null;
     if (isNewUser && bypassGoogle && password) {
-      hashedPassword = await bcrypt.hash(password, 10);
+      hashedPassword = await bcrypt.hash(password, 12);
     } else if (isNewUser && !bypassGoogle) {
       const generatedPassword = crypto.randomBytes(32).toString('hex');
-      hashedPassword = await bcrypt.hash(generatedPassword, 10);
+      hashedPassword = await bcrypt.hash(generatedPassword, 12);
     }
 
     if (existingUserResult.rows.length > 0) {
@@ -1236,7 +1236,7 @@ export const completeOnboarding = async (req, res) => {
     const token = jwt.sign(
       { userId, email: resolvedEmail, designation },
       process.env.JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '3d' }
     );
 
     // Attempt automatic monitor key assignment (non-blocking)

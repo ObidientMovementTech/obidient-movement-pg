@@ -18,6 +18,7 @@ import { ThemeProvider } from "./context/ThemeContexts.tsx";
 import { UserProvider } from "./context/UserContext.tsx";
 import { ModalProvider } from "./context/ModalContext.tsx";
 import { SocketProvider } from "./context/SocketContext.tsx";
+import { BlockProvider } from "./context/BlockContext.tsx";
 
 // Lazy load all page components
 const PublicLayout = lazy(() => import("./pages/public/PublicLayout.tsx"));
@@ -43,10 +44,12 @@ const JoinRedirect = lazy(() => import("./pages/auth/JoinRedirect.tsx"));
 // Profile Pages
 const ProfileLayout = lazy(() => import("./pages/profile/page.tsx"));
 const ProfilePage = lazy(() => import("./pages/profile/ProfilePage.tsx"));
+const ChatPrivacySettings = lazy(() => import("./pages/profile/sections/ChatPrivacySettings.tsx"));
 
 // Dashboard Pages
 const DashboardLayout = lazy(() => import("./pages/dashboard/DashboardLayout.tsx"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome.tsx"));
+const CompleteProfilePage = lazy(() => import("./pages/dashboard/CompleteProfilePage.tsx"));
 const MemberCardPage = lazy(() => import("./pages/dashboard/MemberCardPage.tsx"));
 const MyVotingBlocRedirect = lazy(() => import("./pages/dashboard/votingBloc/MyVotingBlocRedirect.tsx"));
 const LeaderboardPage = lazy(() => import("./pages/dashboard/votingBloc/LeaderboardPage.tsx"));
@@ -183,6 +186,27 @@ const router = createBrowserRouter([
     ),
     errorElement: <ErrorPage />,
     children: [{ index: true, element: <ProfilePage /> }],
+  },
+  {
+    path: "/settings/chat-privacy",
+    element: (
+      <ProtectedRoute>
+        <Suspense fallback={<PageLoader />}>
+          <ChatPrivacySettings />
+        </Suspense>
+      </ProtectedRoute>
+    ),
+  },
+  // Profile completion gate — shown when profile is incomplete
+  {
+    path: "/complete-profile",
+    element: (
+      <ProtectedRoute>
+        <Suspense fallback={<PageLoader />}>
+          <CompleteProfilePage />
+        </Suspense>
+      </ProtectedRoute>
+    ),
   },
   // Dashboard — nested routes with horizontal header layout
   {
@@ -339,7 +363,9 @@ const router = createBrowserRouter([
   {
     path: "/voting-bloc/:joinCode",
     element: (
-      <VotingBlocDetail />
+      <Suspense fallback={<PageLoader />}>
+        <VotingBlocDetail />
+      </Suspense>
     ),
     errorElement: <ErrorPage />
   },
@@ -390,7 +416,9 @@ const renderApp = () => (
         <ModalProvider>
           <UserProvider>
             <SocketProvider>
+              <BlockProvider>
               <RouterProvider router={router} />
+              </BlockProvider>
             </SocketProvider>
           </UserProvider>
         </ModalProvider>

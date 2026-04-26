@@ -17,7 +17,9 @@ import {
   deleteAccount,
   getProfileCompletion,
   checkUsernameAvailability,
-  getPollingUnitMembers
+  getPollingUnitMembers,
+  getChatSettings,
+  updateChatSettings,
 } from '../controllers/user.controller.js'
 import { parseFileUpload } from '../utils/s3Upload.js';
 
@@ -55,6 +57,10 @@ router.post('/verify-email-change', protect, verifyEmailChange);
 
 // Notification preferences
 router.patch('/notification-preferences', protect, updateNotificationPreferences);
+
+// Chat privacy settings
+router.get('/chat-settings', protect, getChatSettings);
+router.patch('/chat-settings', protect, updateChatSettings);
 
 // Account deletion
 router.post('/delete-account', protect, deleteAccount);

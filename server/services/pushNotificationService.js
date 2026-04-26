@@ -108,8 +108,9 @@ export const sendPushNotification = async (userIds, title, body, data = {}) => {
   }
 };
 
-// Send broadcast to all users in specific states
-export const sendBroadcastPush = async (title, message, targetStates = []) => {
+// Send broadcast to all users in specific states (optionally scoped by states)
+// `data` is attached to every push so the client can deep-link.
+export const sendBroadcastPush = async (title, message, data = {}, targetStates = []) => {
   try {
     let userQuery = `
       SELECT DISTINCT u.id 
@@ -120,7 +121,7 @@ export const sendBroadcastPush = async (title, message, targetStates = []) => {
     `;
     let queryParams = [];
 
-    if (targetStates.length > 0) {
+    if (Array.isArray(targetStates) && targetStates.length > 0) {
       userQuery += ' AND u."assignedState" = ANY($1)';
       queryParams.push(targetStates);
     }
@@ -142,7 +143,7 @@ export const sendBroadcastPush = async (title, message, targetStates = []) => {
         batch,
         title,
         message,
-        { type: 'broadcast' }
+        { type: 'broadcast', ...data }
       );
       if (result.success) {
         totalSent += result.sent;

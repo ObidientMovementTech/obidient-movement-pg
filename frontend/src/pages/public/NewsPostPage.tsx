@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
+import DOMPurify from 'dompurify';
 import SEOHead from '../../components/public/SEOHead';
 import { getPostBySlug, getPublishedPosts, type BlogPost } from '../../services/blogService';
 
@@ -85,7 +86,7 @@ const NewsPostPage = () => {
     '@type': 'Article',
     headline: post.title,
     datePublished: post.published_at,
-    author: { '@type': 'Person', name: post.author_name },
+    author: { '@type': 'Organization', name: 'Obidient Movement' },
     image: post.featured_image_url || undefined,
     publisher: {
       '@type': 'Organization',
@@ -104,7 +105,7 @@ const NewsPostPage = () => {
         canonical={`${import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173'}/news/${post.slug}`}
         article={{
           publishedTime: post.published_at || post.created_at,
-          author: post.author_name,
+          author: 'Obidient Movement',
           category: post.category,
           tags: post.tags || [],
         }}
@@ -140,12 +141,8 @@ const NewsPostPage = () => {
                 })}
               </time>
             )}
-            {post.author_name && (
-              <>
-                <span>·</span>
-                <span>{post.author_name}</span>
-              </>
-            )}
+            <span>·</span>
+            <span>Obidient Movement</span>
           </div>
 
           {/* Title */}
@@ -172,7 +169,7 @@ const NewsPostPage = () => {
               prose-img:rounded-xl
               prose-blockquote:border-l-accent-green prose-blockquote:text-text-muted
               text-text-light dark:text-text-dark leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: post.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
           />
 
           {/* Share Buttons */}

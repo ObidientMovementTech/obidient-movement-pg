@@ -17,6 +17,14 @@ import {
   CircularProgress,
   TextField,
   InputAdornment,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import {
   MessageSquare,
@@ -30,10 +38,13 @@ import {
   CheckCheck,
   Maximize2,
   Users,
+  MoreVertical,
+  Ban,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
 import { useUser } from '../../context/UserContext';
-import { useSocket, type ChatMessage as SocketChatMessage, type TypingEvent } from '../../context/SocketContext';
+import { useBlock } from '../../context/BlockContext';
+import { useSocket, type ChatMessage as SocketChatMessage, type TypingEvent, type ReactionUpdateEvent, type MessageDeletedEvent } from '../../context/SocketContext';
 import {
   getConversations,
   getOrCreateConversation,
@@ -80,6 +91,7 @@ const ROOM_LEVEL_COLORS: Record<string, string> = {
 
 export default function ChatWidget() {
   const { profile } = useUser();
+  const { isBlocked, blockUser: doBlock, unblockUser: doUnblock } = useBlock();
   const navigate = useNavigate();
   const {
     socket,
@@ -114,6 +126,7 @@ export default function ChatWidget() {
     subordinates: [],
   });
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [pendingParticipant, setPendingParticipant] = useState<ChatContact | null>(null);
 
   // Room state
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -128,6 +141,11 @@ export default function ChatWidget() {
   // Mini tab: 'chats' or 'rooms'
   const [listTab, setListTab] = useState<'chats' | 'rooms'>('chats');
 
+  // Block UI state
+  const [blockMenuAnchor, setBlockMenuAnchor] = useState<HTMLElement | null>(null);
+  const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const roomMessagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,10 +156,33 @@ export default function ChatWidget() {
   const isVisible = Boolean(profile?.emailVerified) && !isOnChatPage;
 
   // ──── Active conversation data ────────────
-  const activeConversation = useMemo(
-    () => conversations.find((c) => c.id === activeConvId) ?? null,
-    [conversations, activeConvId]
-  );
+  const activeConversation = useMemo(() => {
+    if (activeConvId) return conversations.find((c) => c.id === activeConvId) ?? null;
+    if (pendingParticipant) {
+      return {
+        id: 'pending',
+        type: 'direct' as const,
+        last_message_at: null,
+        last_message_preview: null,
+        created_at: new Date().toISOString(),
+        unread_count: 0,
+        last_read_at: null,
+        participant_id: pendingParticipant.id,
+        participant_name: pendingParticipant.name,
+        participant_email: pendingParticipant.email,
+        participant_image: pendingParticipant.profileImage,
+        participant_designation: pendingParticipant.designation,
+        participant_assigned_state: null,
+        participant_assigned_lga: null,
+        participant_assigned_ward: null,
+        participant_voting_state: null,
+        participant_voting_lga: null,
+        participant_voting_ward: null,
+        participant_voting_pu: null,
+      } satisfies Conversation;
+    }
+    return null;
+  }, [conversations, activeConvId, pendingParticipant]);
 
   // ──── Total unread ────────────────────────
   const totalUnread = useMemo(
@@ -152,6 +193,24 @@ export default function ChatWidget() {
     },
     [conversations, rooms]
   );
+
+  // ──── Block status for active DM ─────────
+  const isActiveBlocked = activeConversation ? isBlocked(activeConversation.participant_id) : false;
+
+  const handleWidgetBlock = async () => {
+    if (!activeConversation) return;
+    setBlockLoading(true);
+    try {
+      if (isActiveBlocked) {
+        await doUnblock(activeConversation.participant_id);
+      } else {
+        await doBlock(activeConversation.participant_id);
+      }
+    } catch { /* silent */ }
+    setBlockLoading(false);
+    setBlockConfirmOpen(false);
+    setBlockMenuAnchor(null);
+  };
 
   // ──── Load conversations ──────────────────
   const loadConversations = useCallback(async () => {
@@ -227,6 +286,12 @@ export default function ChatWidget() {
             sender_id: msg.sender_id,
             sender_name: msg.sender_name,
             sender_image: msg.sender_image,
+            reply_to_id: msg.reply_to_id ?? null,
+            reply_to_content: msg.reply_to_content ?? null,
+            reply_to_sender_name: msg.reply_to_sender_name ?? null,
+            reply_to_sender_id: msg.reply_to_sender_id ?? null,
+            reactions: msg.reactions ?? [],
+            deleted_at: msg.deleted_at ?? null,
           }];
         });
       }
@@ -275,11 +340,34 @@ export default function ChatWidget() {
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
 
+    const handleReactionUpdated = (data: ReactionUpdateEvent) => {
+      if (data.conversationId !== activeConvId) return;
+      setMessages((prev) =>
+        prev.map((m) => m.id === data.messageId ? { ...m, reactions: data.reactions } : m)
+      );
+    };
+
+    const handleMessageDeleted = (data: MessageDeletedEvent) => {
+      if (data.conversationId !== activeConvId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId
+            ? { ...m, deleted_at: new Date().toISOString(), content: 'This message was deleted' }
+            : m
+        )
+      );
+    };
+
+    socket.on('reaction:updated', handleReactionUpdated);
+    socket.on('message:deleted', handleMessageDeleted);
+
     return () => {
       socket.off('message:new', handleNewMessage);
       socket.off('conversation:created', handleConvCreated);
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
+      socket.off('reaction:updated', handleReactionUpdated);
+      socket.off('message:deleted', handleMessageDeleted);
     };
   }, [socket, activeConvId, profile?._id, loadConversations]);
 
@@ -365,15 +453,31 @@ export default function ChatWidget() {
 
   // ──── Actions ──────────────────────────────
   const handleSend = async () => {
-    if (!activeConvId || !messageInput.trim() || sending) return;
     const content = messageInput.trim();
+    if (!content || sending) return;
+    if (!activeConvId && !pendingParticipant) return;
+
     setMessageInput('');
     setSending(true);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    emitStopTyping(activeConvId);
 
     try {
-      const data = await apiSendMessage(activeConvId, content);
+      let convId = activeConvId;
+
+      // Lazy creation: create conversation on first message send
+      if (!convId && pendingParticipant) {
+        const createData = await getOrCreateConversation(pendingParticipant.id);
+        convId = createData.conversationId;
+        setActiveConvId(convId);
+        setPendingParticipant(null);
+        joinConversation(convId!);
+      }
+
+      if (!convId) return;
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      emitStopTyping(convId);
+
+      const data = await apiSendMessage(convId, content);
       if (data.message) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === data.message.id)) return prev;
@@ -386,23 +490,15 @@ export default function ChatWidget() {
             sender_id: data.message.sender_id,
             sender_name: data.message.sender_name,
             sender_image: data.message.sender_image,
+            reply_to_id: data.message.reply_to_id ?? null,
+            reply_to_content: data.message.reply_to_content ?? null,
+            reply_to_sender_name: data.message.reply_to_sender_name ?? null,
+            reply_to_sender_id: data.message.reply_to_sender_id ?? null,
+            reactions: data.message.reactions ?? [],
+            deleted_at: data.message.deleted_at ?? null,
           }];
         });
-        const preview = content.length > 100 ? content.slice(0, 100) + '...' : content;
-        setConversations((prev) => {
-          const idx = prev.findIndex((c) => c.id === activeConvId);
-          if (idx === -1) return prev;
-          const updated = [...prev];
-          updated[idx] = {
-            ...updated[idx],
-            last_message_at: data.message.created_at,
-            last_message_preview: preview,
-            unread_count: 0,
-          };
-          const [item] = updated.splice(idx, 1);
-          updated.unshift(item);
-          return updated;
-        });
+        await loadConversations();
       }
     } catch {
       setMessageInput(content);
@@ -433,6 +529,7 @@ export default function ChatWidget() {
 
   const goBack = () => {
     setActiveConvId(null);
+    setPendingParticipant(null);
     setMessages([]);
     setTypingUsers(new Map());
     setView('conversations');
@@ -451,14 +548,20 @@ export default function ChatWidget() {
     }
   };
 
-  const startConversation = async (participantId: string) => {
-    try {
-      const data = await getOrCreateConversation(participantId);
-      await loadConversations();
-      setActiveConvId(data.conversationId);
+  const startConversation = (participantId: string) => {
+    // Check local conversations first
+    const existing = conversations.find((c) => c.participant_id === participantId);
+    if (existing) {
+      setActiveConvId(existing.id);
+      setPendingParticipant(null);
       setView('chat');
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Cannot start conversation');
+    } else {
+      const allContacts = [...contacts.coordinators, ...contacts.subordinates];
+      const contact = allContacts.find((c) => c.id === participantId);
+      setPendingParticipant(contact ?? { id: participantId, name: 'User', email: '', phone: null, profileImage: null, designation: '' });
+      setActiveConvId(null);
+      setMessages([]);
+      setView('chat');
     }
   };
 
@@ -636,6 +739,7 @@ export default function ChatWidget() {
                 >
                   <Avatar
                     src={activeConversation.participant_image || undefined}
+                    imgProps={{ referrerPolicy: 'no-referrer' }}
                     sx={{ width: 32, height: 32, bgcolor: '#fff', color: PRIMARY, fontSize: '0.75rem', fontFamily: FONT }}
                   >
                     {activeConversation.participant_name?.[0]?.toUpperCase()}
@@ -649,6 +753,23 @@ export default function ChatWidget() {
                     {typingText || (onlineUsers.has(activeConversation.participant_id) ? 'Online' : richDesignation(activeConversation))}
                   </Typography>
                 </Box>
+                <IconButton size="small" onClick={(e) => setBlockMenuAnchor(e.currentTarget)} sx={{ color: '#fff', p: 0.3 }}>
+                  <MoreVertical size={16} />
+                </IconButton>
+                <Menu
+                  anchorEl={blockMenuAnchor}
+                  open={Boolean(blockMenuAnchor)}
+                  onClose={() => setBlockMenuAnchor(null)}
+                  PaperProps={{ sx: { borderRadius: 2, minWidth: 140, fontFamily: FONT } }}
+                >
+                  <MenuItem
+                    onClick={() => { setBlockMenuAnchor(null); isActiveBlocked ? handleWidgetBlock() : setBlockConfirmOpen(true); }}
+                    sx={{ fontFamily: FONT, fontSize: '0.78rem', gap: 0.75, color: isActiveBlocked ? '#737373' : '#ef4444' }}
+                  >
+                    <Ban size={14} />
+                    {isActiveBlocked ? 'Unblock' : 'Block User'}
+                  </MenuItem>
+                </Menu>
               </>
             )}
 
@@ -782,6 +903,7 @@ export default function ChatWidget() {
                         >
                           <Avatar
                             src={conv.participant_image || undefined}
+                            imgProps={{ referrerPolicy: 'no-referrer' }}
                             sx={{ width: 42, height: 42, bgcolor: PRIMARY, fontFamily: FONT, fontSize: '0.8rem' }}
                           >
                             {conv.participant_name?.[0]?.toUpperCase()}
@@ -945,22 +1067,39 @@ export default function ChatWidget() {
                 <div ref={messagesEndRef} />
               </Box>
 
+              {/* Blocked banner */}
+              {isActiveBlocked && (
+                <Box sx={{ px: 1.5, py: 0.75, display: 'flex', alignItems: 'center', gap: 0.75, bgcolor: '#fef2f2', borderTop: '1px solid rgba(239,68,68,0.1)' }}>
+                  <Ban size={12} color="#ef4444" />
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: '#ef4444', flex: 1 }}>
+                    You blocked this user
+                  </Typography>
+                  <Typography
+                    onClick={handleWidgetBlock}
+                    sx={{ fontFamily: FONT, fontSize: '0.68rem', fontWeight: 600, color: PRIMARY, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                  >
+                    Unblock
+                  </Typography>
+                </Box>
+              )}
+
               {/* Input */}
               <Box sx={{ px: 1, py: 1, borderTop: '1px solid', borderColor: 'divider', bgcolor: '#fff', display: 'flex', gap: 0.75, alignItems: 'flex-end' }}>
                 <TextField
                   multiline
                   maxRows={3}
                   fullWidth
-                  placeholder="Type a message..."
+                  placeholder={isActiveBlocked ? 'Blocked' : 'Type a message...'}
                   value={messageInput}
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
+                  disabled={isActiveBlocked}
                   size="small"
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, fontFamily: FONT, fontSize: '0.8rem' } }}
                 />
                 <IconButton
                   onClick={handleSend}
-                  disabled={!messageInput.trim() || sending}
+                  disabled={!messageInput.trim() || sending || isActiveBlocked}
                   sx={{
                     bgcolor: PRIMARY,
                     color: '#fff',
@@ -994,7 +1133,7 @@ export default function ChatWidget() {
                       <List disablePadding>
                         {contacts.coordinators.map((c) => (
                           <ListItemButton key={c.id} onClick={() => startConversation(c.id)} sx={{ px: 1.5, py: 0.75, gap: 1 }}>
-                            <Avatar src={c.profileImage || undefined} sx={{ width: 36, height: 36, bgcolor: PRIMARY, fontSize: '0.75rem' }}>
+                            <Avatar src={c.profileImage || undefined} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 36, height: 36, bgcolor: PRIMARY, fontSize: '0.75rem' }}>
                               {c.name[0]?.toUpperCase()}
                             </Avatar>
                             <Box sx={{ minWidth: 0 }}>
@@ -1018,7 +1157,7 @@ export default function ChatWidget() {
                       <List disablePadding>
                         {contacts.subordinates.map((c) => (
                           <ListItemButton key={c.id} onClick={() => startConversation(c.id)} sx={{ px: 1.5, py: 0.75, gap: 1 }}>
-                            <Avatar src={c.profileImage || undefined} sx={{ width: 36, height: 36, bgcolor: PRIMARY, fontSize: '0.75rem' }}>
+                            <Avatar src={c.profileImage || undefined} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 36, height: 36, bgcolor: PRIMARY, fontSize: '0.75rem' }}>
                               {c.name[0]?.toUpperCase()}
                             </Avatar>
                             <Box sx={{ minWidth: 0 }}>
@@ -1265,6 +1404,31 @@ export default function ChatWidget() {
           )}
         </Paper>
       </Slide>
+
+      {/* Block confirmation dialog */}
+      <Dialog open={blockConfirmOpen} onClose={() => setBlockConfirmOpen(false)} maxWidth="xs">
+        <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.95rem' }}>
+          Block {activeConversation?.participant_name}?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ fontFamily: FONT, fontSize: '0.82rem' }}>
+            They won't be able to send you direct messages. You can unblock them anytime.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBlockConfirmOpen(false)} sx={{ fontFamily: FONT, textTransform: 'none', color: '#737373', fontSize: '0.82rem' }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleWidgetBlock}
+            variant="contained"
+            disabled={blockLoading}
+            sx={{ fontFamily: FONT, textTransform: 'none', bgcolor: '#ef4444', '&:hover': { bgcolor: '#dc2626' }, fontSize: '0.82rem' }}
+          >
+            {blockLoading ? 'Blocking…' : 'Block'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

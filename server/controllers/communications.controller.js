@@ -15,6 +15,7 @@ import {
   refreshCampaignStatus
 } from '../services/communications/batchProcessingService.js';
 import { logger } from '../middlewares/security.middleware.js';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -29,8 +30,10 @@ const ensureAdminUser = (req) => {
 const authorizeWebhookRequest = (req) => {
   const expectedToken = process.env.COMMUNICATIONS_WEBHOOK_TOKEN;
 
+  // Fail closed: if no secret is configured, reject all webhooks
   if (!expectedToken) {
-    return true;
+    logger.error('COMMUNICATIONS_WEBHOOK_TOKEN not set — rejecting webhook');
+    return false;
   }
 
   const providedToken =
@@ -39,10 +42,19 @@ const authorizeWebhookRequest = (req) => {
     req.query.token ||
     (typeof req.body === 'object' && req.body ? req.body.token : undefined);
 
-  if (providedToken !== expectedToken) {
-    logger.warn('Rejected communications webhook request', {
+  if (!providedToken) {
+    logger.warn('Rejected communications webhook request — no token provided', {
       path: req.originalUrl,
-      hasToken: Boolean(providedToken)
+    });
+    return false;
+  }
+
+  // Timing-safe comparison to prevent timing attacks
+  const a = Buffer.from(String(providedToken));
+  const b = Buffer.from(String(expectedToken));
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    logger.warn('Rejected communications webhook request — invalid token', {
+      path: req.originalUrl,
     });
     return false;
   }

@@ -13,6 +13,7 @@ export const SURFACE_HIGH = '#e8e8e8';
 export type ChatTab = 'messages' | 'community';
 
 export interface ProfileInfo {
+  id?: string;
   name: string;
   image: string | null;
   designation: string | null;

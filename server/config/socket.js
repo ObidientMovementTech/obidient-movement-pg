@@ -3,11 +3,37 @@ import jwt from 'jsonwebtoken';
 import cookie from 'cookie';
 import { query } from './db.js';
 import { registerChatHandlers } from '../socket/chatHandlers.js';
+import { getUserBlockList, getUserBlockedByList } from '../controllers/block.controller.js';
 
 let io = null;
 
 // Online presence: userId → Set<socketId>
 const onlineUsers = new Map();
+
+/**
+ * Re-verify JWT token on a connected socket.
+ * Returns true if still valid, disconnects the socket and returns false otherwise.
+ */
+export function reVerifySocket(socket) {
+  try {
+    let token = socket.handshake.auth?.token;
+    if (!token) {
+      const rawCookies = socket.handshake.headers.cookie || '';
+      const cookies = cookie.parse(rawCookies);
+      token = cookies['cu-auth-token'];
+    }
+    if (!token) {
+      socket.disconnect(true);
+      return false;
+    }
+    jwt.verify(token, process.env.JWT_SECRET); // throws if expired/invalid
+    return true;
+  } catch {
+    socket.emit('auth:expired', { message: 'Session expired' });
+    socket.disconnect(true);
+    return false;
+  }
+}
 
 /**
  * Initialize Socket.IO server with cookie-based JWT authentication
@@ -33,10 +59,15 @@ export function initSocket(httpServer) {
   // ── Authentication middleware ──────────────────────────────────
   io.use(async (socket, next) => {
     try {
-      // Parse token from cookie (same cookie the REST API uses)
-      const rawCookies = socket.handshake.headers.cookie || '';
-      const cookies = cookie.parse(rawCookies);
-      const token = cookies['cu-auth-token'];
+      // 1. Try token from socket.handshake.auth (mobile clients)
+      // 2. Fall back to cookie (web clients)
+      let token = socket.handshake.auth?.token;
+
+      if (!token) {
+        const rawCookies = socket.handshake.headers.cookie || '';
+        const cookies = cookie.parse(rawCookies);
+        token = cookies['cu-auth-token'];
+      }
 
       if (!token) {
         return next(new Error('Authentication required'));
@@ -82,6 +113,33 @@ export function initSocket(httpServer) {
     // Join personal room for direct notifications
     socket.join(`user:${userId}`);
 
+    // Load block lists and chat settings into socket for fast lookups
+    try {
+      const [blockedByMe, blockedByOthers] = await Promise.all([
+        getUserBlockList(userId),
+        getUserBlockedByList(userId),
+      ]);
+      socket.blockedByMe = blockedByMe;     // users I blocked
+      socket.blockedByOthers = blockedByOthers; // users who blocked me
+
+      // Load chat settings
+      const settingsResult = await query(
+        `SELECT show_online_status, show_typing_indicator, read_receipts
+         FROM user_chat_settings WHERE user_id = $1`,
+        [userId]
+      );
+      socket.chatSettings = settingsResult.rows[0] || {
+        show_online_status: true,
+        show_typing_indicator: true,
+        read_receipts: true,
+      };
+    } catch (err) {
+      console.error('[Socket] Error loading block/settings data:', err.message);
+      socket.blockedByMe = new Set();
+      socket.blockedByOthers = new Set();
+      socket.chatSettings = { show_online_status: true, show_typing_indicator: true, read_receipts: true };
+    }
+
     // Join all conversation rooms this user participates in
     try {
       const convResult = await query(
@@ -95,8 +153,10 @@ export function initSocket(httpServer) {
       console.error('[Socket] Error joining conversation rooms:', err.message);
     }
 
-    // Broadcast online status to conversation partners
-    broadcastPresence(userId, true);
+    // Broadcast online status to conversation partners (if enabled)
+    if (socket.chatSettings.show_online_status) {
+      broadcastPresence(userId, true);
+    }
 
     // Register chat event handlers
     registerChatHandlers(io, socket);
@@ -111,7 +171,10 @@ export function initSocket(httpServer) {
         if (sockets.size === 0) {
           onlineUsers.delete(userId);
           // Only broadcast offline when ALL tabs/devices disconnected
-          broadcastPresence(userId, false);
+          // Respect show_online_status setting
+          if (socket.chatSettings?.show_online_status !== false) {
+            broadcastPresence(userId, false);
+          }
         }
       }
     });
@@ -147,6 +210,7 @@ export function getOnlineUserIds() {
 
 /**
  * Broadcast presence change to all conversation partners
+ * Respects block relationships — blocked pairs don't see each other's status
  */
 async function broadcastPresence(userId, isOnline) {
   try {
@@ -159,7 +223,22 @@ async function broadcastPresence(userId, isOnline) {
       [userId]
     );
 
+    // Get block relationships for this user (both directions)
+    const blockResult = await query(
+      `SELECT blocker_id, blocked_id FROM user_blocks
+       WHERE blocker_id = $1 OR blocked_id = $1`,
+      [userId]
+    );
+    const blockedPairs = new Set();
+    for (const row of blockResult.rows) {
+      if (row.blocker_id === userId) blockedPairs.add(row.blocked_id);
+      if (row.blocked_id === userId) blockedPairs.add(row.blocker_id);
+    }
+
     for (const row of result.rows) {
+      // Skip blocked pairs
+      if (blockedPairs.has(row.user_id)) continue;
+
       io.to(`user:${row.user_id}`).emit('presence:change', {
         userId,
         online: isOnline,

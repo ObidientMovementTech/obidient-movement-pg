@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
 import { MessageSquare, Users } from 'lucide-react';
+import { useUser } from '../../context/UserContext';
 
 import type { ChatTab, ProfileInfo } from './chat/types';
 import { FONT, PRIMARY, PRIMARY_LIGHT, SURFACE_LOW } from './chat/types';
@@ -15,6 +16,7 @@ import RoomChat from './chat/components/RoomChat';
 import ProfileModal from './chat/components/ProfileModal';
 
 export default function ChatPage() {
+  const { profile } = useUser();
   const [activeTab, setActiveTab] = useState<ChatTab>('messages');
   const [profileModalUser, setProfileModalUser] = useState<ProfileInfo | null>(null);
 
@@ -126,6 +128,11 @@ export default function ChatPage() {
                 onInputChange={dm.setMessageInput}
                 onLoadMore={dm.handleLoadMore}
                 onProfileClick={setProfileModalUser}
+                replyingTo={dm.replyingTo}
+                onReply={dm.handleReply}
+                onCancelReply={dm.cancelReply}
+                onReact={dm.handleToggleReaction}
+                onDelete={dm.handleDeleteMessage}
               />
             </Box>
 
@@ -200,7 +207,15 @@ export default function ChatPage() {
 
       {/* Profile Modal (shared) */}
       {profileModalUser && (
-        <ProfileModal user={profileModalUser} onClose={() => setProfileModalUser(null)} />
+        <ProfileModal
+          user={profileModalUser}
+          currentUserId={profile?._id}
+          onClose={() => setProfileModalUser(null)}
+          onStartConversation={(userId) => {
+            setActiveTab('messages');
+            dm.startConversation(userId);
+          }}
+        />
       )}
     </Box>
   );

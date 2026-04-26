@@ -104,6 +104,7 @@ const AdminViewUserModal: React.FC<AdminViewUserModalProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: '#f9fafb', borderRadius: 2 }}>
             <Avatar
               src={user.profileImage}
+              imgProps={{ referrerPolicy: 'no-referrer' }}
               sx={{ width: 56, height: 56, bgcolor: '#d1d5db', fontSize: '1.2rem', fontFamily: FONT }}
             >
               {user.name?.charAt(0)?.toUpperCase()}

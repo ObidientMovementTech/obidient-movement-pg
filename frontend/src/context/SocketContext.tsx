@@ -23,6 +23,23 @@ export interface ChatMessage {
   content: string;
   message_type: string;
   created_at: string;
+  reply_to_id?: string | null;
+  reply_to_content?: string | null;
+  reply_to_sender_name?: string | null;
+  reply_to_sender_id?: string | null;
+  reactions?: { emoji: string; count: number; reacted: boolean; user_ids: string[] }[];
+  deleted_at?: string | null;
+}
+
+export interface ReactionUpdateEvent {
+  conversationId: string;
+  messageId: string;
+  reactions: { emoji: string; count: number; reacted: boolean; user_ids: string[] }[];
+}
+
+export interface MessageDeletedEvent {
+  conversationId: string;
+  messageId: string;
 }
 
 export interface TypingEvent {
@@ -42,6 +59,7 @@ export interface ConversationUpdate {
   lastMessageAt: string;
   lastMessagePreview: string;
   senderName: string;
+  unreadCount?: number;
 }
 
 interface SocketContextType {
@@ -118,19 +136,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   }, [profile]);
 
   const joinConversation = useCallback((conversationId: string) => {
-    socketRef.current?.emit('conversation:join', { conversationId });
+    socketRef.current?.emit('conversation:join', conversationId);
   }, []);
 
   const leaveConversation = useCallback((conversationId: string) => {
-    socketRef.current?.emit('conversation:leave', { conversationId });
+    socketRef.current?.emit('conversation:leave', conversationId);
   }, []);
 
   const startTyping = useCallback((conversationId: string) => {
-    socketRef.current?.emit('typing:start', { conversationId });
+    socketRef.current?.emit('typing:start', conversationId);
   }, []);
 
   const stopTyping = useCallback((conversationId: string) => {
-    socketRef.current?.emit('typing:stop', { conversationId });
+    socketRef.current?.emit('typing:stop', conversationId);
   }, []);
 
   const value: SocketContextType = {

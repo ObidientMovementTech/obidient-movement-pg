@@ -86,6 +86,7 @@ export default function ContactsDialog({ open, onClose, loading, coordinators, s
                     >
                       <Avatar
                         src={c.profileImage || undefined}
+                        imgProps={{ referrerPolicy: 'no-referrer' }}
                         sx={{
                           width: 44,
                           height: 44,
@@ -141,6 +142,7 @@ export default function ContactsDialog({ open, onClose, loading, coordinators, s
                     >
                       <Avatar
                         src={c.profileImage || undefined}
+                        imgProps={{ referrerPolicy: 'no-referrer' }}
                         sx={{
                           width: 44,
                           height: 44,

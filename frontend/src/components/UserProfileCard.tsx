@@ -49,6 +49,7 @@ const UserProfileCard = ({ setActivePage }: UserProfileCardProps) => {
         <img
           src={profile.profileImage || "/default-avatar.png"}
           alt="Profile"
+          referrerPolicy="no-referrer"
           className="w-12 h-12 rounded-full border"
         />
         <div className="flex flex-col p-2">

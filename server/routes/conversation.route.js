@@ -7,6 +7,8 @@ import {
   sendMessage,
   getOnlineStatus,
   getChatContacts,
+  toggleReaction,
+  deleteMessage,
 } from '../controllers/conversation.controller.js';
 
 const router = Router();
@@ -24,5 +26,9 @@ router.get('/online', protect, getOnlineStatus);
 // Messages within a conversation
 router.get('/:id/messages', protect, getMessages);
 router.post('/:id/messages', protect, sendMessage);
+
+// Reactions & deletion
+router.post('/:convId/messages/:msgId/reactions', protect, toggleReaction);
+router.delete('/:convId/messages/:msgId', protect, deleteMessage);
 
 export default router;

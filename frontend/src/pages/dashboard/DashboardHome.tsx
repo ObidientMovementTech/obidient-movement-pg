@@ -28,6 +28,12 @@ import {
   Package,
   Upload,
   CheckCircle,
+  X,
+  Heart,
+  Vote,
+  MessageSquare,
+  UserPlus,
+  ArrowUpRight,
 } from 'lucide-react';
 import axios from 'axios';
 import { useUser } from '../../context/UserContext';
@@ -37,6 +43,9 @@ import {
 } from '../../services/votingBlocService';
 import { getNotifications } from '../../services/notificationService';
 import { submitAdcCard } from '../../services/adcService';
+import type { ChatContact } from '../../services/conversationService';
+import { useMyLeaders } from './overview/hooks/useMyLeaders';
+import LeaderInfoModal from './components/LeaderInfoModal';
 
 const FONT = '"Poppins", sans-serif';
 const PRIMARY = '#006837';
@@ -59,6 +68,7 @@ export default function DashboardHome() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobilizationUrl, setMobilizationUrl] = useState('');
+  const [ctaLinks, setCtaLinks] = useState<Record<string, string>>({});
 
   // ADC Registration
   const [adcModalOpen, setAdcModalOpen] = useState(false);
@@ -67,6 +77,21 @@ export default function DashboardHome() {
   const [adcPreview, setAdcPreview] = useState<string | null>(null);
   const [adcBase64, setAdcBase64] = useState<string | null>(null);
   const [adcError, setAdcError] = useState('');
+
+  // Leadership
+  const { leaders, loading: leadersLoading } = useMyLeaders();
+  const [selectedLeader, setSelectedLeader] = useState<ChatContact | null>(null);
+  const [peterObiOpen, setPeterObiOpen] = useState(false);
+
+  const levelLocationFor = (leader: ChatContact) => {
+    // Coordinators are scoped to the current user's voting jurisdiction
+    switch (leader.level) {
+      case 'state': return profile?.votingState || '';
+      case 'lga': return profile?.votingLGA || '';
+      case 'ward': return profile?.votingWard || '';
+      default: return '';
+    }
+  };
 
   const isCoordinator =
     profile?.designation &&
@@ -78,11 +103,23 @@ export default function DashboardHome() {
     ].includes(profile.designation);
 
   useEffect(() => {
+    const ctaKeys = ['cta_volunteer_url', 'cta_run_for_office_url', 'cta_donate_url', 'cta_feedback_url'];
+    const ctaFetch = Promise.all(
+      ctaKeys.map(key =>
+        axios.get(`${API}/api/settings/${key}`).then(r => ({ key, value: r.data.value || '' })).catch(() => ({ key, value: '' }))
+      )
+    ).then(results => {
+      const links: Record<string, string> = {};
+      results.forEach(r => { if (r.value) links[r.key] = r.value; });
+      setCtaLinks(links);
+    });
+
     Promise.all([
       getOwnedVotingBlocs().then((d) => setOwnedBlocs(d.votingBlocs || [])),
       getJoinedVotingBlocs().then((d) => setJoinedBlocs(d.votingBlocs || [])),
       getNotifications().then((d) => setNotifications(Array.isArray(d) ? d.slice(0, 5) : [])),
       axios.get(`${API}/api/settings/mobilization_pack_url`).then((r) => setMobilizationUrl(r.data.value || '')).catch(() => {}),
+      ctaFetch,
     ])
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -184,6 +221,7 @@ export default function DashboardHome() {
               <Avatar
                 src={profile?.profileImage || undefined}
                 alt={profile?.name}
+                imgProps={{ referrerPolicy: 'no-referrer' }}
                 sx={{
                   width: { xs: 72, sm: 96 },
                   height: { xs: 72, sm: 96 },
@@ -565,6 +603,77 @@ export default function DashboardHome() {
         </Card>
       )}
 
+      {/* ═══ Your Leadership ═══ */}
+      <Box>
+        <Typography
+          sx={{
+            fontFamily: FONT,
+            fontWeight: 800,
+            fontSize: { xs: '1.25rem', md: '1.4rem' },
+            letterSpacing: '-0.02em',
+            mb: 2.5,
+          }}
+        >
+          Your Leadership
+        </Typography>
+        {leadersLoading ? (
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 1.5,
+              overflowX: 'auto',
+              pb: 1,
+              '&::-webkit-scrollbar': { display: 'none' },
+            }}
+          >
+            {[1, 2, 3].map((i) => (
+              <Skeleton
+                key={i}
+                variant="rounded"
+                width={160}
+                height={200}
+                sx={{ borderRadius: 4, flexShrink: 0 }}
+              />
+            ))}
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: 'flex',
+              gap: { xs: 1.5, md: 2 },
+              overflowX: 'auto',
+              pb: 1,
+              '&::-webkit-scrollbar': { display: 'none' },
+              scrollbarWidth: 'none',
+            }}
+          >
+            {/* Peter Obi — always first */}
+            <LeaderCard
+              name="Peter Obi"
+              subtitle="FOUNDER"
+              image="/Peter-Obi.webp"
+              onClick={() => setPeterObiOpen(true)}
+            />
+            {leaders.map((leader) => {
+              const loc = levelLocationFor(leader);
+              const subtitle = (loc
+                ? `${loc} ${leader.designation}`
+                : leader.designation
+              ).toUpperCase();
+              return (
+                <LeaderCard
+                  key={leader.id}
+                  name={leader.name}
+                  subtitle={subtitle}
+                  image={leader.profileImage}
+                  onClick={() => setSelectedLeader(leader)}
+                />
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+
       {/* ═══ Quick Actions ═══ */}
       <Box>
         <Typography
@@ -645,6 +754,187 @@ export default function DashboardHome() {
           })}
         </Grid>
       </Box>
+
+      {/* ═══ Call-to-Action Cards ═══ */}
+      {(() => {
+        const ctaCards = [
+          {
+            key: 'cta_volunteer_url',
+            title: 'Volunteer',
+            desc: 'Join a directorate — help build the New Nigeria from your community.',
+            icon: UserPlus,
+            gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+            shadow: 'rgba(5,150,105,0.25)',
+          },
+          {
+            key: 'cta_run_for_office_url',
+            title: 'Run for Office',
+            desc: 'Ready to serve? Submit your interest for 2027 elections.',
+            icon: Vote,
+            gradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+            shadow: 'rgba(37,99,235,0.25)',
+          },
+          {
+            key: 'cta_donate_url',
+            title: 'Donate',
+            desc: 'Support the movement — every contribution fuels change.',
+            icon: Heart,
+            gradient: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+            shadow: 'rgba(124,58,237,0.25)',
+          },
+          {
+            key: 'cta_feedback_url',
+            title: 'Give Feedback',
+            desc: 'Your voice matters — share ideas, report issues, shape direction.',
+            icon: MessageSquare,
+            gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+            shadow: 'rgba(217,119,6,0.25)',
+          },
+        ].filter(c => ctaLinks[c.key]);
+
+        if (ctaCards.length === 0) return null;
+
+        return (
+          <Box>
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontWeight: 800,
+                fontSize: { xs: '1.25rem', md: '1.4rem' },
+                letterSpacing: '-0.02em',
+                mb: 2.5,
+              }}
+            >
+              Get Involved
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  sm: ctaCards.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+                  md: `repeat(${Math.min(ctaCards.length, 4)}, 1fr)`,
+                },
+                gap: { xs: 1.5, md: 2 },
+              }}
+            >
+              {ctaCards.map((cta) => {
+                const Icon = cta.icon;
+                return (
+                  <Card
+                    key={cta.key}
+                    elevation={0}
+                    component="a"
+                    href={ctaLinks[cta.key]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      textDecoration: 'none',
+                      background: cta.gradient,
+                      color: '#fff',
+                      borderRadius: 4,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                      '&:hover': {
+                        transform: 'translateY(-3px)',
+                        boxShadow: `0 16px 40px ${cta.shadow}`,
+                        '& .cta-arrow': {
+                          transform: 'translate(2px, -2px)',
+                        },
+                        '& .cta-bg-glow': {
+                          opacity: 0.18,
+                        },
+                      },
+                      '&:active': {
+                        transform: 'translateY(-1px) scale(0.985)',
+                      },
+                    }}
+                  >
+                    {/* Decorative arc */}
+                    <Box
+                      className="cta-bg-glow"
+                      sx={{
+                        position: 'absolute',
+                        top: -40,
+                        right: -40,
+                        width: 130,
+                        height: 130,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.12)',
+                        transition: 'opacity 0.3s',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                    <Box sx={{ p: { xs: 2.5, md: 3 }, position: 'relative', zIndex: 1 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          mb: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 2.5,
+                            bgcolor: 'rgba(255,255,255,0.2)',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Icon size={20} strokeWidth={2.2} />
+                        </Box>
+                        <Box
+                          className="cta-arrow"
+                          sx={{
+                            transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                            opacity: 0.7,
+                          }}
+                        >
+                          <ArrowUpRight size={18} />
+                        </Box>
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontFamily: FONT,
+                          fontWeight: 800,
+                          fontSize: { xs: '1rem', md: '1.05rem' },
+                          letterSpacing: '-0.01em',
+                          lineHeight: 1.2,
+                          mb: 0.5,
+                        }}
+                      >
+                        {cta.title}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontFamily: FONT,
+                          fontSize: { xs: '0.72rem', md: '0.78rem' },
+                          fontWeight: 400,
+                          lineHeight: 1.5,
+                          opacity: 0.82,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {cta.desc}
+                      </Typography>
+                    </Box>
+                  </Card>
+                );
+              })}
+            </Box>
+          </Box>
+        );
+      })()}
 
       {/* ═══ Mobilization Pack Banner ═══ */}
       {mobilizationUrl && (
@@ -996,6 +1286,130 @@ export default function DashboardHome() {
             )}
       </Box>
 
+      {/* ═══ Leader Info Modal (for coordinators) ═══ */}
+      <LeaderInfoModal
+        leader={selectedLeader}
+        onClose={() => setSelectedLeader(null)}
+      />
+
+      {/* ═══ Peter Obi Bio Dialog ═══ */}
+      <Dialog
+        open={peterObiOpen}
+        onClose={() => setPeterObiOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 5, overflow: 'visible', boxShadow: '0 24px 64px rgba(0,0,0,0.12)' },
+        }}
+      >
+        <Box sx={{ position: 'relative', textAlign: 'center' }}>
+          <Box
+            sx={{
+              height: 96,
+              background: `linear-gradient(135deg, ${PRIMARY} 0%, #006b3e 100%)`,
+              borderRadius: '20px 20px 0 0',
+            }}
+          />
+          <Button
+            onClick={() => setPeterObiOpen(false)}
+            sx={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              minWidth: 0,
+              p: 0.75,
+              color: '#fff',
+              bgcolor: 'rgba(255,255,255,0.15)',
+              borderRadius: '50%',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
+            }}
+          >
+            <X size={16} />
+          </Button>
+          <Avatar
+            src="/Peter-Obi.webp"
+            alt="Peter Obi"
+            sx={{
+              width: 96,
+              height: 96,
+              border: '4px solid #fff',
+              mx: 'auto',
+              mt: -6,
+              boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+            }}
+          />
+          <Box sx={{ px: 3, pb: 3.5, pt: 1.5 }}>
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontWeight: 800,
+                fontSize: '1.2rem',
+                color: '#1a1c1c',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Peter Obi
+            </Typography>
+            <Chip
+              label="FOUNDER"
+              size="small"
+              sx={{
+                fontFamily: FONT,
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                height: 28,
+                mt: 1,
+                bgcolor: `${PRIMARY}14`,
+                color: PRIMARY,
+                borderRadius: 2,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                border: '1px solid',
+                borderColor: `${PRIMARY}26`,
+              }}
+            />
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontSize: '0.6rem',
+                fontWeight: 800,
+                letterSpacing: '0.12em',
+                color: 'text.secondary',
+                textAlign: 'left',
+                mt: 3,
+                mb: 1.25,
+              }}
+            >
+              ABOUT
+            </Typography>
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 3,
+                bgcolor: '#f9fafb',
+                border: '1px solid rgba(0,0,0,0.05)',
+                textAlign: 'left',
+              }}
+            >
+              <Typography
+                sx={{
+                  fontFamily: FONT,
+                  fontSize: '0.82rem',
+                  lineHeight: 1.6,
+                  color: '#374151',
+                }}
+              >
+                Peter Gregory Obi is a Nigerian businessman and politician who
+                served as the Governor of Anambra State from 2006 to 2014. He
+                was the Vice Presidential candidate of the PDP in 2019 and the
+                Presidential candidate of the Labour Party in the 2023 general
+                elections. He is the Founder of the Obidient Movement.
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </Dialog>
+
       {/* ═══ ADC Registration Modal ═══ */}
       <Dialog
         open={adcModalOpen}
@@ -1189,5 +1603,95 @@ export default function DashboardHome() {
         )}
       </Dialog>
     </Box>
+  );
+}
+
+/* ─── Leader Card ─── */
+interface LeaderCardProps {
+  name: string;
+  subtitle: string;
+  image?: string | null;
+  onClick: () => void;
+}
+
+function LeaderCard({ name, subtitle, image, onClick }: LeaderCardProps) {
+  return (
+    <Card
+      elevation={0}
+      onClick={onClick}
+      sx={{
+        flexShrink: 0,
+        width: { xs: 150, md: 170 },
+        borderRadius: 4,
+        border: '1px solid rgba(0,0,0,0.06)',
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        '&:hover': {
+          borderColor: `${PRIMARY}40`,
+          boxShadow: `0 8px 24px ${PRIMARY}14`,
+          transform: 'translateY(-2px)',
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          p: { xs: 2, md: 2.5 },
+        }}
+      >
+        <Avatar
+          src={image || undefined}
+          alt={name}
+          imgProps={{ referrerPolicy: 'no-referrer' }}
+          sx={{
+            width: 72,
+            height: 72,
+            bgcolor: `${PRIMARY}14`,
+            color: PRIMARY,
+            fontFamily: FONT,
+            fontWeight: 700,
+            fontSize: '1.5rem',
+            mb: 1.5,
+          }}
+        >
+          {name?.[0]?.toUpperCase()}
+        </Avatar>
+        <Typography
+          sx={{
+            fontFamily: FONT,
+            fontWeight: 700,
+            fontSize: '0.85rem',
+            color: '#111827',
+            lineHeight: 1.2,
+            width: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {name}
+        </Typography>
+        <Typography
+          sx={{
+            fontFamily: FONT,
+            fontSize: '0.6rem',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            color: 'text.secondary',
+            mt: 0.5,
+            width: '100%',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {subtitle}
+        </Typography>
+      </Box>
+    </Card>
   );
 }

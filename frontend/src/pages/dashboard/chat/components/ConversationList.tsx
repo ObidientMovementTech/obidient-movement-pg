@@ -180,6 +180,7 @@ export default function ConversationList({
                   >
                     <Avatar
                       src={conv.participant_image || undefined}
+                      imgProps={{ referrerPolicy: 'no-referrer' }}
                       sx={{
                         width: 50,
                         height: 50,

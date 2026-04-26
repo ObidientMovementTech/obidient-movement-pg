@@ -4,35 +4,74 @@ import bcrypt from 'bcryptjs';
 import { sendPushNotification, sendBroadcastPush } from '../services/pushNotificationService.js';
 import { uploadBufferToS3 } from '../utils/s3Upload.js';
 import Notification from '../models/notification.model.js';
+import Reaction from '../models/reaction.model.js';
 
 // Mobile Authentication
 const mobileLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Get user with mobile context
+    // Validate input
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email or phone number is required',
+        field: 'email'
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+        field: 'password'
+      });
+    }
+
+    // Determine if input is email or phone number
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isEmail = emailRegex.test(email);
+
+    // Query by email or phone
     const userResult = await query(`
-      SELECT id, name, email, "passwordHash", role, designation,
+      SELECT id, name, email, phone, "passwordHash", role, designation,
              "assignedState", "assignedLGA", "assignedWard",
-             push_notifications_enabled, mobile_last_seen
+             push_notifications_enabled, mobile_last_seen, "emailVerified"
       FROM users 
-      WHERE email = $1 AND "emailVerified" = true
+      WHERE ${isEmail ? 'email' : 'phone'} = $1
     `, [email]);
 
     if (userResult.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials or email not verified'
+        message: isEmail
+          ? 'No account found with this email address. Please check your email or sign up for a new account.'
+          : 'No account found with this phone number. Please check your phone number or sign up for a new account.',
+        field: 'email',
+        errorType: isEmail ? 'EMAIL_NOT_FOUND' : 'PHONE_NOT_FOUND'
       });
     }
 
     const user = userResult.rows[0];
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email address before logging in. Check your inbox for a verification email.',
+        field: 'email',
+        errorType: 'EMAIL_NOT_VERIFIED'
+      });
+    }
+
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
 
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Incorrect password. Please check your password and try again.',
+        field: 'password',
+        errorType: 'INVALID_PASSWORD'
       });
     }
 
@@ -51,7 +90,7 @@ const mobileLogin = async (req, res) => {
         isMobile: true
       },
       process.env.JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '3d' }
     );
 
     // Return user data without password
@@ -103,9 +142,23 @@ const getMobileFeeds = async (req, res) => {
     const totalFeeds = parseInt(countResult.rows[0].count);
     const hasMore = offset + feeds.rows.length < totalFeeds;
 
+    // Attach reaction counts (and user's reaction if authenticated)
+    const feedIds = feeds.rows.map(f => String(f.id));
+    const countsMap = feedIds.length ? await Reaction.getForTargetBatch('mobile_feed', feedIds) : {};
+    let userReactionsMap = {};
+    if (req.user && feedIds.length) {
+      userReactionsMap = await Reaction.getUserReactionsBatch(req.user.id, 'mobile_feed', feedIds);
+    }
+
+    const feedsWithReactions = feeds.rows.map(f => ({
+      ...f,
+      reactions: countsMap[String(f.id)] || { like: 0, love: 0, smile: 0, meh: 0, total: 0 },
+      userReaction: userReactionsMap[String(f.id)] || null,
+    }));
+
     res.json({
       success: true,
-      feeds: feeds.rows,
+      feeds: feedsWithReactions,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -726,14 +779,23 @@ const createMobileFeed = async (req, res) => {
 // Update User's Push Notification Preferences
 const updatePushSettings = async (req, res) => {
   try {
-    const { pushNotificationsEnabled } = req.body;
+    const { pushNotificationsEnabled, enabled } = req.body;
+    const value = typeof pushNotificationsEnabled === 'boolean'
+      ? pushNotificationsEnabled
+      : (typeof enabled === 'boolean' ? enabled : null);
+    if (value === null) {
+      return res.status(400).json({
+        success: false,
+        message: '`pushNotificationsEnabled` (boolean) is required'
+      });
+    }
     const userId = req.user.id;
 
     await query(`
       UPDATE users 
       SET push_notifications_enabled = $1 
       WHERE id = $2
-    `, [pushNotificationsEnabled, userId]);
+    `, [value, userId]);
 
     res.json({
       success: true,
@@ -855,6 +917,110 @@ const markMobileNotificationRead = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to mark notification as read'
+    });
+  }
+};
+
+// Unified Feed — merges mobile_feeds + user notifications (broadcasts)
+// into a single normalized, sorted list. Safe for web (additive endpoint).
+const getUnifiedFeed = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
+    // 1) Mobile feeds (all users see the same ones)
+    const feedsResult = await query(`
+      SELECT id, title, message, feed_type, priority, image_url, published_at, created_at
+      FROM mobile_feeds
+      ORDER BY published_at DESC NULLS LAST, created_at DESC
+    `);
+
+    // 2) User notifications — broadcast-ish types
+    const notifsResult = await query(`
+      SELECT id, title, message, type, read, "createdAt"
+      FROM notifications
+      WHERE recipient = $1
+        AND type IN ('adminBroadcast', 'broadcast', 'votingBlocBroadcast', 'announcement')
+      ORDER BY "createdAt" DESC
+      LIMIT 200
+    `, [req.user.id]);
+
+    // 3) Normalize both shapes
+    const feedItems = feedsResult.rows.map(f => ({
+      id: `feed_${f.id}`,
+      source: 'feed',
+      rawId: String(f.id),
+      title: f.title,
+      message: f.message,
+      type: f.feed_type || 'general',
+      rawType: f.feed_type || 'general',
+      priority: f.priority || 'normal',
+      imageUrl: f.image_url || null,
+      read: true, // mobile_feeds have no per-user read state
+      publishedAt: f.published_at || f.created_at,
+    }));
+
+    const notifItems = notifsResult.rows.map(n => ({
+      id: `notif_${n.id}`,
+      source: 'notification',
+      rawId: String(n.id),
+      title: n.title,
+      message: n.message,
+      type: 'announcement', // display-normalized
+      rawType: n.type,
+      priority: 'normal',
+      imageUrl: null,
+      read: Boolean(n.read),
+      publishedAt: n.createdAt,
+    }));
+
+    // 4) Merge + sort DESC by publishedAt
+    const merged = [...feedItems, ...notifItems].sort((a, b) => {
+      const da = new Date(a.publishedAt || 0).getTime();
+      const db = new Date(b.publishedAt || 0).getTime();
+      return db - da;
+    });
+
+    // 5) Attach reaction counts (only for feed items)
+    const feedRawIds = feedItems.map(f => f.rawId);
+    const countsMap = feedRawIds.length
+      ? await Reaction.getForTargetBatch('mobile_feed', feedRawIds)
+      : {};
+    let userReactionsMap = {};
+    if (feedRawIds.length) {
+      userReactionsMap = await Reaction.getUserReactionsBatch(req.user.id, 'mobile_feed', feedRawIds);
+    }
+
+    const withReactions = merged.map(item => {
+      if (item.source !== 'feed') return item;
+      return {
+        ...item,
+        reactions: countsMap[item.rawId] || { like: 0, love: 0, smile: 0, meh: 0, total: 0 },
+        userReaction: userReactionsMap[item.rawId] || null,
+      };
+    });
+
+    // 6) Paginate the merged list
+    const total = withReactions.length;
+    const paged = withReactions.slice(offset, offset + limitNum);
+
+    res.json({
+      success: true,
+      items: paged,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        hasMore: offset + paged.length < total,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching unified feed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch feed',
     });
   }
 };
@@ -1167,6 +1333,30 @@ const getCurrentUserProfile = async (req, res) => {
   }
 };
 
+// DEV/QA helper — sends a test push to the current user's registered devices.
+// Safe to keep in production because it is scoped to the authenticated user.
+const sendTestPush = async (req, res) => {
+  try {
+    const result = await sendPushNotification(
+      [req.user.id],
+      '🔔 Test notification',
+      'If you see this, push notifications are working.',
+      { type: 'broadcast', test: 'true' }
+    );
+    res.json({
+      success: result.success,
+      sent: result.sent || 0,
+      failed: result.failed || 0,
+      message: result.success
+        ? 'Test push dispatched'
+        : (result.error || 'Push failed')
+    });
+  } catch (error) {
+    console.error('Error sending test push:', error);
+    res.status(500).json({ success: false, message: 'Failed to send test push' });
+  }
+};
+
 export {
   mobileLogin,
   getMobileFeeds,
@@ -1181,8 +1371,10 @@ export {
   updateMobileFeed,
   deleteMobileFeed,
   updatePushSettings,
+  sendTestPush,
   uploadMobileFeedImage,
   getMobileNotifications,
   markMobileNotificationRead,
+  getUnifiedFeed,
   getCurrentUserProfile
 };

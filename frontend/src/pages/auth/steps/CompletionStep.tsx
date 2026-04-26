@@ -86,9 +86,6 @@ const CompletionStep: React.FC<Props> = ({ data }) => {
         window.sessionStorage.removeItem(storageKey);
       }
 
-      // Store token
-      localStorage.setItem('authToken', response.data.data.token);
-
       // Celebrate! 🎉
       confetti({
         particleCount: 100,

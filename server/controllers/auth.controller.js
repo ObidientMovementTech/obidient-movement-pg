@@ -1,14 +1,16 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/user.model.js';
 import VotingBloc from '../models/votingBloc.model.js';
 import DefaultVotingBlocSettings from '../models/defaultVotingBlocSettings.model.js';
 import generateToken from '../utils/generateToken.js';
-import { sendConfirmationEmail } from '../utils/emailHandler.js';
+import { sendConfirmationEmail, sendOTPEmail } from '../utils/emailHandler.js';
 import dotenv from 'dotenv';
 import speakeasy from 'speakeasy';
 import { logger } from '../middlewares/security.middleware.js';
 import { query } from '../config/db.js';
+import { createRefreshToken, rotateRefreshToken, revokeAllUserTokens, getRefreshCookieOptions } from '../utils/refreshToken.js';
 
 dotenv.config();
 
@@ -55,6 +57,32 @@ const decodeGoogleState = (stateParam) => {
     });
     return {};
   }
+};
+
+// ── Dual-mode auth response helper ──────────────────────────────
+// Detects mobile vs web and returns tokens accordingly.
+const isMobileRequest = (req) =>
+  req.headers['x-client-type'] === 'mobile';
+
+const sendAuthTokens = async (req, res, userId, extraPayload = {}) => {
+  const authToken = generateToken(userId);
+  const { rawToken: refreshRaw } = await createRefreshToken(userId);
+
+  if (isMobileRequest(req)) {
+    // Mobile: tokens in response body (stored in SecureStorage)
+    return { authToken, refreshToken: refreshRaw, ...extraPayload };
+  }
+
+  // Web: httpOnly cookies
+  res.cookie('cu-auth-token', authToken, {
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60 * 24 * 3,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+  res.cookie('cu-refresh-token', refreshRaw, getRefreshCookieOptions());
+
+  return { authToken, ...extraPayload };
 };
 
 // REGISTER
@@ -135,9 +163,9 @@ export const registerUser = async (req, res) => {
 
       return res.status(409).json({
         success: false,
-        message: 'An account with this email address already exists. Please use a different email or try logging in.',
+        message: 'An account with these details already exists. Please use different credentials or try logging in.',
         field: 'email',
-        errorType: 'EMAIL_EXISTS'
+        errorType: 'ACCOUNT_EXISTS'
       });
     }
 
@@ -154,13 +182,13 @@ export const registerUser = async (req, res) => {
 
       return res.status(409).json({
         success: false,
-        message: 'An account with this phone number already exists. Please use a different phone number.',
+        message: 'An account with these details already exists. Please use different credentials or try logging in.',
         field: 'phone',
-        errorType: 'PHONE_EXISTS'
+        errorType: 'ACCOUNT_EXISTS'
       });
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create user with optional voting location
@@ -203,14 +231,8 @@ export const registerUser = async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
-    // Generate auth token
-    const authToken = generateToken(newUser.id);
-    res.cookie('cu-auth-token', authToken, {
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 3, // 3 days
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-    });
+    // Generate auth tokens (dual-mode: cookies for web, body for mobile)
+    const regTokens = await sendAuthTokens(req, res, newUser.id);
 
     // Generate confirmation token with pending voting bloc info
     const tokenPayload = { userId: newUser.id };
@@ -221,23 +243,47 @@ export const registerUser = async (req, res) => {
     const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     const link = `${frontendUrl}/auth/confirm-email/${emailToken}`;
 
+    // Generate 6-digit OTP code for email verification
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await User.update(newUser.id, {
+      otp: otpCode,
+      otpExpiry: otpExpiry.toISOString(),
+      otpPurpose: 'email_verification',
+    });
+
     // Try to send the email before responding
     try {
-      await sendConfirmationEmail(name, email, link, "confirm");
-      res.status(201).json({
+      // Send both the link-based email (for web) and OTP email
+      await Promise.all([
+        sendConfirmationEmail(name, email, link, "confirm"),
+        sendOTPEmail(name, email, otpCode, 'email_verification'),
+      ]);
+
+      const response = {
         success: true,
         message: 'Account created successfully! Please check your email to verify your account.',
-        emailSent: true
-      });
+        emailSent: true,
+      };
+      // Include tokens in body for mobile
+      if (isMobileRequest(req)) {
+        response.token = regTokens.authToken;
+        response.refreshToken = regTokens.refreshToken;
+      }
+      res.status(201).json(response);
     } catch (emailError) {
       console.error('Registration email error:', emailError.message);
 
-      // Still create the user but inform about the email issue
-      res.status(201).json({
+      const response = {
         success: true,
         message: 'Account created successfully, but there was an issue sending the verification email. You can request a new verification email from the login page.',
-        emailSent: false
-      });
+        emailSent: false,
+      };
+      if (isMobileRequest(req)) {
+        response.token = regTokens.authToken;
+        response.refreshToken = regTokens.refreshToken;
+      }
+      res.status(201).json(response);
 
       // Attempt to resend the email asynchronously after a brief delay
       setTimeout(async () => {
@@ -315,11 +361,11 @@ export const loginUser = async (req, res) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const isEmail = emailRegex.test(email);
 
-    // Build query to search by either email or phone
-    const query = isEmail ? { email } : { phone: email };
+    // Build filter to search by either email or phone
+    const findFilter = isEmail ? { email } : { phone: email };
 
     // 1. Check if user exists
-    const user = await User.findOne(query);
+    const user = await User.findOne(findFilter);
     if (!user) {
       logger.warn('Login attempt with non-existent credentials', {
         identifier: email,
@@ -331,11 +377,9 @@ export const loginUser = async (req, res) => {
 
       return res.status(401).json({
         success: false,
-        message: isEmail
-          ? "No account found with this email address. Please check your email or sign up for a new account."
-          : "No account found with this phone number. Please check your phone number or sign up for a new account.",
+        message: 'Invalid credentials. Please check your email/phone and password.',
         field: 'email',
-        errorType: isEmail ? 'EMAIL_NOT_FOUND' : 'PHONE_NOT_FOUND'
+        errorType: 'INVALID_CREDENTIALS'
       });
     }
 
@@ -358,9 +402,39 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    // 2b. Check account lockout (8 failed attempts in 30 minutes)
+    const LOCKOUT_WINDOW_MINUTES = 30;
+    const MAX_FAILED_ATTEMPTS = 8;
+
+    const recentFailures = await query(
+      `SELECT COUNT(*) AS fail_count FROM login_attempts
+       WHERE user_id = $1 AND success = false
+         AND attempted_at > NOW() - INTERVAL '${LOCKOUT_WINDOW_MINUTES} minutes'`,
+      [user.id]
+    );
+
+    if (parseInt(recentFailures.rows[0].fail_count) >= MAX_FAILED_ATTEMPTS) {
+      logger.warn('Account locked due to too many failed login attempts', {
+        userId: user.id,
+        ip: req.ip,
+        failCount: recentFailures.rows[0].fail_count
+      });
+      return res.status(429).json({
+        success: false,
+        message: 'Account temporarily locked due to too many failed login attempts. Please try again in 30 minutes.',
+        errorType: 'ACCOUNT_LOCKED'
+      });
+    }
+
     // 3. Compare password
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      // Record failed attempt
+      await query(
+        'INSERT INTO login_attempts (user_id, ip_address, success) VALUES ($1, $2, false)',
+        [user.id, req.ip]
+      );
+
       logger.warn('Login attempt with incorrect password', {
         email,
         userId: user.id,
@@ -371,11 +445,17 @@ export const loginUser = async (req, res) => {
 
       return res.status(401).json({
         success: false,
-        message: "Incorrect password. Please check your password and try again.",
+        message: 'Invalid credentials. Please check your email/phone and password.',
         field: 'password',
-        errorType: 'INVALID_PASSWORD'
+        errorType: 'INVALID_CREDENTIALS'
       });
     }
+
+    // Record successful login and clear failed attempts
+    await query(
+      'INSERT INTO login_attempts (user_id, ip_address, success) VALUES ($1, $2, true)',
+      [user.id, req.ip]
+    );
 
     // 4. Check if 2FA is enabled
     if (user.twoFactorEnabled) {
@@ -383,7 +463,7 @@ export const loginUser = async (req, res) => {
       const tempToken = jwt.sign(
         { userId: user.id, twoFactorPending: true },
         JWT_SECRET,
-        { expiresIn: '10m' }
+        { expiresIn: '5m' }
       );
 
       return res.status(200).json({
@@ -395,26 +475,23 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 5. Generate auth token
-    const authToken = generateToken(user.id);
-
-    // 6. Set cookie
-    res.cookie("cu-auth-token", authToken, {
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 3, // 3 days
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-    });
+    // 5. Generate auth token + refresh token (dual-mode: web cookies / mobile body)
+    const tokenData = await sendAuthTokens(req, res, user.id);
 
     // Return single response with user info but without password
     const userResponse = {
       _id: user.id, // Keep _id for frontend compatibility
+      id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
+      role: user.role,
+      designation: user.designation,
       emailVerified: user.emailVerified,
       twoFactorEnabled: user.twoFactorEnabled,
-      // Include any other fields you want to return
+      assignedState: user.assignedState,
+      assignedLGA: user.assignedLGA,
+      assignedWard: user.assignedWard,
     };
 
     // Log successful login
@@ -431,7 +508,8 @@ export const loginUser = async (req, res) => {
       success: true,
       message: "Login successful! Welcome back.",
       user: userResponse,
-      token: authToken,
+      token: tokenData.authToken,
+      ...(isMobileRequest(req) && { refreshToken: tokenData.refreshToken }),
     });
 
   } catch (error) {
@@ -528,7 +606,7 @@ export const googleLoginCallback = async (req, res) => {
       const tempToken = jwt.sign(
         { userId: updatedUser.id, twoFactorPending: true },
         JWT_SECRET,
-        { expiresIn: '10m' }
+        { expiresIn: '5m' }
       );
 
       const params = new URLSearchParams({
@@ -555,6 +633,10 @@ export const googleLoginCallback = async (req, res) => {
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
+
+    // Issue refresh token for Google login
+    const { rawToken: googleRefresh } = await createRefreshToken(updatedUser.id);
+    res.cookie('cu-refresh-token', googleRefresh, getRefreshCookieOptions());
 
     logger.info('User logged in via Google', {
       userId: updatedUser.id,
@@ -622,7 +704,7 @@ export const confirmEmail = async (req, res) => {
     const sessionToken = jwt.sign(
       { userId: user.id },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '3d' }
     );
 
     // Set HTTP-only cookie for auto-login
@@ -630,8 +712,12 @@ export const confirmEmail = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days
     });
+
+    // Issue refresh token
+    const { rawToken: confirmRefresh } = await createRefreshToken(user.id);
+    res.cookie('cu-refresh-token', confirmRefresh, getRefreshCookieOptions());
 
     // Check if there's a pending voting bloc join in the token
     let pendingJoin = null;
@@ -662,6 +748,113 @@ export const confirmEmail = async (req, res) => {
   }
 };
 
+// Verify email using 6-digit OTP code (for mobile app)
+export const verifyEmailCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and verification code are required',
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email address.',
+        errorType: 'EMAIL_NOT_FOUND',
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already verified. You can proceed to login.',
+        errorType: 'EMAIL_ALREADY_VERIFIED',
+      });
+    }
+
+    // Check OTP validity
+    if (!user.otp || user.otpPurpose !== 'email_verification') {
+      return res.status(400).json({
+        success: false,
+        message: 'No verification code found. Please request a new one.',
+        errorType: 'NO_OTP',
+      });
+    }
+
+    if (new Date() > new Date(user.otpExpiry)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new one.',
+        errorType: 'OTP_EXPIRED',
+      });
+    }
+
+    if (user.otp !== code.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code. Please check and try again.',
+        errorType: 'INVALID_OTP',
+      });
+    }
+
+    // OTP is valid — verify email and clear OTP fields
+    user.emailVerified = true;
+    user.otp = null;
+    user.otpExpiry = null;
+    user.otpPurpose = null;
+    await user.save();
+
+    // Clean up any existing duplicate auto voting blocs
+    await cleanupDuplicateAutoVotingBlocs(user.id);
+
+    // Create automatic voting bloc for the user
+    const existingBlocs = await VotingBloc.findByCreator(user.id);
+    const existingAutoBloc = existingBlocs.find(bloc => bloc.isAutoGenerated);
+
+    if (!existingAutoBloc) {
+      try {
+        await createAutoVotingBloc(user);
+        console.log(`✅ Auto voting bloc created for user: ${user.email}`);
+      } catch (votingBlocError) {
+        console.error('Failed to create auto voting bloc:', votingBlocError);
+      }
+    }
+
+    // Generate session tokens (dual-mode)
+    const verifyTokens = await sendAuthTokens(req, res, user.id);
+
+    const responsePayload = {
+      success: true,
+      message: 'Email verified successfully',
+      token: verifyTokens.authToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        emailVerified: true,
+      },
+    };
+    if (isMobileRequest(req)) {
+      responsePayload.refreshToken = verifyTokens.refreshToken;
+    }
+
+    res.status(200).json(responsePayload);
+  } catch (error) {
+    console.error('Verify email code error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Unable to verify code at this time. Please try again later.',
+      errorType: 'SERVER_ERROR',
+    });
+  }
+};
+
 export const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findByIdSelect(req.userId, ["passwordHash"]);
@@ -672,6 +865,7 @@ export const getCurrentUser = async (req, res) => {
 
     // Format response with flattened fields from the users table
     const userResponse = {
+      id: user.id, // Primary identifier (Postgres)
       _id: user.id, // Keep _id for frontend compatibility
       name: user.name,
       email: user.email,
@@ -718,7 +912,10 @@ export const getCurrentUser = async (req, res) => {
 
       // Timestamps
       createdAt: user.createdAt,
-      updatedAt: user.updatedAt
+      updatedAt: user.updatedAt,
+
+      // Profile completion
+      profileCompletionPercentage: user.profileCompletionPercentage || 0,
     };
 
     res.status(200).json({
@@ -737,22 +934,46 @@ export const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      // Return success regardless to prevent user enumeration
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a reset code has been sent. Please allow up to 5 minutes for delivery.',
+      });
     }
 
-    // Generate token with longer expiration to account for potential delays
-    const resetToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30m' }); // Extended from 15m to 30m
+    // Invalidate any existing reset tokens for this user
+    await query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [user.id]);
 
-    // Update the path to match your router configuration
-    const resetLink = `${process.env.CLIENT_URL}/auth/change-password?token=${resetToken}`;
+    // --- Link-based reset (kept for backward compat with web deep links) ---
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await query(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+      [user.id, tokenHash, expiresAt]
+    );
+
+    const resetLink = `${process.env.CLIENT_URL}/auth/change-password?token=${rawToken}`;
+
+    // --- OTP-based reset (for mobile + new web flow) ---
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await User.update(user.id, {
+      otp: otpCode,
+      otpExpiry: otpExpiry.toISOString(),
+      otpPurpose: 'password_reset',
+    });
 
     try {
-      await sendConfirmationEmail(user.name, user.email, resetLink, "reset");
+      await Promise.all([
+        sendConfirmationEmail(user.name, user.email, resetLink, 'reset'),
+        sendOTPEmail(user.name, user.email, otpCode, 'password_reset'),
+      ]);
 
-      // Inform user about potential delays
       res.status(200).json({
-        message: 'Reset link sent to email. Please allow up to 5 minutes for delivery.',
-        emailProvider: email.includes('@gmail.com') ? 'gmail' : 'other'
+        success: true,
+        message: 'If an account with that email exists, a reset code has been sent. Please allow up to 5 minutes for delivery.',
       });
     } catch (emailError) {
       console.error(`Password reset email error: ${emailError.message}`);
@@ -773,11 +994,28 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    // Hash the incoming token and look it up
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    const salt = await bcrypt.genSalt(10);
+    const result = await query(
+      `SELECT id, user_id FROM password_reset_tokens
+       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
+
+    const resetRow = result.rows[0];
+    const user = await User.findById(resetRow.user_id);
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+
+    // Mark token as used (single-use)
+    await query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1', [resetRow.id]);
+
+    const salt = await bcrypt.genSalt(12);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
     await user.save();
 
@@ -788,7 +1026,94 @@ export const resetPassword = async (req, res) => {
   }
 };
 
-export const logoutUser = (req, res) => {
+/**
+ * OTP-based password reset (for mobile + new web flow).
+ * Step 1: User calls forgotPassword → receives OTP via email
+ * Step 2: User calls this endpoint with { email, code, newPassword }
+ */
+export const resetPasswordWithOTP = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, verification code, and new password are required',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters',
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired code',
+      });
+    }
+
+    // Check OTP validity
+    if (!user.otp || user.otpPurpose !== 'password_reset') {
+      return res.status(400).json({
+        success: false,
+        message: 'No reset code found. Please request a new one.',
+      });
+    }
+
+    if (new Date() > new Date(user.otpExpiry)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset code has expired. Please request a new one.',
+      });
+    }
+
+    if (user.otp !== code.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset code. Please check and try again.',
+      });
+    }
+
+    // OTP is valid — reset password and clear OTP fields
+    const salt = await bcrypt.genSalt(12);
+    user.passwordHash = await bcrypt.hash(newPassword, salt);
+    user.otp = null;
+    user.otpExpiry = null;
+    user.otpPurpose = null;
+    await user.save();
+
+    // Invalidate any link-based reset tokens too
+    await query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [user.id]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful. You can now login with your new password.',
+    });
+  } catch (err) {
+    console.error('Reset password with OTP error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again.',
+    });
+  }
+};
+
+export const logoutUser = async (req, res) => {
+  // Revoke all refresh tokens for this user
+  try {
+    const token = req.cookies?.['cu-auth-token'];
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.id || decoded._id || decoded.userId;
+      if (userId) await revokeAllUserTokens(userId);
+    }
+  } catch { /* token may be expired — still clear cookies */ }
+
   // Clear the authentication cookie with the same options used when setting it
   res.clearCookie('cu-auth-token', {
     httpOnly: true,
@@ -797,7 +1122,71 @@ export const logoutUser = (req, res) => {
     path: '/'
   });
 
+  res.clearCookie('cu-refresh-token', {
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/api/auth'
+  });
+
   res.status(200).json({ message: 'Logged out successfully' });
+};
+
+export const refreshAccessToken = async (req, res) => {
+  try {
+    // Accept refresh token from cookie (web) or request body (mobile)
+    const rawToken = req.cookies?.['cu-refresh-token'] || req.body?.refreshToken;
+    if (!rawToken) {
+      return res.status(401).json({ message: 'No refresh token' });
+    }
+
+    const result = await rotateRefreshToken(rawToken);
+    if (!result) {
+      // Clear cookies for web clients
+      if (!isMobileRequest(req)) {
+        res.clearCookie('cu-auth-token', {
+          httpOnly: true,
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          path: '/'
+        });
+        res.clearCookie('cu-refresh-token', {
+          httpOnly: true,
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          path: '/api/auth'
+        });
+      }
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+
+    // Issue new access token
+    const accessToken = generateToken(result.userId);
+
+    if (isMobileRequest(req)) {
+      // Mobile: return tokens in body
+      return res.status(200).json({
+        success: true,
+        message: 'Token refreshed',
+        token: accessToken,
+        refreshToken: result.newRawToken,
+      });
+    }
+
+    // Web: set cookies
+    res.cookie('cu-auth-token', accessToken, {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24 * 3,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+    res.cookie('cu-refresh-token', result.newRawToken, getRefreshCookieOptions());
+
+    return res.status(200).json({ success: true, message: 'Token refreshed' });
+  } catch (error) {
+    logger.error('Refresh token error', { error: error.message });
+    return res.status(500).json({ message: 'Token refresh failed' });
+  }
 };
 
 export const resendConfirmationEmail = async (req, res) => {
@@ -847,9 +1236,21 @@ export const resendConfirmationEmail = async (req, res) => {
     const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     const link = `${frontendUrl}/auth/confirm-email/${emailToken}`;
 
+    // Generate new 6-digit OTP code for mobile verification
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await User.update(user.id, {
+      otp: otpCode,
+      otpExpiry: otpExpiry.toISOString(),
+      otpPurpose: 'email_verification',
+    });
+
     // Send the confirmation email
     try {
-      await sendConfirmationEmail(user.name, user.email, link, "confirm");
+      await Promise.all([
+        sendConfirmationEmail(user.name, user.email, link, "confirm"),
+        sendOTPEmail(user.name, user.email, otpCode, 'email_verification'),
+      ]);
       res.status(200).json({
         success: true,
         message: 'Verification email sent successfully! Please check your inbox and spam folder.',
@@ -916,23 +1317,17 @@ export const verify2FALogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid verification code" });
     }
 
-    // Generate full auth token
-    const authToken = generateToken(user.id);
-
-    // Set cookie
-    res.cookie("cu-auth-token", authToken, {
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 3, // 3 days
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-    });
+    // Generate full auth token (dual-mode)
+    const tokenData = await sendAuthTokens(req, res, user.id);
 
     // Return user info
     const userResponse = {
-      _id: user.id, // Keep _id for frontend compatibility
+      _id: user.id,
+      id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
+      role: user.role,
       emailVerified: user.emailVerified,
       twoFactorEnabled: user.twoFactorEnabled
     };
@@ -940,7 +1335,8 @@ export const verify2FALogin = async (req, res) => {
     return res.status(200).json({
       message: "2FA verification successful",
       user: userResponse,
-      token: authToken,
+      token: tokenData.authToken,
+      ...(isMobileRequest(req) && { refreshToken: tokenData.refreshToken }),
     });
 
   } catch (error) {
@@ -983,7 +1379,7 @@ const createAutoVotingBloc = async (user) => {
 
     // Generate join code
     const generateJoinCode = () => {
-      return Math.random().toString(36).slice(2, 10); // 8 characters
+      return crypto.randomBytes(4).toString('hex'); // 8 hex characters
     };
 
     votingBlocData.joinCode = generateJoinCode();

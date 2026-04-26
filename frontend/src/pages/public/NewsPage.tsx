@@ -36,7 +36,7 @@ const PostCard = ({ post }: { post: BlogPost }) => (
           <p className="mt-2 text-sm text-text-muted line-clamp-2">{post.excerpt}</p>
         )}
         <div className="mt-4 flex items-center gap-3 text-xs text-text-muted">
-          {post.author_name && <span>{post.author_name}</span>}
+          <span>Obidient Movement</span>
           {post.published_at && (
             <>
               <span>·</span>

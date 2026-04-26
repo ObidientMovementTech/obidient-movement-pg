@@ -1,19 +1,13 @@
 // OTP Utilities for password reset and email verification
+import crypto from 'crypto';
 
 /**
- * Generates a random OTP of specified length
+ * Generates a cryptographically secure OTP of specified length
  * @param {number} length - Length of OTP (default: 6)
  * @returns {string} - Generated OTP
  */
 export const generateOTP = (length = 6) => {
-  const digits = '0123456789';
-  let OTP = '';
-
-  for (let i = 0; i < length; i++) {
-    OTP += digits[Math.floor(Math.random() * 10)];
-  }
-
-  return OTP;
+  return crypto.randomInt(0, Math.pow(10, length)).toString().padStart(length, '0');
 };
 
 /**
@@ -42,6 +36,9 @@ export const isOTPValid = (providedOTP, storedOTP, otpExpiry) => {
     return false;
   }
 
-  // Check if OTP matches
-  return providedOTP === storedOTP;
+  // Timing-safe comparison to prevent timing attacks
+  const a = Buffer.from(String(providedOTP));
+  const b = Buffer.from(String(storedOTP));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 };

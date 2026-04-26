@@ -85,6 +85,7 @@ export default function LeaderboardPage() {
               <img
                 src={creator.profileImage}
                 alt={creator.name}
+                referrerPolicy="no-referrer"
                 className={`w-16 h-16 rounded-full object-cover border-4 ${borderColor} shadow-lg`}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = '/default-avatar.png';
@@ -263,6 +264,7 @@ export default function LeaderboardPage() {
                 <img
                   src={stats.topPerformer.creator.profileImage}
                   alt={stats.topPerformer.creator.name}
+                  referrerPolicy="no-referrer"
                   className="w-12 h-12 rounded-full object-cover border-2 border-yellow-300 shadow-md"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = '/default-avatar.png';

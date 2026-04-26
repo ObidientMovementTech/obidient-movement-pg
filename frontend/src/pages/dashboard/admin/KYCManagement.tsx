@@ -50,9 +50,6 @@ export default function KYCManagement() {
       try {
         setLoading(true);
         const response = await axios.get(`${API_BASE}/kyc/all`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
           withCredentials: true,
         });
         setKycUsers(response.data);
@@ -74,9 +71,6 @@ export default function KYCManagement() {
         `${API_BASE}/kyc/${userId}/approve`,
         {},
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
           withCredentials: true,
         }
       );
@@ -120,9 +114,6 @@ export default function KYCManagement() {
         `${API_BASE}/kyc/${userId}/reject`,
         { reason: rejectionReason },
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
           withCredentials: true,
         }
       );

@@ -1,6 +1,7 @@
 import { query, getClient } from '../config/db.js';
 import { getIO, isUserOnline } from '../config/socket.js';
 import { checkSpam } from '../utils/spamProtection.js';
+import { pushRoomMessage } from '../utils/chatPushNotification.js';
 
 // ── Coordinator designations with hierarchy levels ──────────────
 const COORDINATOR_LEVELS = {
@@ -316,11 +317,11 @@ export const sendRoomMessage = async (req, res) => {
   try {
     const userId = req.user.id;
     const roomId = req.params.id;
-    const { content } = req.body;
+    const { content, replyToId } = req.body;
 
     // Verify this is a room
     const roomCheck = await query(
-      `SELECT id, type FROM conversations WHERE id = $1 AND type = 'room'`,
+      `SELECT id, type, title FROM conversations WHERE id = $1 AND type = 'room'`,
       [roomId]
     );
     if (roomCheck.rows.length === 0) {
@@ -342,10 +343,10 @@ export const sendRoomMessage = async (req, res) => {
     const preview = trimmed.length > 100 ? trimmed.slice(0, 100) + '...' : trimmed;
 
     const msgResult = await query(
-      `INSERT INTO chat_messages (conversation_id, sender_id, content)
-       VALUES ($1, $2, $3)
-       RETURNING id, content, message_type, created_at, sender_id`,
-      [roomId, userId, trimmed]
+      `INSERT INTO chat_messages (conversation_id, sender_id, content, reply_to_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, content, message_type, created_at, sender_id, reply_to_id`,
+      [roomId, userId, trimmed, replyToId || null]
     );
 
     const message = msgResult.rows[0];
@@ -372,6 +373,26 @@ export const sendRoomMessage = async (req, res) => {
       [message.created_at, roomId, userId]
     );
 
+    // Fetch reply-to preview if replying
+    let replyTo = null;
+    if (message.reply_to_id) {
+      const replyResult = await query(
+        `SELECT m.id, m.content, m.sender_id, u.name AS sender_name
+         FROM chat_messages m JOIN users u ON u.id = m.sender_id
+         WHERE m.id = $1`,
+        [message.reply_to_id]
+      );
+      if (replyResult.rows.length > 0) {
+        const r = replyResult.rows[0];
+        replyTo = {
+          id: r.id,
+          content: r.content.length > 100 ? r.content.slice(0, 100) + '...' : r.content,
+          sender_name: r.sender_name,
+          sender_id: r.sender_id,
+        };
+      }
+    }
+
     // Real-time delivery
     const messagePayload = {
       id: message.id,
@@ -385,6 +406,12 @@ export const sendRoomMessage = async (req, res) => {
       created_at: message.created_at,
       is_pinned: false,
       is_deleted: false,
+      reply_to_id: message.reply_to_id || null,
+      reply_to_content: replyTo?.content || null,
+      reply_to_sender_name: replyTo?.sender_name || null,
+      reply_to_sender_id: replyTo?.sender_id || null,
+      reactions: [],
+      deleted_at: null,
     };
 
     try {
@@ -392,10 +419,88 @@ export const sendRoomMessage = async (req, res) => {
       io.to(`conv:${roomId}`).emit('room:message:new', messagePayload);
     } catch (_) {}
 
+    // FCM push for offline, non-muted participants (fire-and-forget, throttled)
+    pushRoomMessage(roomId, userId, req.user.name, roomCheck.rows[0].title || 'Community Room', preview);
+
     res.status(201).json({ success: true, message: messagePayload });
   } catch (error) {
     console.error('sendRoomMessage error:', error);
     res.status(500).json({ message: 'Failed to send message' });
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════
+// POST /api/rooms/:id/messages/:msgId/reactions — Toggle reaction
+// ══════════════════════════════════════════════════════════════════
+export const toggleRoomReaction = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id: roomId, msgId } = req.params;
+    const { emoji } = req.body;
+
+    if (!emoji || typeof emoji !== 'string' || emoji.length > 8) {
+      return res.status(400).json({ message: 'Valid emoji is required' });
+    }
+
+    // Verify user is a participant
+    const participantCheck = await query(
+      'SELECT 1 FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2',
+      [roomId, userId]
+    );
+    if (participantCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'Not a participant' });
+    }
+
+    // Verify message exists in this room
+    const msgCheck = await query(
+      'SELECT id FROM chat_messages WHERE id = $1 AND conversation_id = $2 AND is_deleted = false',
+      [msgId, roomId]
+    );
+    if (msgCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    // Toggle: try to delete first, if nothing deleted then insert
+    const deleteResult = await query(
+      'DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3 RETURNING id',
+      [msgId, userId, emoji]
+    );
+
+    if (deleteResult.rows.length === 0) {
+      await query(
+        'INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3)',
+        [msgId, userId, emoji]
+      );
+    }
+
+    // Fetch updated reactions for this message
+    const reactionsResult = await query(
+      `SELECT emoji, COUNT(*)::int AS count,
+              ARRAY_AGG(user_id) AS user_ids
+       FROM message_reactions WHERE message_id = $1 GROUP BY emoji ORDER BY emoji`,
+      [msgId]
+    );
+
+    const reactions = reactionsResult.rows.map(r => ({
+      emoji: r.emoji,
+      count: r.count,
+      user_ids: r.user_ids,
+    }));
+
+    // Emit to room
+    try {
+      const io = getIO();
+      io.to(`conv:${roomId}`).emit('reaction:updated', {
+        conversationId: roomId,
+        messageId: msgId,
+        reactions,
+      });
+    } catch (_) {}
+
+    res.json({ success: true, reactions });
+  } catch (error) {
+    console.error('toggleRoomReaction error:', error);
+    res.status(500).json({ message: 'Failed to toggle reaction' });
   }
 };
 
@@ -666,6 +771,7 @@ export const getRoomMembers = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 30));
     const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim();
 
     // Verify participant
     const pCheck = await query(
@@ -676,22 +782,40 @@ export const getRoomMembers = async (req, res) => {
       return res.status(403).json({ message: 'Not a participant in this room' });
     }
 
+    // Build optional search clause
+    const searchClause = search
+      ? `AND (u.name ILIKE $4 OR u.designation ILIKE $4)`
+      : '';
+    const searchParam = search ? `%${search}%` : null;
+
+    const baseParams = [roomId, limit, offset];
+    const params = searchParam ? [...baseParams, searchParam] : baseParams;
+
     const result = await query(
       `SELECT u.id, u.name, u."profileImage", u.designation,
+              u."votingState", u."votingLGA", u."votingWard", u."votingPU",
               cp.role, cp.is_muted, cp.muted_until
        FROM conversation_participants cp
        JOIN users u ON u.id = cp.user_id
-       WHERE cp.conversation_id = $1
+       WHERE cp.conversation_id = $1 ${searchClause}
        ORDER BY
          CASE cp.role WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END,
          u.name
        LIMIT $2 OFFSET $3`,
-      [roomId, limit, offset]
+      params
     );
 
+    const countParams = searchParam ? [roomId, searchParam] : [roomId];
+    const countClause = search
+      ? `AND (u.name ILIKE $2 OR u.designation ILIKE $2)`
+      : '';
+
     const countResult = await query(
-      'SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = $1',
-      [roomId]
+      `SELECT COUNT(*)
+       FROM conversation_participants cp
+       JOIN users u ON u.id = cp.user_id
+       WHERE cp.conversation_id = $1 ${countClause}`,
+      countParams
     );
 
     // Add online status

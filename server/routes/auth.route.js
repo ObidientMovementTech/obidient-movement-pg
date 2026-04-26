@@ -6,10 +6,13 @@ import {
   confirmEmail,
   forgotPassword,
   resetPassword,
+  resetPasswordWithOTP,
   logoutUser,
   getCurrentUser,
   resendConfirmationEmail,
   verify2FALogin,
+  verifyEmailCode,
+  refreshAccessToken,
 } from '../controllers/auth.controller.js';
 import { protect, authenticateUser } from "../middlewares/auth.middleware.js";
 import {
@@ -23,6 +26,8 @@ import {
   validateNewPassword,
   handleValidationErrors
 } from '../middlewares/security.middleware.js';
+
+import { verifyRecaptcha } from '../middlewares/recaptcha.middleware.js';
 
 const router = express.Router();
 
@@ -80,6 +85,7 @@ const getLoginCallbackUrl = (req) => {
 // Authentication routes with rate limiting and validation
 router.post('/register',
   registerRateLimit,
+  verifyRecaptcha,
   validateRegistration,
   handleValidationErrors,
   registerUser
@@ -87,6 +93,7 @@ router.post('/register',
 
 router.post('/login',
   loginRateLimit,
+  verifyRecaptcha,
   // validateLogin,
   handleValidationErrors,
   loginUser
@@ -99,8 +106,14 @@ router.post('/verify-2fa',
 
 router.post('/confirm-email', confirmEmail);
 
+router.post('/verify-email-code',
+  loginRateLimit,
+  verifyEmailCode
+);
+
 router.post('/forgot-password',
   passwordResetRateLimit,
+  verifyRecaptcha,
   validatePasswordReset,
   handleValidationErrors,
   forgotPassword
@@ -113,7 +126,15 @@ router.post('/reset-password/:token',
   resetPassword
 );
 
+// OTP-based password reset (for mobile + new web flow)
+router.post('/reset-password-otp',
+  passwordResetRateLimit,
+  resetPasswordWithOTP
+);
+
 router.post('/logout', logoutUser);
+
+router.post('/refresh', refreshAccessToken);
 
 router.get("/me", protect, getCurrentUser); // Using protect middleware that includes email verification
 

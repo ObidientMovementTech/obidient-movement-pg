@@ -14,9 +14,10 @@ import { deriveMonitoringScopeFromUser, MonitoringScopeError } from '../utils/mo
  */
 const generateMonitorKey = () => {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const bytes = crypto.randomBytes(6);
   let key = '';
   for (let i = 0; i < 6; i++) {
-    key += chars.charAt(Math.floor(Math.random() * chars.length));
+    key += chars.charAt(bytes[i] % chars.length);
   }
   return key;
 };

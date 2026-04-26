@@ -133,6 +133,7 @@ export default function PbxTopBar({ onMenuToggle }: PbxTopBarProps) {
         <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
           <Avatar
             src={profile?.profileImage}
+            imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.75rem' }}
           >
             {profile?.name?.[0] || '?'}

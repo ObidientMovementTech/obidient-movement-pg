@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import {
   ChevronRight,
   Search,
@@ -750,7 +751,7 @@ const StateDashboard: React.FC = () => {
                       <div className="ml-3">
                         <p className="text-sm text-amber-700 flex items-center">
                           <span className="font-medium">Data Discrepancy: </span>
-                          <span dangerouslySetInnerHTML={{ __html: message }}></span>
+                          <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message) }}></span>
                           <span className="relative group ml-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

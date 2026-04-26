@@ -84,10 +84,7 @@ export default function LiveResults({
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const headers: Record<string, string> = {
-        Authorization: `Bearer ${token}`
-      };
+      const headers: Record<string, string> = {};
 
       // Add ETag for conditional requests
       if (etagRef.current) {
@@ -96,7 +93,7 @@ export default function LiveResults({
 
       const response = await axios.get(
         `${API_BASE}/api/live-results/elections/${electionId}/live-summary`,
-        { headers }
+        { headers, withCredentials: true }
       );
 
       // 304 Not Modified - data hasn't changed

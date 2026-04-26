@@ -8,6 +8,7 @@ import { uploadToS3 } from '../utils/s3Upload.js';
 import { sendVotingBlocBroadcastEmail, sendVotingBlocPrivateMessageEmail, sendVotingBlocInvitationEmail, sendVotingBlocRemovalEmail } from '../utils/emailHandler.js';
 import { transformVotingBloc, transformUser } from '../utils/mongoCompat.js';
 import { query } from '../config/db.js';
+import crypto from 'crypto';
 
 // Helper function to safely extract ID from object or string
 const getId = (obj) => {
@@ -17,7 +18,7 @@ const getId = (obj) => {
 };
 
 const generateJoinCode = () => {
-  return Math.random().toString(36).slice(2, 10); // 8 characters
+  return crypto.randomBytes(4).toString('hex'); // 8 hex characters
 };
 
 // Create new voting bloc
@@ -233,7 +234,7 @@ export const getVotingBlocByJoinCode = async (req, res) => {
   try {
     const { joinCode } = req.params;
 
-    const votingBloc = await VotingBloc.findByJoinCode(joinCode);
+    const votingBloc = await VotingBloc.findByJoinCodePublic(joinCode);
 
     if (!votingBloc) {
       return res.status(404).json({ message: 'Voting bloc not found' });
@@ -572,6 +573,7 @@ export const getLeaderboard = async (req, res) => {
       state,
       lga,
       ward,
+      period = 'all',
       limit = 100,
       offset = 0
     } = req.query;
@@ -594,8 +596,13 @@ export const getLeaderboard = async (req, res) => {
         break;
     }
 
+    // Validate period param
+    const validPeriods = ['week', 'month', 'all'];
+    const sanitizedPeriod = validPeriods.includes(period) ? period : 'all';
+
     const leaderboard = await VotingBloc.searchForLeaderboard({
       ...searchOptions,
+      period: sanitizedPeriod === 'all' ? undefined : sanitizedPeriod,
       limit: Math.min(parseInt(limit) || 100, 100), // Cap at 100 for performance
       offset: parseInt(offset) || 0
     });

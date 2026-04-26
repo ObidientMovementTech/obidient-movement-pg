@@ -2,6 +2,7 @@ import s3Client from '../config/aws.js';
 import { uploadBufferToS3 } from '../utils/s3Upload.js';
 import User from '../models/user.model.js';
 import { query, getClient } from '../config/db.js';
+import { auditLog } from '../utils/auditLog.js';
 
 // Helper function to transform frontend field names to database field names
 const transformPersonalInfoFields = (frontendData) => {
@@ -68,16 +69,46 @@ const saveKycInfo = async (userId, kycData) => {
   );
 };
 
+// Allowed MIME types for image uploads
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+
 // Helper function to upload base64 image to S3
 const uploadBase64ToS3 = async (base64String, filename, folder) => {
   try {
+    // Extract and validate MIME type from data URI
+    const mimeMatch = base64String.match(/^data:([^;]+);base64,/);
+    const declaredMime = mimeMatch ? mimeMatch[1] : null;
+
+    if (declaredMime && !ALLOWED_IMAGE_TYPES.includes(declaredMime)) {
+      throw new Error(`Invalid image type: ${declaredMime}. Allowed: JPEG, PNG, WebP`);
+    }
+
     // Remove data URL prefix if present
     const base64Data = base64String.replace(/^data:image\/[a-z]+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
 
+    // Validate file size
+    if (buffer.length > MAX_IMAGE_SIZE) {
+      throw new Error(`Image too large (${(buffer.length / 1024 / 1024).toFixed(1)}MB). Maximum allowed: 5MB`);
+    }
+
+    // Validate magic bytes to prevent MIME spoofing
+    const magicBytes = buffer.slice(0, 4);
+    const isJPEG = magicBytes[0] === 0xFF && magicBytes[1] === 0xD8;
+    const isPNG = magicBytes[0] === 0x89 && magicBytes[1] === 0x50 && magicBytes[2] === 0x4E && magicBytes[3] === 0x47;
+    const isWebP = magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46;
+
+    if (!isJPEG && !isPNG && !isWebP) {
+      throw new Error('File does not appear to be a valid image (JPEG, PNG, or WebP)');
+    }
+
+    // Determine actual content type from magic bytes
+    const contentType = isJPEG ? 'image/jpeg' : isPNG ? 'image/png' : 'image/webp';
+
     const imageUrl = await uploadBufferToS3(buffer, filename, {
       folder,
-      contentType: 'image/jpeg' // Assuming JPEG, could be made dynamic
+      contentType
     });
 
     return imageUrl;
@@ -632,6 +663,8 @@ export const approveKYC = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    auditLog({ actorId: req.userId, action: 'kyc.approve', targetType: 'user', targetId: userId, req });
+
     res.status(200).json({ message: 'KYC approved successfully' });
   } catch (err) {
     console.error('Approve KYC error:', err);
@@ -662,6 +695,8 @@ export const rejectKYC = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    auditLog({ actorId: req.userId, action: 'kyc.reject', targetType: 'user', targetId: userId, details: { reason: reason.trim() }, req });
 
     res.status(200).json({ message: 'KYC rejected with reason provided' });
   } catch (err) {

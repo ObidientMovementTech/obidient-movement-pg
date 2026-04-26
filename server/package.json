@@ -20,7 +20,9 @@
     "test:webhooks": "node scripts/communications/testWebhooks.js",
     "test:webhooks:sms": "node scripts/communications/testWebhooks.js sms",
     "test:webhooks:voice": "node scripts/communications/testWebhooks.js voice",
-    "test:webhooks:security": "node scripts/communications/testWebhooks.js security"
+    "test:webhooks:security": "node scripts/communications/testWebhooks.js security",
+    "security:audit": "npm audit --audit-level=high",
+    "preinstall": "npm audit --audit-level=critical || true"
   },
   "keywords": [],
   "author": "",

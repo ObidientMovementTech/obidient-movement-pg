@@ -1,4 +1,5 @@
 import { query } from '../config/db.js';
+import crypto from 'crypto';
 import { parseExcelFile, parseExcelFileWithMapping, previewExcelFile, batchInsertVoters } from '../services/excelImportService.js';
 import fs from 'fs';
 
@@ -140,7 +141,7 @@ const importVotersWithMapping = async (req, res) => {
     }
 
     // Generate session ID if not provided
-    const importSessionId = sessionId || `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const importSessionId = sessionId || `import_${crypto.randomUUID()}`;
 
     // Initialize progress tracking
     importProgress.set(importSessionId, {

@@ -1,5 +1,5 @@
 import { query } from '../config/db.js';
-import { getObidientVotersByState, getObidientVotersDetailed } from '../services/obidientVotersService.js';
+import { getObidientVotersByState } from '../services/obidientVotersService.js';
 
 /**
  * Helper function to convert location name to URL-friendly slug
@@ -36,36 +36,6 @@ const normalizeLocationName = (name) => {
 const locationNamesMatch = (name1, name2) => {
   if (!name1 || !name2) return false;
   return normalizeLocationName(name1) === normalizeLocationName(name2);
-};
-
-/**
- * Find a state key in detailedData using case-insensitive matching
- * Returns the actual key as stored in the data, or null
- */
-const findStateKey = (detailedData, targetStateName) => {
-  if (!detailedData || !targetStateName) return null;
-  // Try exact match first
-  if (detailedData[targetStateName]) return targetStateName;
-  // Try case-insensitive match
-  const normalized = normalizeLocationName(targetStateName);
-  for (const key of Object.keys(detailedData)) {
-    if (normalizeLocationName(key) === normalized) return key;
-  }
-  return null;
-};
-
-/**
- * Find an LGA key within a state's lgas using case-insensitive matching
- * Returns the actual key as stored in the data, or null
- */
-const findLgaKey = (stateData, targetLgaName) => {
-  if (!stateData?.lgas || !targetLgaName) return null;
-  if (stateData.lgas[targetLgaName]) return targetLgaName;
-  const normalized = normalizeLocationName(targetLgaName);
-  for (const key of Object.keys(stateData.lgas)) {
-    if (normalizeLocationName(key) === normalized) return key;
-  }
-  return null;
 };
 
 /** Empty stats object for when no data exists yet */
@@ -273,7 +243,14 @@ export const getNationalData = async (req, res) => {
 export const getStateData = async (req, res) => {
   try {
     const { stateId } = req.params;
-    const stateName = fromSlug(stateId);
+
+    // Resolve slug to canonical UPPERCASE state name from nigeria_locations
+    const statesResult = await query(`SELECT name FROM nigeria_locations WHERE level='state' ORDER BY name`);
+    let stateName = null;
+    for (const r of statesResult.rows) {
+      if (toSlug(r.name) === stateId) { stateName = r.name; break; }
+    }
+    if (!stateName) stateName = fromSlug(stateId).toUpperCase();
 
     // Check if user has access to this state using direct query
     const userId = req.user.userId || req.user.id;
@@ -314,15 +291,22 @@ export const getStateData = async (req, res) => {
       }
     }
 
-    // Get detailed voter data for the state
-    const detailedData = await getObidientVotersDetailed();
+    // Direct scoped query — only fetch LGAs for this state
+    const lgaQuery = `
+      SELECT 
+        "votingLGA" as lga,
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
+        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+      FROM users
+      WHERE "votingState" = $1 AND "votingLGA" IS NOT NULL AND "votingLGA" != ''
+      GROUP BY "votingLGA"
+      ORDER BY "votingLGA"
+    `;
+    const lgaResult = await query(lgaQuery, [stateName]);
 
-    const matchedStateKey = findStateKey(detailedData, stateName);
-    const stateData = matchedStateKey ? detailedData[matchedStateKey] : null;
-
-    if (!stateData) {
+    if (lgaResult.rows.length === 0) {
       console.log(`⚠️ No voter data yet for state: ${stateName} — returning empty dashboard`);
-      // Return empty dashboard instead of 404 so coordinators see a blank dashboard
       return res.json({
         success: true,
         data: {
@@ -337,29 +321,23 @@ export const getStateData = async (req, res) => {
       });
     }
 
-    // Process LGA data
-
-    const lgasData = Object.entries(stateData.lgas || {}).map(([lgaName, lgaData]) => {
-
-      const totalObidient = lgaData.obidientRegisteredVoters || 0;
-      const votersWithPVC = lgaData.obidientVotersWithPVC || 0;
-      const votersWithoutPVC = lgaData.obidientVotersWithoutPVC || 0;
-
-      const lgaResult = {
-        id: `${stateId}-${lgaName.toLowerCase().replace(/\s+/g, '-')}`,
-        name: lgaName,
-        code: lgaName.substring(0, 3).toUpperCase(),
+    const lgasData = lgaResult.rows.map(row => {
+      const total = parseInt(row.total) || 0;
+      const withPvc = parseInt(row.with_pvc) || 0;
+      const withoutPvc = parseInt(row.without_pvc) || 0;
+      return {
+        id: `${stateId}-${toSlug(row.lga)}`,
+        name: row.lga,
+        code: row.lga.substring(0, 3).toUpperCase(),
         level: 'lga',
-        stateId: stateId,
-        stateName: stateName,
-        obidientRegisteredVoters: totalObidient,
-        obidientVotersWithPVC: votersWithPVC,
-        obidientVotersWithoutPVC: votersWithoutPVC,
-        pvcWithStatus: votersWithPVC,
-        pvcWithoutStatus: votersWithoutPVC
+        stateId,
+        stateName,
+        obidientRegisteredVoters: total,
+        obidientVotersWithPVC: withPvc,
+        obidientVotersWithoutPVC: withoutPvc,
+        pvcWithStatus: withPvc,
+        pvcWithoutStatus: withoutPvc
       };
-
-      return lgaResult;
     });
 
 
@@ -408,36 +386,50 @@ export const getLGAData = async (req, res) => {
   try {
     const { lgaId } = req.params;
 
-    // Get detailed voter data early so we can use it for smart parsing
-    const detailedData = await getObidientVotersDetailed();
+    // Resolve the composite slug (e.g. "cross-river-calabar-municipality") by
+    // matching against known states in nigeria_locations
+    const statesResult = await query(`SELECT DISTINCT name FROM nigeria_locations WHERE level='state' ORDER BY name`);
+    const stateNames = statesResult.rows.map(r => r.name);
 
-    // Smart parsing: find the state slug by matching against known states
-    // This handles multi-word states like "cross-river" correctly
-    let stateId, stateName, lgaSlugPart, lgaName, matchedStateKey;
-
-    const stateKeys = Object.keys(detailedData);
+    let stateId, stateName, lgaSlugPart, lgaName;
     let foundMatch = false;
-    for (const key of stateKeys) {
-      const slug = toSlug(key);
+    for (const sName of stateNames) {
+      const slug = toSlug(sName);
       if (lgaId.startsWith(slug + '-')) {
-        matchedStateKey = key;
         stateId = slug;
-        stateName = key;
+        stateName = sName;
         lgaSlugPart = lgaId.substring(slug.length + 1);
-        lgaName = fromSlug(lgaSlugPart);
         foundMatch = true;
         break;
       }
     }
 
-    // Fallback: split on first hyphen (single-word state)
     if (!foundMatch) {
       const parts = lgaId.split('-');
       stateId = parts[0];
-      stateName = fromSlug(stateId);
+      stateName = fromSlug(stateId).toUpperCase();
       lgaSlugPart = lgaId.replace(`${stateId}-`, '');
-      lgaName = fromSlug(lgaSlugPart);
-      matchedStateKey = findStateKey(detailedData, stateName);
+    }
+
+    // Resolve the LGA name from the slug by matching against known LGAs in that state
+    const lgasLookup = await query(
+      `SELECT nl.name FROM nigeria_locations nl
+       JOIN nigeria_locations s ON nl.parent_id = s.id AND s.level='state' AND s.name = $1
+       WHERE nl.level='lga' ORDER BY nl.name`,
+      [stateName]
+    );
+    const knownLgas = lgasLookup.rows.map(r => r.name);
+
+    lgaName = null;
+    for (const name of knownLgas) {
+      if (toSlug(name) === lgaSlugPart) {
+        lgaName = name;
+        break;
+      }
+    }
+    if (!lgaName) {
+      // Fallback: title-case the slug
+      lgaName = fromSlug(lgaSlugPart).toUpperCase();
     }
 
     // Check if user has access to this LGA using direct query
@@ -456,47 +448,40 @@ export const getLGAData = async (req, res) => {
 
     const { designation, assignedLGA, assignedState, role } = userResult.rows[0];
 
-
     // Allow admin users full access
     if (role !== 'admin') {
-      // For non-admin users, check specific access permissions
-      if (designation === 'LGA Coordinator') {
-        // Check both state and LGA match
-        if (!locationNamesMatch(assignedState, stateName)) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. State mismatch. Your assigned: "${assignedState}", Requested: "${stateName}"`
-          });
-        }
-        if (!locationNamesMatch(assignedLGA, lgaName)) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. LGA mismatch. Your assigned: "${assignedLGA}", Requested: "${lgaName}"`
-          });
-        }
+      if ((designation === 'LGA Coordinator' || designation === 'Ward Coordinator') &&
+          !locationNamesMatch(assignedState, stateName)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. State mismatch. Your assigned: "${assignedState}", Requested: "${stateName}"`
+        });
       }
-      if (designation === 'Ward Coordinator') {
-        // Check both state and LGA match
-        if (!locationNamesMatch(assignedState, stateName)) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. State mismatch. Your assigned: "${assignedState}", Requested: "${stateName}"`
-          });
-        }
-        if (!locationNamesMatch(assignedLGA, lgaName)) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. LGA mismatch. Your assigned: "${assignedLGA}", Requested: "${lgaName}"`
-          });
-        }
+      if ((designation === 'LGA Coordinator' || designation === 'Ward Coordinator') &&
+          !locationNamesMatch(assignedLGA, lgaName)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. LGA mismatch. Your assigned: "${assignedLGA}", Requested: "${lgaName}"`
+        });
       }
     }
 
-    // Get data for the state and LGA
-    const stateData = matchedStateKey ? detailedData[matchedStateKey] : null;
-    const lgaKey = stateData ? findLgaKey(stateData, lgaName) : null;
+    // Direct scoped query — only fetch wards for this state+LGA
+    const wardQuery = `
+      SELECT
+        "votingWard" as ward,
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
+        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+      FROM users
+      WHERE "votingState" = $1 AND "votingLGA" = $2
+        AND "votingWard" IS NOT NULL AND "votingWard" != ''
+      GROUP BY "votingWard"
+      ORDER BY "votingWard"
+    `;
+    const wardResult = await query(wardQuery, [stateName, lgaName]);
 
-    if (!stateData || !lgaKey) {
+    if (wardResult.rows.length === 0) {
       console.log(`⚠️ No voter data yet for LGA: ${lgaName} in state: ${stateName} — returning empty dashboard`);
       return res.json({
         success: true,
@@ -513,28 +498,24 @@ export const getLGAData = async (req, res) => {
       });
     }
 
-    const lgaData = stateData.lgas[lgaKey];
-
-    // Process Ward data
-    const wardsData = Object.entries(lgaData.wards || {}).map(([wardName, wardData]) => {
-      const totalObidient = wardData.obidientRegisteredVoters || 0;
-      const votersWithPVC = wardData.obidientVotersWithPVC || 0;
-      const votersWithoutPVC = wardData.obidientVotersWithoutPVC || 0;
-
+    const wardsData = wardResult.rows.map(row => {
+      const total = parseInt(row.total) || 0;
+      const withPvc = parseInt(row.with_pvc) || 0;
+      const withoutPvc = parseInt(row.without_pvc) || 0;
       return {
-        id: `${lgaId}-${wardName.toLowerCase().replace(/\s+/g, '-')}`,
-        name: wardName,
-        code: wardName.substring(0, 3).toUpperCase(),
+        id: `${lgaId}-${toSlug(row.ward)}`,
+        name: row.ward,
+        code: row.ward.substring(0, 3).toUpperCase(),
         level: 'ward',
-        lgaId: lgaId,
-        lgaName: lgaName,
-        stateId: stateId,
-        stateName: stateName,
-        obidientRegisteredVoters: totalObidient,
-        obidientVotersWithPVC: votersWithPVC,
-        obidientVotersWithoutPVC: votersWithoutPVC,
-        pvcWithStatus: votersWithPVC,
-        pvcWithoutStatus: votersWithoutPVC
+        lgaId,
+        lgaName,
+        stateId,
+        stateName,
+        obidientRegisteredVoters: total,
+        obidientVotersWithPVC: withPvc,
+        obidientVotersWithoutPVC: withoutPvc,
+        pvcWithStatus: withPvc,
+        pvcWithoutStatus: withoutPvc
       };
     });
 
@@ -584,67 +565,46 @@ export const getWardData = async (req, res) => {
   try {
     const { wardId } = req.params;
 
-    // Get detailed voter data early for smart parsing
-    const detailedData = await getObidientVotersDetailed();
+    // Resolve composite slug using nigeria_locations for state and LGA matching
+    const statesResult = await query(`SELECT DISTINCT name FROM nigeria_locations WHERE level='state' ORDER BY name`);
+    const stateNames = statesResult.rows.map(r => r.name);
 
-    // Smart parsing: find state slug, LGA slug, ward slug by matching against known data
-    let stateId, lgaSlug, wardSlug, stateName, lgaName, wardName;
-    let matchedStateKey, matchedLgaKey, matchedWardKey;
+    let stateId, stateName, lgaSlug, lgaName, wardSlug, wardName;
     let foundValidCombination = false;
 
-    // Try to match state from known keys (handles multi-word states)
-    for (const stKey of Object.keys(detailedData)) {
-      const stSlug = toSlug(stKey);
+    for (const sName of stateNames) {
+      const stSlug = toSlug(sName);
       if (!wardId.startsWith(stSlug + '-')) continue;
 
-      const remainder = wardId.substring(stSlug.length + 1); // e.g. "aguata-igbo-ukwu-i"
-      const stateObj = detailedData[stKey];
-      if (!stateObj?.lgas) continue;
+      const remainder = wardId.substring(stSlug.length + 1);
 
-      // Try to match LGA from known keys within this state
-      for (const lgKey of Object.keys(stateObj.lgas)) {
-        const lgSlug = toSlug(lgKey);
+      // Look up LGAs for this state
+      const lgasLookup = await query(
+        `SELECT nl.name FROM nigeria_locations nl
+         JOIN nigeria_locations s ON nl.parent_id = s.id AND s.level='state' AND s.name = $1
+         WHERE nl.level='lga' ORDER BY LENGTH(nl.name) DESC`,
+        [sName]
+      );
+
+      for (const lgRow of lgasLookup.rows) {
+        const lgSlug = toSlug(lgRow.name);
         if (!remainder.startsWith(lgSlug + '-')) continue;
 
-        const wardRemainder = remainder.substring(lgSlug.length + 1); // e.g. "igbo-ukwu-i"
-        const lgaObj = stateObj.lgas[lgKey];
-        if (!lgaObj?.wards) continue;
+        const wardRemainder = remainder.substring(lgSlug.length + 1);
+        if (!wardRemainder) continue;
 
-        // Try to match ward from known keys within this LGA
-        for (const wdKey of Object.keys(lgaObj.wards)) {
-          if (toSlug(wdKey) === wardRemainder) {
-            matchedStateKey = stKey;
-            matchedLgaKey = lgKey;
-            matchedWardKey = wdKey;
-            stateId = stSlug;
-            lgaSlug = lgSlug;
-            wardSlug = wardRemainder;
-            stateName = stKey;
-            lgaName = lgKey;
-            wardName = wdKey;
-            foundValidCombination = true;
-            break;
-          }
-        }
-        if (foundValidCombination) break;
+        stateId = stSlug;
+        stateName = sName;
+        lgaSlug = lgSlug;
+        lgaName = lgRow.name;
+        wardSlug = wardRemainder;
+        foundValidCombination = true;
+        break;
       }
       if (foundValidCombination) break;
     }
 
     if (!foundValidCombination) {
-      // Fallback parsing for breadcrumbs when no data exists
-      const wardIdParts = wardId.split('-');
-      const fbState = fromSlug(wardIdParts[0]);
-      const fbLga = wardIdParts.length >= 3 ? fromSlug(wardIdParts.slice(1, -1).join('-')) : '';
-      const fbWard = wardIdParts.length >= 3 ? fromSlug(wardIdParts[wardIdParts.length - 1]) : '';
-
-      stateId = wardIdParts[0];
-      lgaSlug = wardIdParts.length >= 3 ? wardIdParts.slice(1, -1).join('-') : '';
-      stateName = fbState;
-      lgaName = fbLga;
-      wardName = fbWard;
-
-      console.log(`⚠️ No voter data for ward: ${wardId} — returning empty dashboard`);
       return res.json({
         success: true,
         data: {
@@ -653,99 +613,113 @@ export const getWardData = async (req, res) => {
           items: [],
           breadcrumbs: [
             { level: 'national', name: 'National Overview' },
-            { level: 'state', name: fbState, id: wardIdParts[0] },
-            { level: 'lga', name: fbLga, id: `${wardIdParts[0]}-${lgaSlug}` },
-            { level: 'ward', name: fbWard, id: wardId }
+            { level: 'ward', name: wardId, id: wardId }
           ]
         }
       });
     }
 
-    // Check if user has access to this Ward using direct query
+    // Resolve ward name by matching slug against actual user data
+    const wardLookup = await query(
+      `SELECT DISTINCT "votingWard" FROM users
+       WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" IS NOT NULL AND "votingWard" != ''`,
+      [stateName, lgaName]
+    );
+    wardName = null;
+    for (const r of wardLookup.rows) {
+      if (toSlug(r.votingWard) === wardSlug) {
+        wardName = r.votingWard;
+        break;
+      }
+    }
+    if (!wardName) wardName = fromSlug(wardSlug).toUpperCase();
+
+    // Check access
     const userId = req.user.userId || req.user.id;
-    const userQuery = `
-      SELECT designation, "assignedWard", "assignedLGA", "assignedState", role FROM users WHERE id = $1
-    `;
-    const userResult = await query(userQuery, [userId]);
+    const userResult = await query(
+      `SELECT designation, "assignedWard", "assignedLGA", "assignedState", role FROM users WHERE id = $1`,
+      [userId]
+    );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     const { designation, assignedWard, assignedLGA, assignedState, role } = userResult.rows[0];
 
-
-    // Allow admin users full access
-    if (role !== 'admin') {
-      // For Ward Coordinators, check state, LGA, and ward match
-      if (designation === 'Ward Coordinator') {
-        if (!locationNamesMatch(assignedState, stateName)) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. State mismatch. Your assigned: "${assignedState}", Requested: "${stateName}"`
-          });
-        }
-        if (!locationNamesMatch(assignedLGA, lgaName)) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. LGA mismatch. Your assigned: "${assignedLGA}", Requested: "${lgaName}"`
-          });
-        }
-        if (!locationNamesMatch(assignedWard, wardName)) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. Ward mismatch. Your assigned: "${assignedWard}", Requested: "${wardName}"`
-          });
-        }
-      }
+    if (role !== 'admin' && designation === 'Ward Coordinator') {
+      if (!locationNamesMatch(assignedState, stateName))
+        return res.status(403).json({ success: false, message: `Access denied. State mismatch.` });
+      if (!locationNamesMatch(assignedLGA, lgaName))
+        return res.status(403).json({ success: false, message: `Access denied. LGA mismatch.` });
+      if (!locationNamesMatch(assignedWard, wardName))
+        return res.status(403).json({ success: false, message: `Access denied. Ward mismatch.` });
     }
 
-    // We already have detailedData from the smart parsing above
-    // Use the matched keys directly
-    const wardData = detailedData[matchedStateKey].lgas[matchedLgaKey].wards[matchedWardKey];
+    // Direct scoped query — only fetch PUs for this state+LGA+ward
+    const puQuery = `
+      SELECT
+        "votingPU" as pu,
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
+        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+      FROM users
+      WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" = $3
+        AND "votingPU" IS NOT NULL AND "votingPU" != ''
+      GROUP BY "votingPU"
+      ORDER BY "votingPU"
+    `;
+    const puResult = await query(puQuery, [stateName, lgaName, wardName]);
 
-    // Process Polling Unit data
-    const pollingUnitsData = Object.entries(wardData.pollingUnits || {}).map(([puName, puData]) => {
-      const totalObidient = puData.obidientRegisteredVoters || 0;
-      const votersWithPVC = puData.obidientVotersWithPVC || 0;
-      const votersWithoutPVC = puData.obidientVotersWithoutPVC || 0;
+    const lgaId = `${stateId}-${lgaSlug}`;
 
+    if (puResult.rows.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          level: 'ward',
+          stats: { ...EMPTY_STATS },
+          items: [],
+          breadcrumbs: [
+            { level: 'national', name: 'National Overview' },
+            { level: 'state', name: stateName, id: stateId },
+            { level: 'lga', name: lgaName, id: lgaId },
+            { level: 'ward', name: wardName, id: wardId }
+          ]
+        }
+      });
+    }
+
+    const pollingUnitsData = puResult.rows.map(row => {
+      const total = parseInt(row.total) || 0;
+      const withPvc = parseInt(row.with_pvc) || 0;
+      const withoutPvc = parseInt(row.without_pvc) || 0;
       return {
-        id: `${wardId}-${puName.toLowerCase().replace(/\\s+/g, '-')}`,
-        name: puName,
-        code: puData.polling_unit_code || `PU-${puName.substring(0, 3).toUpperCase()}`,
+        id: `${wardId}-${toSlug(row.pu)}`,
+        name: row.pu,
+        code: `PU-${row.pu.substring(0, 3).toUpperCase()}`,
         level: 'pu',
-        wardId: wardId,
-        wardName: wardName,
-        lgaId: `${stateId}-${lgaSlug}`,
-        lgaName: lgaName,
-        stateId: stateId,
-        stateName: stateName,
-        obidientRegisteredVoters: totalObidient,
-        obidientVotersWithPVC: votersWithPVC,
-        obidientVotersWithoutPVC: votersWithoutPVC,
-        pvcWithStatus: votersWithPVC,
-        pvcWithoutStatus: votersWithoutPVC
+        wardId,
+        wardName,
+        lgaId,
+        lgaName,
+        stateId,
+        stateName,
+        obidientRegisteredVoters: total,
+        obidientVotersWithPVC: withPvc,
+        obidientVotersWithoutPVC: withoutPvc,
+        pvcWithStatus: withPvc,
+        pvcWithoutStatus: withoutPvc
       };
     });
 
-    // Calculate Ward totals
     const wardStats = pollingUnitsData.reduce((acc, pu) => ({
       obidientRegisteredVoters: acc.obidientRegisteredVoters + pu.obidientRegisteredVoters,
       obidientVotersWithPVC: acc.obidientVotersWithPVC + pu.obidientVotersWithPVC,
       obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + pu.obidientVotersWithoutPVC,
       pvcWithStatus: acc.pvcWithStatus + pu.pvcWithStatus,
       pvcWithoutStatus: acc.pvcWithoutStatus + pu.pvcWithoutStatus
-    }), {
-      obidientRegisteredVoters: 0,
-      obidientVotersWithPVC: 0,
-      obidientVotersWithoutPVC: 0,
-      pvcWithStatus: 0,
-      pvcWithoutStatus: 0
-    });
+    }), { ...EMPTY_STATS });
 
     res.json({
       success: true,
@@ -756,7 +730,7 @@ export const getWardData = async (req, res) => {
         breadcrumbs: [
           { level: 'national', name: 'National Overview' },
           { level: 'state', name: stateName, id: stateId },
-          { level: 'lga', name: lgaName, id: `${stateId}-${lgaSlug}` },
+          { level: 'lga', name: lgaName, id: lgaId },
           { level: 'ward', name: wardName, id: wardId }
         ]
       }
@@ -779,70 +753,113 @@ export const getPollingUnitData = async (req, res) => {
   try {
     const { puId } = req.params;
 
-    // Parse PU ID to extract components
-    const puIdParts = puId.split('-');
-    if (puIdParts.length < 4) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid polling unit ID format'
-      });
+    // Resolve composite slug using nigeria_locations
+    const statesResult = await query(`SELECT DISTINCT name FROM nigeria_locations WHERE level='state' ORDER BY name`);
+    const stateNames = statesResult.rows.map(r => r.name);
+
+    let stateId, stateName, lgaSlug, lgaName, wardSlug, wardName, puSlug, puName;
+    let found = false;
+
+    for (const sName of stateNames) {
+      const stSlug = toSlug(sName);
+      if (!puId.startsWith(stSlug + '-')) continue;
+
+      const remainder = puId.substring(stSlug.length + 1);
+      const lgasLookup = await query(
+        `SELECT nl.name FROM nigeria_locations nl
+         JOIN nigeria_locations s ON nl.parent_id = s.id AND s.level='state' AND s.name = $1
+         WHERE nl.level='lga' ORDER BY LENGTH(nl.name) DESC`,
+        [sName]
+      );
+
+      for (const lgRow of lgasLookup.rows) {
+        const lgSlug = toSlug(lgRow.name);
+        if (!remainder.startsWith(lgSlug + '-')) continue;
+
+        const afterLga = remainder.substring(lgSlug.length + 1);
+        if (!afterLga) continue;
+
+        // Resolve ward name from actual user data
+        const wardLookup = await query(
+          `SELECT DISTINCT "votingWard" FROM users
+           WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" IS NOT NULL AND "votingWard" != ''`,
+          [sName, lgRow.name]
+        );
+
+        for (const wRow of wardLookup.rows) {
+          const wSlug = toSlug(wRow.votingWard);
+          if (!afterLga.startsWith(wSlug + '-')) continue;
+
+          const afterWard = afterLga.substring(wSlug.length + 1);
+          if (!afterWard) continue;
+
+          stateId = stSlug; stateName = sName;
+          lgaSlug = lgSlug; lgaName = lgRow.name;
+          wardSlug = wSlug; wardName = wRow.votingWard;
+          puSlug = afterWard;
+          found = true;
+          break;
+        }
+        if (found) break;
+      }
+      if (found) break;
     }
 
-    const stateId = puIdParts[0];
-    const lgaSlug = puIdParts[1];
-    const wardSlug = puIdParts[2];
-    const puSlug = puIdParts.slice(3).join('-');
-
-    const stateName = stateId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    const lgaName = lgaSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    const wardName = wardSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    const puName = puSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    // Get detailed voter data
-    const detailedData = await getObidientVotersDetailed();
-    const stateData = detailedData[stateName];
-
-    if (!stateData || !stateData.lgas[lgaName] || !stateData.lgas[lgaName].wards[wardName] ||
-      !stateData.lgas[lgaName].wards[wardName].pollingUnits[puName]) {
-      return res.status(404).json({
-        success: false,
-        message: `No data found for Polling Unit: ${puName}`
-      });
+    if (!found) {
+      return res.status(404).json({ success: false, message: `Could not resolve polling unit: ${puId}` });
     }
 
-    const puData = stateData.lgas[lgaName].wards[wardName].pollingUnits[puName];
+    // Resolve PU name
+    const puLookup = await query(
+      `SELECT DISTINCT "votingPU" FROM users
+       WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" = $3 AND "votingPU" IS NOT NULL AND "votingPU" != ''`,
+      [stateName, lgaName, wardName]
+    );
+    puName = null;
+    for (const r of puLookup.rows) {
+      if (toSlug(r.votingPU) === puSlug) { puName = r.votingPU; break; }
+    }
+    if (!puName) puName = fromSlug(puSlug).toUpperCase();
 
-    const totalObidient = puData.obidientRegisteredVoters || 0;
-    const votersWithPVC = puData.obidientVotersWithPVC || 0;
-    const votersWithoutPVC = puData.obidientVotersWithoutPVC || 0;
-    const estimatedINECVoters = Math.round(totalObidient * (Math.random() * 15 + 20));
+    // Direct scoped query
+    const puQuery = `
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
+        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+      FROM users
+      WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" = $3 AND "votingPU" = $4
+    `;
+    const puResult = await query(puQuery, [stateName, lgaName, wardName, puName]);
+    const row = puResult.rows[0] || { total: 0, with_pvc: 0, without_pvc: 0 };
+
+    const total = parseInt(row.total) || 0;
+    const withPvc = parseInt(row.with_pvc) || 0;
+    const withoutPvc = parseInt(row.without_pvc) || 0;
+    const lgaId = `${stateId}-${lgaSlug}`;
+    const wardId = `${lgaId}-${wardSlug}`;
 
     const pollingUnitDetails = {
       id: puId,
       name: puName,
-      code: puData.polling_unit_code || `PU-${puName.substring(0, 3).toUpperCase()}`,
+      code: `PU-${puName.substring(0, 3).toUpperCase()}`,
       level: 'pu',
-      wardId: `${stateId}-${lgaSlug}-${wardSlug}`,
-      wardName: wardName,
-      lgaId: `${stateId}-${lgaSlug}`,
-      lgaName: lgaName,
-      stateId: stateId,
-      stateName: stateName,
-      inecRegisteredVoters: estimatedINECVoters,
-      obidientRegisteredVoters: totalObidient,
-      obidientVotersWithPVC: votersWithPVC,
-      obidientVotersWithoutPVC: votersWithoutPVC,
-      unconvertedVoters: Math.max(0, estimatedINECVoters - totalObidient),
-      conversionRate: estimatedINECVoters > 0 ? Number(((totalObidient / estimatedINECVoters) * 100).toFixed(2)) : 0,
-      pvcWithStatus: votersWithPVC,
-      pvcWithoutStatus: votersWithoutPVC,
+      wardId,
+      wardName,
+      lgaId,
+      lgaName,
+      stateId,
+      stateName,
+      obidientRegisteredVoters: total,
+      obidientVotersWithPVC: withPvc,
+      obidientVotersWithoutPVC: withoutPvc,
+      pvcWithStatus: withPvc,
+      pvcWithoutStatus: withoutPvc,
       realData: {
-        totalObidientUsers: totalObidient,
-        votersWithPVC: votersWithPVC,
-        votersWithoutPVC: votersWithoutPVC,
-        votersWithPhone: puData.voters_with_phone || 0,
-        votersWithEmail: puData.voters_with_email || 0,
-        pvcCompletionRate: totalObidient > 0 ? ((votersWithPVC / totalObidient) * 100) : 0,
+        totalObidientUsers: total,
+        votersWithPVC: withPvc,
+        votersWithoutPVC: withoutPvc,
+        pvcCompletionRate: total > 0 ? (withPvc / total) * 100 : 0,
         isRealData: true
       }
     };
@@ -856,8 +873,8 @@ export const getPollingUnitData = async (req, res) => {
         breadcrumbs: [
           { level: 'national', name: 'National Overview' },
           { level: 'state', name: stateName, id: stateId },
-          { level: 'lga', name: lgaName, id: `${stateId}-${lgaSlug}` },
-          { level: 'ward', name: wardName, id: `${stateId}-${lgaSlug}-${wardSlug}` },
+          { level: 'lga', name: lgaName, id: lgaId },
+          { level: 'ward', name: wardName, id: wardId },
           { level: 'pu', name: puName, id: puId }
         ]
       }

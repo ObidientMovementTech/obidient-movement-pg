@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import {
   Copy,
@@ -18,9 +18,10 @@ import { useUserContext } from "../../../context/UserContext";
 import Loading from "../../../components/Loader";
 import Toast from "../../../components/Toast";
 import TopLogo from "../../../components/TopLogo";
-import AuthModal from "../../../components/AuthModal";
 import DOMPurify from "dompurify";
 import "./VotingBlocDetail.css";
+
+const AuthModal = lazy(() => import("../../../components/AuthModal"));
 
 export default function VotingBlocDetail() {
   const { joinCode } = useParams<{ joinCode: string }>();
@@ -229,6 +230,8 @@ export default function VotingBlocDetail() {
           <img
             src={votingBloc.bannerImageUrl}
             alt={votingBloc.name}
+            loading="eager"
+            fetchPriority="high"
             className="w-full max-h-[300px] sm:max-h-[400px] md:max-h-[500px] lg:max-h-[600px] object-cover object-left-bottom"
           />
         </div>
@@ -249,6 +252,7 @@ export default function VotingBlocDetail() {
                 <img
                   src={votingBloc.creator?.profileImage || '/default-avatar.png'}
                   alt={votingBloc.creator?.name || 'Creator'}
+                  referrerPolicy="no-referrer"
                   className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-24 lg:h-24 rounded-full object-cover border-3 border-green-200 shadow-lg"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -628,14 +632,18 @@ export default function VotingBlocDetail() {
       </div>
 
       {/* Auth Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onAuthSuccess={handleAuthSuccess}
-        initialTab={authModalTab}
-        joinCode={joinCode}
-        votingBlocName={votingBloc?.name}
-      />
+      {showAuthModal && (
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+            onAuthSuccess={handleAuthSuccess}
+            initialTab={authModalTab}
+            joinCode={joinCode}
+            votingBlocName={votingBloc?.name}
+          />
+        </Suspense>
+      )}
 
       {/* Toast */}
       {toast && (
