@@ -11,6 +11,8 @@ import {
   Badge,
   Typography,
   Container,
+  Drawer,
+  IconButton,
 } from '@mui/material';
 import {
   Home,
@@ -22,6 +24,9 @@ import {
   CreditCard,
   ExternalLink,
   MessageSquare,
+  Menu as MenuIcon,
+  X,
+  ChevronRight,
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { logoutUser } from '../../services/authService';
@@ -52,6 +57,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !profile) navigate('/auth/login');
@@ -124,6 +130,21 @@ export default function DashboardLayout() {
               <img src="/obidientLogoGreen.svg" alt="Obidient" style={{ height: 36 }} />
             </Box>
 
+            {/* Mobile hamburger */}
+            <IconButton
+              onClick={() => setDrawerOpen(true)}
+              sx={{
+                display: { xs: 'flex', md: 'none' },
+                ml: 'auto',
+                mr: 1,
+                color: '#525252',
+                p: 0.75,
+              }}
+              aria-label="Open navigation menu"
+            >
+              <MenuIcon size={22} strokeWidth={2} />
+            </IconButton>
+
             {/* Desktop Nav — text only, no icons */}
             <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0, flex: 1, ml: 1 }}>
               {NAV_ITEMS.map((item) => {
@@ -134,11 +155,11 @@ export default function DashboardLayout() {
                       sx={{
                         fontFamily: FONT,
                         fontSize: '0.82rem',
-                        fontWeight: active ? 500 : 400,
-                        color: active ? '#0a0a0a' : '#737373',
+                        fontWeight: active ? 600 : 400,
+                        color: active ? PRIMARY : '#737373',
                         letterSpacing: '-0.01em',
                         transition: 'color 0.15s',
-                        '&:hover': { color: '#0a0a0a' },
+                        '&:hover': { color: active ? PRIMARY : '#0a0a0a' },
                       }}
                     >
                       {item.label}
@@ -148,9 +169,9 @@ export default function DashboardLayout() {
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </Box>
                     )}
-                    {/* Active indicator — thin bottom line */}
+                    {/* Active indicator — brand-colored bottom line */}
                     {active && (
-                      <Box sx={{ position: 'absolute', bottom: 0, left: 16, right: 16, height: 2, bgcolor: '#0a0a0a', borderRadius: 1 }} />
+                      <Box sx={{ position: 'absolute', bottom: 0, left: 16, right: 16, height: 2.5, bgcolor: PRIMARY, borderRadius: 2 }} />
                     )}
                   </Box>
                 );
@@ -172,8 +193,8 @@ export default function DashboardLayout() {
               </Box>
             </Box>
 
-            {/* Mobile — just avatar */}
-            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', ml: 'auto' }}>
+            {/* Mobile — avatar (right side) */}
+            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center' }}>
               <Avatar
                 src={profile.profileImage || undefined}
                 alt={profile.name}
@@ -236,7 +257,7 @@ export default function DashboardLayout() {
         </Container>
       </Box>
 
-      {/* ─── Mobile Bottom Nav — icons only, minimal ─── */}
+      {/* ─── Mobile Bottom Nav — icons only, branded active ─── */}
       <Box
         component="nav"
         sx={{
@@ -271,7 +292,7 @@ export default function DashboardLayout() {
                 py: 0.75,
                 flex: 1,
                 position: 'relative',
-                color: active ? '#0a0a0a' : '#a3a3a3',
+                color: active ? PRIMARY : '#a3a3a3',
                 transition: 'color 0.15s',
               }}
             >
@@ -282,14 +303,285 @@ export default function DashboardLayout() {
               ) : (
                 <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
               )}
-              {/* Active dot */}
+              {/* Active dot — brand color */}
               {active && (
-                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#0a0a0a', mt: 0.5 }} />
+                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: PRIMARY, mt: 0.5 }} />
               )}
             </Box>
           );
         })}
       </Box>
+
+      {/* ─── Mobile Drawer ─── */}
+      <Drawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        sx={{ zIndex: 1400 }}
+        PaperProps={{
+          sx: {
+            width: 300,
+            bgcolor: '#fff',
+            borderRight: 'none',
+            boxShadow: '4px 0 40px rgba(0,0,0,0.08)',
+          },
+        }}
+        slotProps={{
+          backdrop: { sx: { bgcolor: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(2px)' } },
+        }}
+      >
+        {/* Drawer header */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            px: 2.5,
+            pt: 2.5,
+            pb: 2,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <img src="/obidientLogoGreen.svg" alt="Obidient" style={{ height: 32 }} />
+          </Box>
+          <IconButton
+            onClick={() => setDrawerOpen(false)}
+            sx={{ color: '#737373', p: 0.5 }}
+            aria-label="Close menu"
+          >
+            <X size={20} />
+          </IconButton>
+        </Box>
+
+        <Divider sx={{ borderColor: '#f5f5f5' }} />
+
+        {/* User card */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2.5,
+            py: 2,
+          }}
+        >
+          <Avatar
+            src={profile.profileImage || undefined}
+            alt={profile.name}
+            imgProps={{ referrerPolicy: 'no-referrer' }}
+            sx={{
+              width: 40,
+              height: 40,
+              bgcolor: PRIMARY,
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              fontFamily: FONT,
+            }}
+          >
+            {profile.name?.[0]}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                color: '#0a0a0a',
+                lineHeight: 1.2,
+              }}
+              noWrap
+            >
+              {profile.name}
+            </Typography>
+            <Typography
+              sx={{
+                fontFamily: FONT,
+                fontSize: '0.72rem',
+                color: '#a3a3a3',
+                mt: 0.25,
+              }}
+              noWrap
+            >
+              {profile.email}
+            </Typography>
+          </Box>
+        </Box>
+
+        <Divider sx={{ borderColor: '#f5f5f5', mx: 2 }} />
+
+        {/* Nav links */}
+        <Box sx={{ py: 1, px: 1 }}>
+          {[
+            { path: '/dashboard', label: 'Dashboard', icon: Home, exact: true },
+            { path: '/dashboard/voting-bloc', label: 'Voting Bloc', icon: Users },
+            { path: '/dashboard/chat', label: 'Chat', icon: MessageSquare },
+            { path: '/dashboard/notifications', label: 'Notifications', icon: Bell, hasBadge: true },
+            { path: '/dashboard/profile', label: 'Profile', icon: User },
+            { path: '/dashboard/card', label: 'Membership Card', icon: CreditCard },
+          ].map((item) => {
+            const active = isActive(item.path, item.exact);
+            const Icon = item.icon;
+            return (
+              <Box
+                key={item.path}
+                component={Link}
+                to={item.path}
+                onClick={() => setDrawerOpen(false)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  textDecoration: 'none',
+                  px: 2,
+                  py: 1.25,
+                  borderRadius: 2.5,
+                  mb: 0.25,
+                  bgcolor: active ? `${PRIMARY}0A` : 'transparent',
+                  transition: 'all 0.15s',
+                  '&:hover': {
+                    bgcolor: active ? `${PRIMARY}12` : '#fafafa',
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 2,
+                    bgcolor: active ? `${PRIMARY}14` : '#f5f5f5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: active ? PRIMARY : '#737373',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontFamily: FONT,
+                    fontSize: '0.84rem',
+                    fontWeight: active ? 600 : 400,
+                    color: active ? PRIMARY : '#525252',
+                    flex: 1,
+                  }}
+                >
+                  {item.label}
+                </Typography>
+                {item.hasBadge && unreadCount > 0 && (
+                  <Box
+                    sx={{
+                      minWidth: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      bgcolor: '#ef4444',
+                      color: '#fff',
+                      fontSize: '0.6rem',
+                      fontWeight: 700,
+                      fontFamily: FONT,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      px: 0.5,
+                    }}
+                  >
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Box>
+                )}
+                {active && (
+                  <ChevronRight size={14} color={PRIMARY} style={{ opacity: 0.5 }} />
+                )}
+              </Box>
+            );
+          })}
+        </Box>
+
+        {/* Admin link (conditional) */}
+        {(profile.role === 'admin' || isCoordinator) && (
+          <>
+            <Divider sx={{ borderColor: '#f5f5f5', mx: 2 }} />
+            <Box sx={{ py: 1, px: 1 }}>
+              <Box
+                component="a"
+                href="/pbx/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setDrawerOpen(false)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  textDecoration: 'none',
+                  px: 2,
+                  py: 1.25,
+                  borderRadius: 2.5,
+                  transition: 'all 0.15s',
+                  '&:hover': { bgcolor: '#fafafa' },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 2,
+                    bgcolor: '#f5f5f5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#737373',
+                  }}
+                >
+                  <ShieldCheck size={16} strokeWidth={1.8} />
+                </Box>
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.84rem', fontWeight: 400, color: '#525252', flex: 1 }}>
+                  Admin Panel
+                </Typography>
+                <ExternalLink size={13} style={{ opacity: 0.3 }} />
+              </Box>
+            </Box>
+          </>
+        )}
+
+        {/* Spacer + logout */}
+        <Box sx={{ mt: 'auto' }}>
+          <Divider sx={{ borderColor: '#f5f5f5' }} />
+          <Box sx={{ px: 1, py: 1.5 }}>
+            <Box
+              onClick={() => { setDrawerOpen(false); handleLogout(); }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                px: 2,
+                py: 1.25,
+                borderRadius: 2.5,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                '&:hover': { bgcolor: '#fef2f2' },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 2,
+                  bgcolor: '#fef2f2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#dc2626',
+                }}
+              >
+                <LogOut size={16} strokeWidth={1.8} />
+              </Box>
+              <Typography sx={{ fontFamily: FONT, fontSize: '0.84rem', fontWeight: 500, color: '#dc2626' }}>
+                Log out
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </Drawer>
     </Box>
   );
 }

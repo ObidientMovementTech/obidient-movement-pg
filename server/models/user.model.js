@@ -218,7 +218,7 @@ class User {
       }
 
       // Handle direct user fields
-      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA', 'designation', 'assignedState', 'assignedLGA', 'assignedWard', 'bankName', 'bankAccountNumber', 'bankAccountName'];
+      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA', 'votingWard', 'votingPU', 'designation', 'assignedState', 'assignedLGA', 'assignedWard', 'bankName', 'bankAccountNumber', 'bankAccountName', 'otp', 'otpExpiry', 'otpPurpose', 'emailVerified'];
       directFields.forEach(field => {
         if (updateData[field] !== undefined) {
           fieldsToUpdate.push(`"${field}" = $${paramCount}`);

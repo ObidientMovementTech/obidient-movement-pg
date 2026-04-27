@@ -11,8 +11,7 @@ import validatePassword from "../../utils/validatePassword.js";
 import { registerUser } from "../../services/authService.js";
 import { useUserContext } from "../../context/UserContext.js";
 import FormSelect from "../../components/select/FormSelect.js";
-import { getStateNames, getFormattedLGAs } from "../../utils/StateLGAWardPollingUnits";
-import { OptionType } from "../../utils/lookups.js";
+import useNigeriaLocations from "../../hooks/useNigeriaLocations";
 import { formatPhoneForStorage } from "../../utils/phoneUtils.js";
 import ListBoxComp from "../../components/select/ListBox.js";
 
@@ -26,8 +25,6 @@ const GetStartedPage = () => {
   const [phone, setPhone] = useState("");
   const [countryCode, setCountryCode] = useState("+234"); // Default to Nigeria
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [votingState, setVotingState] = useState("");
-  const [votingLGA, setVotingLGA] = useState("");
   const [isDiaspora, setIsDiaspora] = useState(false);
   const [country, setCountry] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -35,7 +32,8 @@ const GetStartedPage = () => {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [states, setStates] = useState<OptionType[]>([]);
+
+  const locations = useNigeriaLocations({ levels: 2 });
 
   // Redirect to dashboard if user is already authenticated
   useEffect(() => {
@@ -51,25 +49,7 @@ const GetStartedPage = () => {
     }
   }, [profile, isAuthLoading, navigate]);
 
-  // Initialize states list
-  useEffect(() => {
-    const stateNames = getStateNames();
-    const stateOptions = stateNames.map((stateName, i) => ({
-      id: i,
-      label: stateName, // Display UPPERCASE name (e.g., "ABIA")
-      value: stateName, // Send UPPERCASE to backend
-    }));
-    setStates(stateOptions);
-  }, []);
 
-  const getLgas = (stateName: string): OptionType[] => {
-    const formattedLGAs = getFormattedLGAs(stateName);
-    return formattedLGAs.map((lga, i) => ({
-      id: i,
-      label: lga.label, // Display with abbreviation (e.g., "01 - ABA NORTH")
-      value: lga.value // Send only name to backend (e.g., "ABA NORTH")
-    }));
-  };
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -129,8 +109,8 @@ const GetStartedPage = () => {
         phone: formattedPhone,
         countryCode,
         password: validPassword,
-        votingState: !isDiaspora && votingState ? votingState : undefined, // Send raw UPPERCASE value
-        votingLGA: !isDiaspora && votingLGA ? votingLGA : undefined, // Send raw UPPERCASE value
+        votingState: !isDiaspora && locations.selectedState ? locations.selectedState.name : undefined,
+        votingLGA: !isDiaspora && locations.selectedLGA ? locations.selectedLGA.name : undefined,
         country: isDiaspora ? country : undefined,
         isDiaspora,
       });
@@ -138,7 +118,7 @@ const GetStartedPage = () => {
       setMessage(result.message || "Signup successful! Please check your email.");
       setToastType("success");
       setShowToast(true);
-      navigate("/auth/verify");
+      navigate("/auth/verify", { state: { email } });
     } catch (error: any) {
       console.log('Registration error:', error);
 
@@ -275,8 +255,7 @@ const GetStartedPage = () => {
               setIsDiaspora(e.target.checked);
               // Clear voting location fields when switching to diaspora
               if (e.target.checked) {
-                setVotingState('');
-                setVotingLGA('');
+                locations.setSelectedState(null);
               } else {
                 setCountry('');
               }
@@ -310,30 +289,40 @@ const GetStartedPage = () => {
             <div>
               <FormSelect
                 label="Voting State"
-                options={states}
-                defaultSelected={votingState}
+                options={locations.states.options}
+                defaultSelected={locations.selectedState?.name || ''}
                 onChange={(opt) => {
                   if (opt) {
-                    setVotingState(opt.value);
-                    setVotingLGA(''); // Reset LGA when state changes
+                    const loc = locations.states.data.find((s) => s.name === opt.value);
+                    locations.setSelectedState(loc || null);
                   } else {
-                    setVotingState('');
-                    setVotingLGA('');
+                    locations.setSelectedState(null);
                   }
                 }}
               />
+              {locations.states.isLoading && (
+                <p className="text-xs text-gray-400 mt-1">Loading states…</p>
+              )}
             </div>
 
             <div>
               <FormSelect
                 label="Voting LGA"
-                options={getLgas(votingState)}
-                defaultSelected={votingLGA}
+                options={locations.lgas.options}
+                defaultSelected={locations.selectedLGA?.name || ''}
                 onChange={(opt) => {
-                  setVotingLGA(opt ? opt.value : '');
+                  if (opt) {
+                    const loc = locations.lgas.data.find((l) => l.name === opt.value);
+                    locations.setSelectedLGA(loc || null);
+                  } else {
+                    locations.setSelectedLGA(null);
+                  }
                 }}
-                disabled={!votingState}
+                disabled={!locations.selectedState || locations.lgas.isLoading}
               />
+              {locations.lgas.isLoading && (
+                <p className="text-xs text-gray-400 mt-1">Loading LGAs…</p>
+              )}
             </div>
           </div>
         )}

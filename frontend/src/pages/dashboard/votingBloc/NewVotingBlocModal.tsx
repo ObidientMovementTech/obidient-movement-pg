@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Upload, Plus, Trash2 } from "lucide-react";
 import { createVotingBloc, uploadVotingBlocBannerImage, uploadRichDescriptionImage } from "../../../services/votingBlocService";
-import { getStateNames, getFormattedLGAs, getFormattedWards } from "../../../utils/StateLGAWardPollingUnits";
+import { getStateNamesAsync, getFormattedLGAsAsync, getFormattedWardsAsync } from "../../../services/nigeriaLocationsService";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 
@@ -35,28 +35,35 @@ export default function NewVotingBlocModal({ isOpen, onClose, onSuccess, onError
   const [loading, setLoading] = useState(false);
   const [lgaOptions, setLgaOptions] = useState<string[]>([]);
   const [wardOptions, setWardOptions] = useState<string[]>([]);
+  const [stateNames, setStateNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    getStateNamesAsync().then(setStateNames);
+  }, []);
 
   // Update LGA options when state changes
   useEffect(() => {
     if (formData.location.state) {
-      const formattedLGAs = getFormattedLGAs(formData.location.state);
-      setLgaOptions(formattedLGAs.map(lga => lga.value));
-      setFormData(prev => ({
-        ...prev,
-        location: { ...prev.location, lga: "", ward: "" }
-      }));
+      getFormattedLGAsAsync(formData.location.state).then(formattedLGAs => {
+        setLgaOptions(formattedLGAs.map(lga => lga.value));
+        setFormData(prev => ({
+          ...prev,
+          location: { ...prev.location, lga: "", ward: "" }
+        }));
+      });
     }
   }, [formData.location.state]);
 
   // Update Ward options when LGA changes
   useEffect(() => {
     if (formData.location.state && formData.location.lga) {
-      const formattedWards = getFormattedWards(formData.location.state, formData.location.lga);
-      setWardOptions(formattedWards.map(ward => ward.value));
-      setFormData(prev => ({
-        ...prev,
-        location: { ...prev.location, ward: "" }
-      }));
+      getFormattedWardsAsync(formData.location.state, formData.location.lga).then(formattedWards => {
+        setWardOptions(formattedWards.map(ward => ward.value));
+        setFormData(prev => ({
+          ...prev,
+          location: { ...prev.location, ward: "" }
+        }));
+      });
     }
   }, [formData.location.state, formData.location.lga]);
 
@@ -313,7 +320,7 @@ export default function NewVotingBlocModal({ isOpen, onClose, onSuccess, onError
                 required
               >
                 <option value="">Select state</option>
-                {getStateNames().map(state => (
+                {stateNames.map(state => (
                   <option key={state} value={state}>{state}</option>
                 ))}
               </select>
@@ -336,13 +343,9 @@ export default function NewVotingBlocModal({ isOpen, onClose, onSuccess, onError
                 disabled={!formData.location.state}
               >
                 <option value="">Select LGA</option>
-                {lgaOptions.map(lga => {
-                  const formattedLGAs = getFormattedLGAs(formData.location.state);
-                  const lgaData = formattedLGAs.find(l => l.value === lga);
-                  return (
-                    <option key={lga} value={lga}>{lgaData?.label || lga}</option>
-                  );
-                })}
+                {lgaOptions.map(lga => (
+                  <option key={lga} value={lga}>{lga}</option>
+                ))}
               </select>
             </div>
 
@@ -361,13 +364,9 @@ export default function NewVotingBlocModal({ isOpen, onClose, onSuccess, onError
                 disabled={!formData.location.lga}
               >
                 <option value="">Select Ward</option>
-                {wardOptions.map(ward => {
-                  const formattedWards = getFormattedWards(formData.location.state, formData.location.lga);
-                  const wardData = formattedWards.find(w => w.value === ward);
-                  return (
-                    <option key={ward} value={ward}>{wardData?.label || ward}</option>
-                  );
-                })}
+                {wardOptions.map(ward => (
+                  <option key={ward} value={ward}>{ward}</option>
+                ))}
               </select>
             </div>
           </div>

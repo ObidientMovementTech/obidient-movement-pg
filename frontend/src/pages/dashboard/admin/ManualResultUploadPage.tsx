@@ -3,7 +3,8 @@ import { Upload, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import Toast from '../../../components/Toast';
 import { electionService } from '../../../services/electionService';
-import { StateLGAWardPollingUnits } from '../../../utils/StateLGAWardPollingUnits';
+import useNigeriaLocations from '../../../hooks/useNigeriaLocations';
+import { NigeriaLocation } from '../../../services/nigeriaLocationsService';
 
 // Lazy load the heavy form component
 const CombinedResultForm = lazy(() => import('../elections/monitor/components/stages/result-tracking/CombinedResultForm'));
@@ -23,11 +24,7 @@ export default function ManualResultUploadPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showForm, setShowForm] = useState(false); // Only show form when PU info is filled
 
-  // Location selection helpers
-  const [selectedStateName, setSelectedStateName] = useState('');
-  const [selectedLGAName, setSelectedLGAName] = useState('');
-  const [selectedWardName, setSelectedWardName] = useState('');
-  const [selectedPUName, setSelectedPUName] = useState('');
+  const locations = useNigeriaLocations({ levels: 4 });
 
   const [formData, setFormData] = useState({
     electionId: null as string | null,
@@ -57,44 +54,37 @@ export default function ManualResultUploadPage() {
   }, []);
 
   // Get available options based on selection
-  const states = Object.keys(StateLGAWardPollingUnits);
-  const lgas = selectedStateName ? Object.keys(StateLGAWardPollingUnits[selectedStateName]?.lgas || {}) : [];
-  const wards = selectedStateName && selectedLGAName
-    ? Object.keys(StateLGAWardPollingUnits[selectedStateName]?.lgas[selectedLGAName]?.wards || {})
-    : [];
-  const pollingUnits = selectedStateName && selectedLGAName && selectedWardName
-    ? StateLGAWardPollingUnits[selectedStateName]?.lgas[selectedLGAName]?.wards[selectedWardName]?.pollingUnits || []
-    : [];
+  const states: NigeriaLocation[] = locations.states.data;
+  const lgas: NigeriaLocation[] = locations.lgas.data;
+  const wards: NigeriaLocation[] = locations.wards.data;
+  const pollingUnits: NigeriaLocation[] = locations.pollingUnits.data;
 
   // Handle location changes
   const handleStateChange = (stateName: string) => {
-    setSelectedStateName(stateName);
-    setSelectedLGAName('');
-    setSelectedWardName('');
-    setSelectedPUName('');
+    const state = locations.states.data.find(s => s.name === stateName);
+    locations.setSelectedState(state || null);
     setFormData(prev => ({ ...prev, state: stateName, lga: '', ward: '', puCode: '', puName: '' }));
   };
 
   const handleLGAChange = (lgaName: string) => {
-    setSelectedLGAName(lgaName);
-    setSelectedWardName('');
-    setSelectedPUName('');
+    const lga = locations.lgas.data.find(l => l.name === lgaName);
+    locations.setSelectedLGA(lga || null);
     setFormData(prev => ({ ...prev, lga: lgaName, ward: '', puCode: '', puName: '' }));
   };
 
   const handleWardChange = (wardName: string) => {
-    setSelectedWardName(wardName);
-    setSelectedPUName('');
+    const ward = locations.wards.data.find(w => w.name === wardName);
+    locations.setSelectedWard(ward || null);
     setFormData(prev => ({ ...prev, ward: wardName, puCode: '', puName: '' }));
   };
 
   const handlePUChange = (puName: string) => {
-    const selectedPU = pollingUnits.find(pu => pu.name === puName);
-    setSelectedPUName(puName);
+    const selectedPU = locations.pollingUnits.data.find(pu => pu.name === puName);
     if (selectedPU) {
+      locations.setSelectedPU(selectedPU);
       setFormData(prev => ({
         ...prev,
-        puCode: selectedPU.id || selectedPU.abbreviation,
+        puCode: selectedPU.abbreviation || selectedPU.id.toString(),
         puName: selectedPU.name
       }));
     }
@@ -298,14 +288,14 @@ export default function ManualResultUploadPage() {
                     State <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={selectedStateName}
+                    value={locations.selectedState?.name || ''}
                     onChange={(e) => handleStateChange(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     required
                   >
                     <option value="">Select State</option>
                     {states.map((state) => (
-                      <option key={state} value={state}>{state}</option>
+                      <option key={state.id} value={state.name}>{state.name}</option>
                     ))}
                   </select>
                 </div>
@@ -316,15 +306,15 @@ export default function ManualResultUploadPage() {
                     LGA <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={selectedLGAName}
+                    value={locations.selectedLGA?.name || ''}
                     onChange={(e) => handleLGAChange(e.target.value)}
-                    disabled={!selectedStateName}
+                    disabled={!locations.selectedState}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
                   >
                     <option value="">Select LGA</option>
                     {lgas.map((lga) => (
-                      <option key={lga} value={lga}>{lga}</option>
+                      <option key={lga.id} value={lga.name}>{lga.name}</option>
                     ))}
                   </select>
                 </div>
@@ -335,15 +325,15 @@ export default function ManualResultUploadPage() {
                     Ward <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={selectedWardName}
+                    value={locations.selectedWard?.name || ''}
                     onChange={(e) => handleWardChange(e.target.value)}
-                    disabled={!selectedLGAName}
+                    disabled={!locations.selectedLGA}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
                   >
                     <option value="">Select Ward</option>
                     {wards.map((ward) => (
-                      <option key={ward} value={ward}>{ward}</option>
+                      <option key={ward.id} value={ward.name}>{ward.name}</option>
                     ))}
                   </select>
                 </div>
@@ -354,9 +344,9 @@ export default function ManualResultUploadPage() {
                     Polling Unit <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={selectedPUName}
+                    value={locations.selectedPU?.name || ''}
                     onChange={(e) => handlePUChange(e.target.value)}
-                    disabled={!selectedWardName}
+                    disabled={!locations.selectedWard}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
                   >

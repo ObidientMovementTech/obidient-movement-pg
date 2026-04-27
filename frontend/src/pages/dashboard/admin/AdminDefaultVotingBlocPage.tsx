@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Save, Plus, Trash2, Settings, Upload, Link, X } from "lucide-react";
 import { useUserContext } from "../../../context/UserContext";
-import { getStateNames, getFormattedLGAs, getFormattedWards } from "../../../utils/StateLGAWardPollingUnits";
+import { getStateNamesAsync, getFormattedLGAsAsync, getFormattedWardsAsync } from "../../../services/nigeriaLocationsService";
 import RichTextEditor from "../../../components/inputs/RichTextEditor";
 import Toast from "../../../components/Toast";
 import Loading from "../../../components/Loader";
@@ -60,6 +60,7 @@ export default function AdminDefaultVotingBlocPage() {
   const [imageUploadMode, setImageUploadMode] = useState<'url' | 'upload'>('url');
   const [lgaOptions, setLgaOptions] = useState<string[]>([]);
   const [wardOptions, setWardOptions] = useState<string[]>([]);
+  const [stateNames, setStateNames] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // Check if user is admin
@@ -73,6 +74,7 @@ export default function AdminDefaultVotingBlocPage() {
 
   // Load default settings
   useEffect(() => {
+    getStateNamesAsync().then(setStateNames);
     if (profile?.role === 'admin') {
       fetchDefaultSettings();
     }
@@ -81,8 +83,9 @@ export default function AdminDefaultVotingBlocPage() {
   // Update LGA options when state changes
   useEffect(() => {
     if (settings.locationDefaults.defaultState) {
-      const formattedLGAs = getFormattedLGAs(settings.locationDefaults.defaultState);
-      setLgaOptions(formattedLGAs.map(lga => lga.value));
+      getFormattedLGAsAsync(settings.locationDefaults.defaultState).then(formattedLGAs => {
+        setLgaOptions(formattedLGAs.map(lga => lga.value));
+      });
 
       // Reset LGA and Ward if state changed
       if (settings.locationDefaults.defaultLga) {
@@ -104,8 +107,9 @@ export default function AdminDefaultVotingBlocPage() {
   // Update Ward options when LGA changes
   useEffect(() => {
     if (settings.locationDefaults.defaultState && settings.locationDefaults.defaultLga) {
-      const formattedWards = getFormattedWards(settings.locationDefaults.defaultState, settings.locationDefaults.defaultLga);
-      setWardOptions(formattedWards.map(ward => ward.value));
+      getFormattedWardsAsync(settings.locationDefaults.defaultState, settings.locationDefaults.defaultLga).then(formattedWards => {
+        setWardOptions(formattedWards.map(ward => ward.value));
+      });
 
       // Reset Ward if LGA changed
       if (settings.locationDefaults.defaultWard) {
@@ -476,7 +480,7 @@ export default function AdminDefaultVotingBlocPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="">Select State</option>
-                    {getStateNames().map((state) => (
+                    {stateNames.map((state) => (
                       <option key={state} value={state}>
                         {state}
                       </option>

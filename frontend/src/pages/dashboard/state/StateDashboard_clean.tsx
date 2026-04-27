@@ -25,7 +25,7 @@ import {
   ArcElement
 } from 'chart.js';
 import Loading from '../../../components/Loader';
-import { StateLGAWardPollingUnits, getStateNames } from '../../../utils/StateLGAWardPollingUnits';
+import { fetchStates, fetchLGAs, fetchWards, fetchPollingUnits } from '../../../services/nigeriaLocationsService';
 
 // Register ChartJS components
 ChartJS.register(
@@ -152,8 +152,8 @@ const StateDashboard: React.FC = () => {
   };
 
   // Mock INEC data generation using real state structure
-  const generateMockINECData = () => {
-    const stateNames = getStateNames();
+  const generateMockINECData = async () => {
+    const stateNames = await fetchStates();
 
     // Mock INEC registration numbers for major states
     const inecDataMap: Record<string, number> = {
@@ -196,9 +196,8 @@ const StateDashboard: React.FC = () => {
       'Zamfara State': 2100000
     };
 
-    const mockStates: StateData[] = stateNames.map((stateName) => {
-      const stateData = StateLGAWardPollingUnits[stateName];
-      const inecVoters = inecDataMap[stateName] || Math.floor(Math.random() * 1000000) + 500000;
+    const mockStates: StateData[] = stateNames.map((state) => {
+      const inecVoters = inecDataMap[state.name] || Math.floor(Math.random() * 1000000) + 500000;
 
       // Generate realistic mobilization data
       const reachedCalls = Math.floor(inecVoters * (Math.random() * 0.15 + 0.05));
@@ -208,8 +207,8 @@ const StateDashboard: React.FC = () => {
       const agentCoverage = Math.random() * 40 + 20;
 
       return {
-        id: stateData.id.toString(),
-        name: stateName,
+        id: state.id.toString(),
+        name: state.name,
         inecRegisteredVoters: inecVoters,
         obidientRegisteredVoters: 0,
         unconvertedVoters: 0,
@@ -258,7 +257,7 @@ const StateDashboard: React.FC = () => {
         totalPVCWith,
         totalPVCWithout,
         averageAgentCoverage
-      } = generateMockINECData();
+      } = await generateMockINECData();
 
       const obidientVotersByState = await fetchObidientVotersByState();
 
@@ -306,7 +305,8 @@ const StateDashboard: React.FC = () => {
 
   const fetchObidientVotersByState = async (): Promise<Record<string, number>> => {
     try {
-      const stateNames = getStateNames();
+      const statesList = await fetchStates();
+      const stateNames = statesList.map((s) => s.name);
       const mockObidientData: Record<string, number> = {};
 
       stateNames.forEach(stateName => {
@@ -357,17 +357,12 @@ const StateDashboard: React.FC = () => {
 
     } catch (error) {
       console.error('Error fetching Obidient voter data:', error);
-      const stateNames = getStateNames();
-      const fallbackData: Record<string, number> = {};
-      stateNames.forEach(stateName => {
-        fallbackData[stateName] = Math.floor(Math.random() * 20000) + 5000;
-      });
-      return fallbackData;
+      return {};
     }
   };
 
   // Navigation handlers
-  const navigateToState = (stateId: string, stateName: string) => {
+  const navigateToState = async (stateId: string, stateName: string) => {
     setSelectedStateId(stateId);
     setCurrentView('state');
     setBreadcrumbs([
@@ -376,16 +371,16 @@ const StateDashboard: React.FC = () => {
     ]);
 
     // Generate LGA data for the selected state
-    const stateData = StateLGAWardPollingUnits[stateName];
-    if (stateData) {
-      const lgasData: LGAData[] = Object.values(stateData.lgas).map(lga => {
+    const lgasList = await fetchLGAs(parseInt(stateId));
+    if (lgasList.length > 0) {
+      const lgasData: LGAData[] = lgasList.map(lga => {
         const inecVoters = Math.floor(Math.random() * 500000) + 100000;
         const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.08 + 0.01));
         const unconverted = inecVoters - obidientVoters;
         const conversionRate = (obidientVoters / inecVoters) * 100;
 
         return {
-          id: lga.id,
+          id: lga.id.toString(),
           name: lga.name,
           stateId: stateId,
           inecRegisteredVoters: inecVoters,
@@ -405,7 +400,7 @@ const StateDashboard: React.FC = () => {
     }
   };
 
-  const navigateToLGA = (lgaId: string, lgaName: string, stateName: string) => {
+  const navigateToLGA = async (lgaId: string, lgaName: string, stateName: string) => {
     setSelectedLGAId(lgaId);
     setCurrentView('lga');
     setBreadcrumbs([
@@ -415,17 +410,16 @@ const StateDashboard: React.FC = () => {
     ]);
 
     // Generate Ward data for the selected LGA
-    const stateData = StateLGAWardPollingUnits[stateName];
-    if (stateData && stateData.lgas[lgaName]) {
-      const lgaData = stateData.lgas[lgaName];
-      const wardsData: WardData[] = Object.values(lgaData.wards).map(ward => {
+    const wardsList = await fetchWards(parseInt(lgaId));
+    if (wardsList.length > 0) {
+      const wardsData: WardData[] = wardsList.map(ward => {
         const inecVoters = Math.floor(Math.random() * 100000) + 20000;
         const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.08 + 0.01));
         const unconverted = inecVoters - obidientVoters;
         const conversionRate = (obidientVoters / inecVoters) * 100;
 
         return {
-          id: ward.id,
+          id: ward.id.toString(),
           name: ward.name,
           lgaId: lgaId,
           inecRegisteredVoters: inecVoters,
@@ -445,7 +439,7 @@ const StateDashboard: React.FC = () => {
     }
   };
 
-  const navigateToWard = (wardId: string, wardName: string, lgaName: string, stateName: string) => {
+  const navigateToWard = async (wardId: string, wardName: string, lgaName: string, stateName: string) => {
     setSelectedWardId(wardId);
     setCurrentView('ward');
     setBreadcrumbs([
@@ -456,19 +450,18 @@ const StateDashboard: React.FC = () => {
     ]);
 
     // Generate Polling Unit data for the selected Ward
-    const stateData = StateLGAWardPollingUnits[stateName];
-    if (stateData && stateData.lgas[lgaName] && stateData.lgas[lgaName].wards[wardName]) {
-      const wardData = stateData.lgas[lgaName].wards[wardName];
-      const pollingUnitsData: PUData[] = wardData.pollingUnits.map((pu: any) => {
+    const puList = await fetchPollingUnits(parseInt(wardId));
+    if (puList.length > 0) {
+      const pollingUnitsData: PUData[] = puList.map((pu) => {
         const inecVoters = Math.floor(Math.random() * 2000) + 500;
         const obidientVoters = Math.floor(inecVoters * (Math.random() * 0.10 + 0.005));
         const unconverted = inecVoters - obidientVoters;
         const conversionRate = (obidientVoters / inecVoters) * 100;
 
         return {
-          id: pu.id,
+          id: pu.id.toString(),
           name: pu.name,
-          code: pu.abbreviation || pu.id,
+          code: pu.abbreviation || pu.id.toString(),
           wardId: wardId,
           inecRegisteredVoters: inecVoters,
           obidientRegisteredVoters: obidientVoters,

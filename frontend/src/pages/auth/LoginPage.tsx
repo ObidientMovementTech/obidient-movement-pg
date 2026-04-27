@@ -173,7 +173,9 @@ export default function LoginPage() {
         errorMessage = error.message || "No account found with these credentials.";
       else if (error.errorType === "EMAIL_NOT_VERIFIED") {
         errorMessage = "Please verify your email before logging in.";
-        setShowResendVerification(true);
+        // Redirect to verification page with email
+        navigate("/auth/verify", { state: { email } });
+        return;
       } else if (error.errorType === "INVALID_PASSWORD")
         errorMessage = "Incorrect password.";
       else if (error.errorType === "NETWORK_ERROR")

@@ -246,19 +246,20 @@ export const registerUser = async (req, res) => {
     // Generate 6-digit OTP code for email verification
     const otpCode = crypto.randomInt(100000, 1000000).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    await User.update(newUser.id, {
+    await User.findByIdAndUpdate(newUser.id, {
       otp: otpCode,
       otpExpiry: otpExpiry.toISOString(),
       otpPurpose: 'email_verification',
     });
 
+    // DEBUG: Verify OTP was actually saved
+    const savedUser = await User.findById(newUser.id);
+    console.log(`[OTP-DEBUG] Registration OTP for ${email}: code=${otpCode}, saved_otp=${savedUser?.otp}, saved_purpose=${savedUser?.otpPurpose}, saved_expiry=${savedUser?.otpExpiry}`);
+
     // Try to send the email before responding
     try {
-      // Send both the link-based email (for web) and OTP email
-      await Promise.all([
-        sendConfirmationEmail(name, email, link, "confirm"),
-        sendOTPEmail(name, email, otpCode, 'email_verification'),
-      ]);
+      // Send OTP code for email verification
+      await sendOTPEmail(name, email, otpCode, 'email_verification');
 
       const response = {
         success: true,
@@ -285,13 +286,13 @@ export const registerUser = async (req, res) => {
       }
       res.status(201).json(response);
 
-      // Attempt to resend the email asynchronously after a brief delay
+      // Attempt to resend the OTP email asynchronously after a brief delay
       setTimeout(async () => {
         try {
-          await sendConfirmationEmail(name, email, link, "confirm");
-          console.log('Delayed confirmation email sent successfully');
+          await sendOTPEmail(name, email, otpCode, 'email_verification');
+          console.log('Delayed OTP email sent successfully');
         } catch (retryError) {
-          console.error('Failed to send delayed confirmation email:', retryError);
+          console.error('Failed to send delayed OTP email:', retryError);
         }
       }, 2000);
     }
@@ -779,6 +780,7 @@ export const verifyEmailCode = async (req, res) => {
     }
 
     // Check OTP validity
+    console.log(`[OTP-DEBUG] Verify attempt for ${email}: stored_otp=${user.otp}, stored_purpose=${user.otpPurpose}, submitted_code=${code}`);
     if (!user.otp || user.otpPurpose !== 'email_verification') {
       return res.status(400).json({
         success: false,
@@ -959,17 +961,14 @@ export const forgotPassword = async (req, res) => {
     // --- OTP-based reset (for mobile + new web flow) ---
     const otpCode = crypto.randomInt(100000, 1000000).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    await User.update(user.id, {
+    await User.findByIdAndUpdate(user.id, {
       otp: otpCode,
       otpExpiry: otpExpiry.toISOString(),
       otpPurpose: 'password_reset',
     });
 
     try {
-      await Promise.all([
-        sendConfirmationEmail(user.name, user.email, resetLink, 'reset'),
-        sendOTPEmail(user.name, user.email, otpCode, 'password_reset'),
-      ]);
+      await sendOTPEmail(user.name, user.email, otpCode, 'password_reset');
 
       res.status(200).json({
         success: true,
@@ -1239,7 +1238,7 @@ export const resendConfirmationEmail = async (req, res) => {
     // Generate new 6-digit OTP code for mobile verification
     const otpCode = crypto.randomInt(100000, 1000000).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    await User.update(user.id, {
+    await User.findByIdAndUpdate(user.id, {
       otp: otpCode,
       otpExpiry: otpExpiry.toISOString(),
       otpPurpose: 'email_verification',
@@ -1247,10 +1246,7 @@ export const resendConfirmationEmail = async (req, res) => {
 
     // Send the confirmation email
     try {
-      await Promise.all([
-        sendConfirmationEmail(user.name, user.email, link, "confirm"),
-        sendOTPEmail(user.name, user.email, otpCode, 'email_verification'),
-      ]);
+      await sendOTPEmail(user.name, user.email, otpCode, 'email_verification');
       res.status(200).json({
         success: true,
         message: 'Verification email sent successfully! Please check your inbox and spam folder.',

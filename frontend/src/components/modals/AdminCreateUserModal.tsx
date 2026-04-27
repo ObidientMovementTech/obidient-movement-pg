@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import {
   Drawer, Box, Typography, IconButton, Divider, Button,
@@ -6,9 +6,9 @@ import {
 } from '@mui/material';
 import { UserPlus, X as XIcon } from 'lucide-react';
 import FormSelect from '../select/FormSelect';
-import { getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from '../../utils/StateLGAWardPollingUnits';
+import useNigeriaLocations from '../../hooks/useNigeriaLocations';
 import { formatPhoneForStorage } from '../../utils/phoneUtils';
-import { OptionType, genderOptions, ageRangeOptions } from '../../utils/lookups';
+import { genderOptions, ageRangeOptions } from '../../utils/lookups';
 import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import ListBoxComp from '../select/ListBox';
 import Toast from '../Toast';
@@ -78,9 +78,10 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [states, setStates] = useState<OptionType[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [quickOnboardingMode, setQuickOnboardingMode] = useState(false);
+
+  const locations = useNigeriaLocations({ levels: 4 });
 
   // Helper function to generate email from name
   const generateEmailFromName = (name: string): string => {
@@ -122,23 +123,25 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
       setFormData(prev => ({
         ...prev,
         password: '123456',
-        votingState: 'ANAMBRA',
         citizenship: 'Nigerian Citizen',
         isVoter: 'Yes',
         willVote: 'Yes',
         email: prev.name ? generateEmailFromName(prev.name) : ''
       }));
+      // Pre-select ANAMBRA state
+      const anambra = locations.states.data.find((s) => s.name === 'ANAMBRA');
+      if (anambra) locations.setSelectedState(anambra);
     } else {
       // Disable quick onboarding mode - clear auto-filled values
       setFormData(prev => ({
         ...prev,
         password: '',
-        votingState: '',
         citizenship: '',
         isVoter: '',
         willVote: '',
-        email: prev.email.endsWith('@obidients.com') ? '' : prev.email // Only clear if it's an auto-generated email
+        email: prev.email.endsWith('@obidients.com') ? '' : prev.email
       }));
+      locations.setSelectedState(null);
     }
   };
 
@@ -155,46 +158,7 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
     { id: 2, label: "No", value: "No" },
   ];
 
-  // Initialize states list
-  useEffect(() => {
-    const stateNames = getStateNames();
-    const stateOptions = stateNames.map((stateName, i) => ({
-      id: i,
-      label: stateName,
-      value: stateName,
-    }));
-    setStates(stateOptions);
-  }, []);
 
-  const getLgas = (stateName: string): OptionType[] => {
-    if (!stateName) return [];
-    const formattedLGAs = getFormattedLGAs(stateName);
-    return formattedLGAs.map((lga, i) => ({
-      id: i,
-      label: lga.label,
-      value: lga.value
-    }));
-  };
-
-  const getWards = (stateName: string, lgaName: string): OptionType[] => {
-    if (!stateName || !lgaName) return [];
-    const formattedWards = getFormattedWards(stateName, lgaName);
-    return formattedWards.map((ward, i) => ({
-      id: i,
-      label: ward.label,
-      value: ward.value
-    }));
-  };
-
-  const getPollingUnits = (stateName: string, lgaName: string, wardName: string): OptionType[] => {
-    if (!stateName || !lgaName || !wardName) return [];
-    const formattedPollingUnits = getFormattedPollingUnits(stateName, lgaName, wardName);
-    return formattedPollingUnits.map((pu, i) => ({
-      id: i,
-      label: pu.label,
-      value: pu.value
-    }));
-  };
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -250,9 +214,9 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
       const userData = {
         ...formData,
         phone: formattedPhone,
-        votingState: formData.votingState || undefined, // Send raw UPPERCASE value
-        votingLGA: formData.votingLGA || undefined, // Send raw UPPERCASE value
-        votingWard: formData.votingWard || undefined, // Send raw UPPERCASE value
+        votingState: locations.selectedState?.name || undefined,
+        votingLGA: locations.selectedLGA?.name || undefined,
+        votingWard: locations.selectedWard?.name || undefined,
       };
 
       // Use the admin user management service
@@ -507,49 +471,56 @@ const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                 <Box>
                   <FormSelect
                     label="State of Origin"
-                    options={states}
+                    options={locations.states.options}
                     defaultSelected={formData.stateOfOrigin}
                     onChange={(opt) => setFormData(prev => ({ ...prev, stateOfOrigin: opt?.value || '' }))}
-                    placeholder="Select state of origin"
                   />
                 </Box>
                 <Box>
                   <FormSelect
                     label="Voting State"
-                    options={states}
-                    defaultSelected={formData.votingState}
-                    onChange={(opt) => setFormData(prev => ({ ...prev, votingState: opt?.value || '', votingLGA: '', votingWard: '', votingPU: '' }))}
-                    placeholder="Select voting state"
+                    options={locations.states.options}
+                    defaultSelected={locations.selectedState?.name || ''}
+                    onChange={(opt) => {
+                      const loc = opt ? locations.states.data.find((s) => s.name === opt.value) || null : null;
+                      locations.setSelectedState(loc);
+                    }}
                   />
                 </Box>
                 <Box>
                   <FormSelect
                     label="Voting LGA"
-                    options={getLgas(formData.votingState || '')}
-                    defaultSelected={formData.votingLGA}
-                    onChange={(opt) => setFormData(prev => ({ ...prev, votingLGA: opt?.value || '', votingWard: '', votingPU: '' }))}
-                    disabled={!formData.votingState}
-                    placeholder="Select voting LGA"
+                    options={locations.lgas.options}
+                    defaultSelected={locations.selectedLGA?.name || ''}
+                    onChange={(opt) => {
+                      const loc = opt ? locations.lgas.data.find((l) => l.name === opt.value) || null : null;
+                      locations.setSelectedLGA(loc);
+                    }}
+                    disabled={!locations.selectedState || locations.lgas.isLoading}
                   />
                 </Box>
                 <Box>
                   <FormSelect
                     label="Voting Ward"
-                    options={getWards(formData.votingState || '', formData.votingLGA || '')}
-                    defaultSelected={formData.votingWard}
-                    onChange={(opt) => setFormData(prev => ({ ...prev, votingWard: opt?.value || '', votingPU: '' }))}
-                    disabled={!formData.votingLGA}
-                    placeholder="Select voting ward"
+                    options={locations.wards.options}
+                    defaultSelected={locations.selectedWard?.name || ''}
+                    onChange={(opt) => {
+                      const loc = opt ? locations.wards.data.find((w) => w.name === opt.value) || null : null;
+                      locations.setSelectedWard(loc);
+                    }}
+                    disabled={!locations.selectedLGA || locations.wards.isLoading}
                   />
                 </Box>
                 <Box>
                   <FormSelect
                     label="Polling Unit"
-                    options={getPollingUnits(formData.votingState || '', formData.votingLGA || '', formData.votingWard || '')}
-                    defaultSelected={formData.votingPU}
-                    onChange={(opt) => setFormData(prev => ({ ...prev, votingPU: opt?.value || '' }))}
-                    disabled={!formData.votingWard}
-                    placeholder="Select polling unit"
+                    options={locations.pollingUnits.options}
+                    defaultSelected={locations.selectedPU?.name || ''}
+                    onChange={(opt) => {
+                      const loc = opt ? locations.pollingUnits.data.find((p) => p.name === opt.value) || null : null;
+                      locations.setSelectedPU(loc);
+                    }}
+                    disabled={!locations.selectedWard || locations.pollingUnits.isLoading}
                   />
                 </Box>
                 <Box>

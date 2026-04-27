@@ -43,11 +43,12 @@ const ElectionManagement = () => {
   const [success, setSuccess] = useState('');
 
   const electionTypes = electionService.getElectionTypes();
-  const nigerianStates = electionService.getNigerianStates();
+  const [nigerianStates, setNigerianStates] = useState<string[]>([]);
 
   useEffect(() => {
     fetchElections();
     fetchParties();
+    electionService.getNigerianStates().then(setNigerianStates);
   }, []);
 
   const fetchParties = async () => {
@@ -197,7 +198,7 @@ const ElectionManagement = () => {
 
     // Set available LGAs for the selected state
     if (election.state) {
-      const lgas = electionService.getLGAsByState(election.state);
+      const lgas = await electionService.getLGAsByState(election.state);
       setAvailableLGAs(lgas);
     }
 
@@ -227,7 +228,7 @@ const ElectionManagement = () => {
   };
 
   // Handle state change to update available LGAs
-  const handleStateChange = (newState: string) => {
+  const handleStateChange = async (newState: string) => {
     setFormData(prev => ({
       ...prev,
       state: newState,
@@ -235,7 +236,7 @@ const ElectionManagement = () => {
     }));
 
     if (newState) {
-      const lgas = electionService.getLGAsByState(newState);
+      const lgas = await electionService.getLGAsByState(newState);
       setAvailableLGAs(lgas);
     } else {
       setAvailableLGAs([]);

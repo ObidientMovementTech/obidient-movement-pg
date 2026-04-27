@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { getLeaderboard } from "../../../services/votingBlocService";
 import { LeaderboardEntry } from "../../../types/votingBloc";
-import { getStateNames, getFormattedLGAs } from "../../../utils/StateLGAWardPollingUnits";
+import { getStateNamesAsync, getFormattedLGAsAsync } from "../../../services/nigeriaLocationsService";
 import Loading from "../../../components/Loader";
 import Toast from "../../../components/Toast";
 
@@ -19,6 +19,7 @@ export default function LeaderboardPage() {
   const [selectedLga, setSelectedLga] = useState('');
   const [selectedWard, setSelectedWard] = useState('');
   const [lgaOptions, setLgaOptions] = useState<string[]>([]);
+  const [stateNames, setStateNames] = useState<string[]>([]);
   const [displayCount, setDisplayCount] = useState(50); // Initially show 50 items
 
   // Memoized calculations for performance
@@ -40,15 +41,17 @@ export default function LeaderboardPage() {
   }, [leaderboard, displayCount]);
 
   useEffect(() => {
+    getStateNamesAsync().then(setStateNames);
     fetchLeaderboard();
   }, [level, selectedState, selectedLga, selectedWard]);
 
   useEffect(() => {
     if (selectedState) {
-      const formattedLGAs = getFormattedLGAs(selectedState);
-      setLgaOptions(formattedLGAs.map(lga => lga.value));
-      setSelectedLga('');
-      setSelectedWard('');
+      getFormattedLGAsAsync(selectedState).then(formattedLGAs => {
+        setLgaOptions(formattedLGAs.map(lga => lga.value));
+        setSelectedLga('');
+        setSelectedWard('');
+      });
     }
   }, [selectedState]);
 
@@ -184,7 +187,7 @@ export default function LeaderboardPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
               >
                 <option value="">All States</option>
-                {getStateNames().map(state => (
+                {stateNames.map(state => (
                   <option key={state} value={state}>{state}</option>
                 ))}
               </select>
@@ -199,14 +202,6 @@ export default function LeaderboardPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
                   disabled={!selectedState}
                 >
-                  <option value="">All LGAs</option>
-                  {lgaOptions.map(lga => {
-                    const formattedLGAs = getFormattedLGAs(selectedState);
-                    const lgaData = formattedLGAs.find(l => l.value === lga);
-                    return (
-                      <option key={lga} value={lga}>{lgaData?.label || lga}</option>
-                    );
-                  })}
                   <option value="">All LGAs</option>
                   {lgaOptions.map(lga => (
                     <option key={lga} value={lga}>{lga}</option>

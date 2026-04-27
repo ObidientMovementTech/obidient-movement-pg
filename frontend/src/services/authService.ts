@@ -129,3 +129,27 @@ export const resendVerificationEmail = async (email: string) => {
   }
 };
 
+export const verifyEmailCode = async (email: string, code: string) => {
+  try {
+    const response = await axios.post(`${API_BASE}/auth/verify-email-code`,
+      { email, code },
+      { withCredentials: true }
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw {
+        message: error.response.data.message || "Verification failed.",
+        errorType: error.response.data.errorType,
+        success: false,
+        ...error.response.data
+      };
+    }
+    throw {
+      message: "Verification failed. Please check your connection and try again.",
+      success: false,
+      errorType: 'NETWORK_ERROR'
+    };
+  }
+};
+

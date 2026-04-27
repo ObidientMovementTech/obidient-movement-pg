@@ -557,8 +557,3 @@ export const electionConcernOptions: OptionType[] = [
   { id: 9, label: "Disenfranchisement of Eligible Voters", value: "Disenfranchisement of Eligible Voters" },
   { id: 10, label: "Counting and Collation Errors", value: "Counting and Collation Errors" },
 ];
-
-export { StateLGAWardPollingUnits, getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from "./StateLGAWardPollingUnits";
-
-// Legacy export for backward compatibility (deprecated - use StateLGAWardPollingUnits instead)
-export { StateLGAWardPollingUnits as statesLGAWardList } from "./StateLGAWardPollingUnits";

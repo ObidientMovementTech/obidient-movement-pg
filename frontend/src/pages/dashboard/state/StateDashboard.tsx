@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import DOMPurify from 'dompurify';
+import { useNavigate } from 'react-router';
 import {
   ChevronRight,
   Search,
-  SortAsc,
-  SortDesc
+  Users,
+  UserPlus
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -14,7 +14,6 @@ import {
   Title,
   Tooltip,
   Legend,
-  ArcElement
 } from 'chart.js';
 import Loading from '../../../components/Loader';
 import {
@@ -22,13 +21,9 @@ import {
   MobilizationStats,
   ViewLevel,
   BreadcrumbItem,
-  SortField,
-  SortOrder,
-  PerformanceFilter
 } from '../types/dashboard.types';
 import { mobiliseDashboardService } from '../../../services/mobiliseDashboardService';
 import DashboardCharts from '../components/DashboardCharts';
-import StatsCards from '../components/StatsCards';
 
 // Register ChartJS components
 ChartJS.register(
@@ -38,17 +33,26 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ArcElement
 );
 
 interface UserLevelData {
   userLevel: string;
   designation: string;
+  role: string;
   assignedLocation: any;
   allowedLevels: string[];
 }
 
+const COORDINATOR_DESIGNATIONS = [
+  'National Coordinator',
+  'State Coordinator',
+  'LGA Coordinator',
+  'Ward Coordinator',
+];
+
 const StateDashboard: React.FC = () => {
+  const navigate = useNavigate();
+
   // Core state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,57 +73,8 @@ const StateDashboard: React.FC = () => {
   // User context
   const [userLevel, setUserLevel] = useState<UserLevelData | null>(null);
 
-  // Filters and search
+  // Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterRegion, setFilterRegion] = useState('all');
-  const [performanceFilter, setPerformanceFilter] = useState<PerformanceFilter>('all');
-  const [sortBy, setSortBy] = useState<SortField>('name');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-  const [showOnlyWithObidients, setShowOnlyWithObidients] = useState(false);
-
-  // Nigeria geopolitical zones mapping
-  const getStateRegion = (stateName: string): string => {
-    const regions: Record<string, string[]> = {
-      'North Central': [
-        'Benue', 'Kogi', 'Kwara', 'Nasarawa', 'Niger', 'Plateau', 'FCT'
-      ],
-      'North East': [
-        'Adamawa', 'Bauchi', 'Borno', 'Gombe', 'Taraba', 'Yobe'
-      ],
-      'North West': [
-        'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Sokoto', 'Zamfara'
-      ],
-      'South East': [
-        'Abia', 'Anambra', 'Ebonyi', 'Enugu', 'Imo'
-      ],
-      'South South': [
-        'Akwa Ibom', 'Bayelsa', 'Cross River', 'Delta', 'Edo', 'Rivers'
-      ],
-      'South West': [
-        'Ekiti', 'Lagos', 'Ogun', 'Ondo', 'Osun', 'Oyo'
-      ]
-    };
-
-    for (const [region, states] of Object.entries(regions)) {
-      if (states.some(state =>
-        stateName.toLowerCase().includes(state.toLowerCase()) ||
-        state.toLowerCase().includes(stateName.toLowerCase())
-      )) {
-        return region;
-      }
-    }
-    return 'Other';
-  };
-
-  // Performance categorization based on PVC rate
-  const getPerformanceCategory = (item: any): 'high' | 'medium' | 'low' => {
-    const total = item.obidientRegisteredVoters || 0;
-    const withPvc = item.obidientVotersWithPVC || 0;
-    const pvcRate = total > 0 ? (withPvc / total) * 100 : 0;
-    if (pvcRate >= 70) return 'high';
-    if (pvcRate >= 40) return 'medium';
-    return 'low';
-  };
 
   // Initialize dashboard
   useEffect(() => {
@@ -395,78 +350,22 @@ const StateDashboard: React.FC = () => {
 
   // Utility functions
   const formatNumber = (num: number): string => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toLocaleString();
   };
 
-  const getPvcColor = (rate: number): string => {
-    if (rate >= 70) return 'text-green-600';
-    if (rate >= 40) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+  // Filtered data (search only)
+  const filteredData = React.useMemo(() => {
+    if (!searchQuery.trim()) return currentData;
+    const q = searchQuery.toLowerCase();
+    return currentData.filter((item: any) => item.name?.toLowerCase().includes(q));
+  }, [currentData, searchQuery]);
 
-  // Data filtering and sorting
-  const filteredAndSortedData = React.useMemo(() => {
-    let filtered = [...currentData];
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((item: any) =>
-        item.name?.toLowerCase().includes(query)
-      );
-    }
-
-    // Apply region filter (only for state view)
-    if (filterRegion !== 'all' && currentView === 'national') {
-      filtered = filtered.filter((item: any) =>
-        getStateRegion(item.name) === filterRegion
-      );
-    }
-
-    // Apply performance filter (based on PVC rate)
-    if (performanceFilter !== 'all') {
-      filtered = filtered.filter((item: any) => {
-        return getPerformanceCategory(item) === performanceFilter;
-      });
-    }
-
-    // Apply obidients-only filter
-    if (showOnlyWithObidients) {
-      filtered = filtered.filter((item: any) => item.obidientRegisteredVoters > 0);
-    }
-
-    // Apply sorting
-    filtered.sort((a: any, b: any) => {
-      let aVal, bVal;
-
-      switch (sortBy) {
-        case 'name':
-          aVal = a.name?.toLowerCase() || '';
-          bVal = b.name?.toLowerCase() || '';
-          break;
-        case 'obidient':
-          aVal = a.obidientRegisteredVoters || 0;
-          bVal = b.obidientRegisteredVoters || 0;
-          break;
-        case 'pvc':
-          aVal = a.obidientVotersWithPVC || 0;
-          bVal = b.obidientVotersWithPVC || 0;
-          break;
-        default:
-          return 0;
-      }
-
-      if (typeof aVal === 'string') {
-        return sortOrder === 'asc'
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      } else {
-        return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-    });
-
-    return filtered;
-  }, [currentData, searchQuery, filterRegion, performanceFilter, showOnlyWithObidients, sortBy, sortOrder, currentView]);
+  // Is coordinator or admin?
+  const isCoordOrAdmin = userLevel
+    ? userLevel.role === 'admin' || COORDINATOR_DESIGNATIONS.includes(userLevel.designation)
+    : false;
 
   // Loading state
   if (loading) {
@@ -478,13 +377,17 @@ const StateDashboard: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
-          <div className="text-red-500 text-xl mb-4">⚠️ Something went wrong!</div>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-50 flex items-center justify-center">
+            <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-gray-600 text-sm mb-4">{error}</p>
           <button
             onClick={initializeDashboard}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2.5 bg-accent-green text-white text-sm font-medium rounded-lg hover:bg-green-800 transition-colors"
           >
-            Retry
+            Try again
           </button>
         </div>
       </div>
@@ -497,404 +400,227 @@ const StateDashboard: React.FC = () => {
       case 'national':
         return 'National Overview';
       case 'state':
-        const stateBreadcrumb = breadcrumbs.find(b => b.level === 'state');
-        return stateBreadcrumb ? `${stateBreadcrumb.name} State` : 'State Overview';
+        return breadcrumbs.find(b => b.level === 'state')?.name
+          ? `${breadcrumbs.find(b => b.level === 'state')!.name} State`
+          : 'State Overview';
       case 'lga':
-        const lgaBreadcrumb = breadcrumbs.find(b => b.level === 'lga');
-        return lgaBreadcrumb ? `${lgaBreadcrumb.name} LGA` : 'LGA Overview';
+        return breadcrumbs.find(b => b.level === 'lga')?.name
+          ? `${breadcrumbs.find(b => b.level === 'lga')!.name} LGA`
+          : 'LGA Overview';
       case 'ward':
-        const wardBreadcrumb = breadcrumbs.find(b => b.level === 'ward');
-        return wardBreadcrumb ? `${wardBreadcrumb.name} Ward` : 'Ward Overview';
+        return breadcrumbs.find(b => b.level === 'ward')?.name
+          ? `${breadcrumbs.find(b => b.level === 'ward')!.name} Ward`
+          : 'Ward Overview';
       default:
         return 'Dashboard';
     }
   };
 
-  // Get next level label
-  const getNextLevelLabel = (): string => {
+  // Navigate to item based on current level
+  const handleItemClick = (item: any) => {
     switch (currentView) {
-      case 'national':
-        return 'States';
-      case 'state':
-        return 'LGAs';
-      case 'lga':
-        return 'Wards';
-      case 'ward':
-        return 'Polling Units';
-      default:
-        return 'Items';
+      case 'national': navigateToState(item.id, item.name); break;
+      case 'state': navigateToLGA(item.id, item.name); break;
+      case 'lga': navigateToWard(item.id, item.name); break;
     }
   };
 
+  const canDrillDown = currentView !== 'ward';
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {getCurrentLevelTitle()}
-          </h1>
+        <div className="mb-4 sm:mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+              {getCurrentLevelTitle()}
+            </h1>
+            {/* Coordinator action buttons */}
+            {isCoordOrAdmin && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/dashboard/my-team')}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="hidden sm:inline">My Team</span>
+                </button>
+                <button
+                  onClick={() => navigate('/dashboard/assign-leader')}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-accent-green rounded-lg hover:bg-green-800 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Assign Leader</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Breadcrumbs */}
-          <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-            {breadcrumbs.map((breadcrumb, index) => {
-              const isCurrentPage = index === breadcrumbs.length - 1;
-
-              return (
-                <React.Fragment key={index}>
-                  <button
-                    onClick={() => !isCurrentPage ? navigateToBreadcrumb(index) : null}
-                    className={`transition-colors ${isCurrentPage
-                      ? 'text-gray-900 font-medium cursor-default'
-                      : 'hover:text-blue-600 cursor-pointer'
+          {breadcrumbs.length > 0 && (
+            <nav className="flex items-center gap-1.5 text-sm mb-4 overflow-x-auto">
+              {breadcrumbs.map((breadcrumb, index) => {
+                const isLast = index === breadcrumbs.length - 1;
+                return (
+                  <React.Fragment key={index}>
+                    <button
+                      onClick={() => !isLast && navigateToBreadcrumb(index)}
+                      disabled={isLast}
+                      className={`whitespace-nowrap px-2.5 py-1 rounded-md transition-colors ${
+                        isLast
+                          ? 'bg-green-50 text-accent-green font-semibold cursor-default'
+                          : 'text-gray-500 hover:text-accent-green hover:bg-gray-100 cursor-pointer'
                       }`}
-                    disabled={isCurrentPage}
-                  >
-                    {breadcrumb.name}
-                  </button>
-                  {index < breadcrumbs.length - 1 && (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </nav>          {/* User context info */}
-          {userLevel && (
-            <div className="text-sm text-gray-600">
-              Logged in as: <span className="font-medium">{userLevel.designation}</span>
-              {userLevel.assignedLocation && (
-                <span className="ml-2">
-                  • {userLevel.assignedLocation.stateName || userLevel.assignedLocation.name}
-                </span>
-              )}
-              <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                Access Level: {userLevel.userLevel.charAt(0).toUpperCase() + userLevel.userLevel.slice(1)}
-              </span>
-            </div>
+                    >
+                      {breadcrumb.name}
+                    </button>
+                    {!isLast && (
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </nav>
           )}
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats card — matching mobile layout */}
         {nationalStats && (
-          <StatsCards
-            currentStats={{
-              ...nationalStats,
-              pvcWithStatus: nationalStats.obidientVotersWithPVC || 0,
-              pvcWithoutStatus: nationalStats.obidientVotersWithoutPVC || 0
-            }}
-            currentView={currentView}
-            currentScope={(() => {
-              // Get the current scope name from breadcrumbs
-              switch (currentView) {
-                case 'national':
-                  return 'National';
-                case 'state':
-                  return breadcrumbs.find(b => b.level === 'state')?.name || '';
-                case 'lga':
-                  return breadcrumbs.find(b => b.level === 'lga')?.name || '';
-                case 'ward':
-                  return breadcrumbs.find(b => b.level === 'ward')?.name || '';
-                default:
-                  return '';
-              }
-            })()}
-            loading={loading}
-            formatNumber={formatNumber}
-          />
-        )}
-
-        {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by name..."
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
+              Total Obidients
+            </p>
+            <div className="flex items-end gap-2 mb-5">
+              <span className="text-3xl font-extrabold text-gray-900 tracking-tight leading-none">
+                {formatNumber(nationalStats.obidientRegisteredVoters)}
+              </span>
+              <span className="text-sm text-gray-500 pb-0.5">registered</span>
             </div>
-
-            {/* Region Filter (only for national view) */}
-            {currentView === 'national' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Region
-                </label>
-                <select
-                  value={filterRegion}
-                  onChange={(e) => setFilterRegion(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Regions</option>
-                  <option value="North Central">North Central</option>
-                  <option value="North East">North East</option>
-                  <option value="North West">North West</option>
-                  <option value="South East">South East</option>
-                  <option value="South South">South South</option>
-                  <option value="South West">South West</option>
-                </select>
+            <div className="h-px bg-gray-100 mb-4" />
+            {/* PVC breakdown */}
+            <div className="flex items-center gap-5">
+              {/* Mini donut visual */}
+              <div className="relative w-14 h-14 flex-shrink-0">
+                <svg viewBox="0 0 36 36" className="w-14 h-14">
+                  <circle cx="18" cy="18" r="14" fill="none" stroke="#f3f4f6" strokeWidth="3" />
+                  <circle
+                    cx="18" cy="18" r="14" fill="none"
+                    stroke="#0B6739" strokeWidth="3"
+                    strokeDasharray={`${
+                      nationalStats.obidientRegisteredVoters > 0
+                        ? ((nationalStats.obidientVotersWithPVC || 0) / nationalStats.obidientRegisteredVoters) * 88
+                        : 0
+                    } 88`}
+                    strokeLinecap="round"
+                    transform="rotate(-90 18 18)"
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-900">
+                  {nationalStats.obidientRegisteredVoters > 0
+                    ? `${Math.round(((nationalStats.obidientVotersWithPVC || 0) / nationalStats.obidientRegisteredVoters) * 100)}%`
+                    : '0%'}
+                </span>
               </div>
-            )}
-
-            {/* Performance Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Performance
-              </label>
-              <select
-                value={performanceFilter}
-                onChange={(e) => setPerformanceFilter(e.target.value as PerformanceFilter)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Performance</option>
-                <option value="high">High PVC (≥70%)</option>
-                <option value="medium">Medium PVC (40-69%)</option>
-                <option value="low">Low PVC (&lt;40%)</option>
-              </select>
-            </div>
-
-            {/* Sort */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sort By
-              </label>
-              <div className="flex space-x-2">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortField)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="name">Name</option>
-                  <option value="obidient">Obidients</option>
-                  <option value="pvc">With PVC</option>
-                </select>
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
-                </button>
+              <div className="flex-1 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-green" />
+                  <span className="text-xs text-gray-500 flex-1">With PVC</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {formatNumber(nationalStats.obidientVotersWithPVC || 0)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-200" />
+                  <span className="text-xs text-gray-500 flex-1">Without PVC</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {formatNumber(nationalStats.obidientVotersWithoutPVC || 0)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Additional Filters */}
-          <div className="mt-4 flex items-center space-x-4">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={showOnlyWithObidients}
-                onChange={(e) => setShowOnlyWithObidients(e.target.checked)}
-                className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <span className="text-sm text-gray-700">Only show areas with Obidient voters</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Discrepancy Notice - Shown when there's a discrepancy between parent and children counts */}
-        {nationalStats && currentData.length > 0 && (
-          <React.Fragment>
-            {(() => {
-              // Calculate the sum of children's obidient voters
-              const childrenSum = filteredAndSortedData.reduce((sum, item) => sum + (item.obidientRegisteredVoters || 0), 0);
-              const parentTotalVoters = nationalStats.obidientRegisteredVoters;
-              const discrepancy = parentTotalVoters - childrenSum;
-
-              // Only show the message if there's a discrepancy of at least 1
-              if (discrepancy > 0) {
-                // Determine the appropriate message based on current view
-                let message = '';
-                let childType = '';
-
-                switch (currentView) {
-                  case 'national':
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} with no State assignment. These users are included in the national total but not in any State count.`;
-                    childType = 'State';
-                    break;
-                  case 'state':
-                    const stateName = breadcrumbs.find(b => b.level === 'state')?.name || '';
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} in ${stateName} with no LGA assignment. These users are included in the state total but not in any LGA count.`;
-                    childType = 'LGA';
-                    break;
-                  case 'lga':
-                    const lgaName = breadcrumbs.find(b => b.level === 'lga')?.name || '';
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} in ${lgaName} with no Ward assignment. These users are included in the LGA total but not in any Ward count.`;
-                    childType = 'Ward';
-                    break;
-                  case 'ward':
-                    const wardName = breadcrumbs.find(b => b.level === 'ward')?.name || '';
-                    message = `There ${discrepancy === 1 ? 'is' : 'are'} <span class="font-bold">${discrepancy}</span> user${discrepancy !== 1 ? 's' : ''} in ${wardName} with no Polling Unit assignment. These users are included in the Ward total but not in any Polling Unit count.`;
-                    childType = 'Polling Unit';
-                    break;
-                  default:
-                    return null;
-                }
-
-                return (
-                  <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4 rounded-md">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm text-amber-700 flex items-center">
-                          <span className="font-medium">Data Discrepancy: </span>
-                          <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message) }}></span>
-                          <span className="relative group ml-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 w-64 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10">
-                              When a user registers but doesn't provide complete location information, they're still counted in the parent total but can't be displayed in child locations.
-                            </div>
-                          </span>
-                        </p>
-                        <p className="mt-2 text-xs text-amber-600">
-                          <span className="font-medium">Tip for admins: </span>
-                          These users need their {childType.toLowerCase()} information updated in the database to ensure accurate reporting.
-                        </p>
-                        {userLevel && userLevel.designation.includes('Admin') && (
-                          <button
-                            onClick={() => {
-                              // This would trigger an export or report generation in a real implementation
-                              alert(`Export of ${discrepancy} users with missing ${childType} data will be prepared and sent to your email.`);
-                            }}
-                            className="mt-2 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded flex items-center w-fit"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Export List
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-          </React.Fragment>
         )}
 
-        {/* Charts Section */}
-        {nationalStats && (
+        {/* Charts — Obidients vs PVC comparison */}
+        {currentData.length > 0 && (
           <DashboardCharts
             nationalStats={nationalStats}
             currentView={currentView}
             currentData={currentData}
-            formatNumber={formatNumber}
+            formatNumber={(n) => n.toLocaleString()}
           />
         )}
 
-        {/* Data Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">
-              {getNextLevelLabel()} ({filteredAndSortedData.length})
-            </h3>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Obidient Voters
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    With PVC
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    PVC Rate
-                  </th>
-                  {currentView === 'national' && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Region
-                    </th>
-                  )}
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAndSortedData.map((item: any, index) => {
-                  const total = item.obidientRegisteredVoters || 0;
-                  const withPvc = item.obidientVotersWithPVC || 0;
-                  const pvcRate = total > 0 ? (withPvc / total) * 100 : 0;
-
-                  return (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatNumber(item.obidientRegisteredVoters || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatNumber(withPvc)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-sm font-medium ${getPvcColor(pvcRate)}`}>
-                          {pvcRate.toFixed(1)}%
-                        </span>
-                      </td>
-                      {currentView === 'national' && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {getStateRegion(item.name)}
-                        </td>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {currentView !== 'ward' && (
-                          <button
-                            onClick={() => {
-                              switch (currentView) {
-                                case 'national':
-                                  navigateToState(item.id, item.name);
-                                  break;
-                                case 'state':
-                                  navigateToLGA(item.id, item.name);
-                                  break;
-                                case 'lga':
-                                  navigateToWard(item.id, item.name);
-                                  break;
-                              }
-                            }}
-                            className="text-blue-600 hover:text-blue-900 transition-colors"
-                          >
-                            View Details
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredAndSortedData.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No data matches your current filters.
-            </div>
-          )}
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name…"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-accent-green focus:border-transparent outline-none transition-all"
+          />
         </div>
+
+        {/* Location cards list */}
+        {filteredData.length === 0 ? (
+          <div className="text-center py-16">
+            <svg className="w-10 h-10 mx-auto mb-3 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <p className="text-sm text-gray-400">No results</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredData.map((item: any, index) => {
+              const total = item.obidientRegisteredVoters || 0;
+              const withPvc = item.obidientVotersWithPVC || 0;
+              const pvcRate = total > 0 ? withPvc / total : 0;
+
+              return (
+                <button
+                  key={item.id || index}
+                  onClick={canDrillDown ? () => handleItemClick(item) : undefined}
+                  disabled={!canDrillDown}
+                  className={`w-full bg-white rounded-xl border border-gray-100 px-4 py-3.5 text-left transition-colors ${
+                    canDrillDown ? 'hover:border-gray-200 cursor-pointer' : 'cursor-default'
+                  }`}
+                >
+                  {/* Top: name + percentage */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-semibold text-gray-900 truncate flex-1">
+                      {item.name}
+                    </span>
+                    <span className="text-[13px] font-bold text-gray-900 tracking-tight">
+                      {(pvcRate * 100).toFixed(0)}%
+                    </span>
+                    {canDrillDown && (
+                      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                    )}
+                  </div>
+                  {/* Progress bar */}
+                  <div className="h-[3px] bg-gray-100 rounded-full overflow-hidden mb-2.5">
+                    <div
+                      className="h-full bg-accent-green rounded-full"
+                      style={{ width: `${Math.min(pvcRate * 100, 100)}%` }}
+                    />
+                  </div>
+                  {/* Meta row */}
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="font-semibold text-gray-900">{formatNumber(total)}</span>
+                    <span className="text-gray-500">Obidients</span>
+                    <span className="w-[3px] h-[3px] rounded-full bg-gray-300 mx-1.5" />
+                    <span className="font-semibold text-gray-900">{formatNumber(withPvc)}</span>
+                    <span className="text-gray-500">with PVC</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

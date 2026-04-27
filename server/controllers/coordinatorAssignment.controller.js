@@ -289,7 +289,7 @@ export const getSubordinates = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const { designation: filterDesignation } = req.query;
+    const { designation: filterDesignation, q: searchQuery } = req.query;
 
     // Build WHERE clause based on caller's jurisdiction
     const conditions = [`designation != 'Community Member'`, `id != $1`];
@@ -330,6 +330,14 @@ export const getSubordinates = async (req, res) => {
       conditions.push(`designation = $${paramIdx}`);
       params.push(filterDesignation);
       paramIdx++;
+    }
+
+    // Optional text search (name, email, phone)
+    if (searchQuery && typeof searchQuery === 'string' && searchQuery.trim().length > 0) {
+      const q = `%${searchQuery.trim()}%`;
+      conditions.push(`(name ILIKE $${paramIdx} OR email ILIKE $${paramIdx + 1} OR phone ILIKE $${paramIdx + 2})`);
+      params.push(q, q, q);
+      paramIdx += 3;
     }
 
     const where = conditions.join(' AND ');

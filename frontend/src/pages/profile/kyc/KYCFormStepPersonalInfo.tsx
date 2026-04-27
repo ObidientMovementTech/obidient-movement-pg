@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import TextInput from "../../../components/inputs/TextInput.js";
 import PhoneInput from "../../../components/PhoneInput.js";
 import FormSelect from "../../../components/select/FormSelect.js";
 // import NextButton from "../../../components/NextButton";
 import BackButton from "../../../components/BackButton.js";
 import { genderOptions, ageRangeOptions } from "../../../utils/lookups.js";
-import { getStateNames, getFormattedLGAs, getFormattedWards } from "../../../utils/StateLGAWardPollingUnits";
+import useNigeriaLocations from "../../../hooks/useNigeriaLocations";
 import { countries } from "../../../utils/countries.js";
-import { OptionType } from "../../../utils/lookups.js";
+
 import { savePersonalInfoStep } from "../../../services/kycService.js";
 import { toast } from "react-hot-toast";
 
@@ -57,38 +57,14 @@ const defaultValues: PersonalInfo = {
 
 export default function KYCFormStepPersonalInfo({ initialData, onNext, onBack }: Props) {
   const [formData, setFormData] = useState<PersonalInfo>(initialData || defaultValues);
-  const [states, setStates] = useState<OptionType[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const stateNames = getStateNames();
-    const stateOptions = stateNames.map((stateName, i) => ({
-      id: i,
-      label: stateName,
-      value: stateName,
-    }));
-    setStates(stateOptions);
-  }, []);
-
-  const getLgas = (stateName: string): OptionType[] => {
-    if (!stateName) return [];
-    const formattedLGAs = getFormattedLGAs(stateName);
-    return formattedLGAs.map((lga, i) => ({
-      id: i,
-      label: lga.label,
-      value: lga.value
-    }));
-  };
-
-  const getWards = (stateName: string, lgaName: string): OptionType[] => {
-    if (!stateName || !lgaName) return [];
-    const formattedWards = getFormattedWards(stateName, lgaName);
-    return formattedWards.map((ward, i) => ({
-      id: i,
-      label: ward.label,
-      value: ward.value
-    }));
-  };
+  const locations = useNigeriaLocations({
+    levels: 3,
+    initialState: initialData?.voting_engagement_state || '',
+    initialLGA: initialData?.lga || '',
+    initialWard: initialData?.ward || '',
+  });
 
   const validateForm = (): boolean => {
     // Simplified validation for testing
@@ -259,7 +235,7 @@ export default function KYCFormStepPersonalInfo({ initialData, onNext, onBack }:
         />
         <FormSelect
           label="Your State of Origin"
-          options={states}
+          options={locations.states.options}
           defaultSelected={formData.state_of_origin}
           onChange={(opt) => {
             if (opt) handleInputChange({ ...formData, state_of_origin: opt.value });
@@ -276,29 +252,43 @@ export default function KYCFormStepPersonalInfo({ initialData, onNext, onBack }:
         />
         <FormSelect
           label="Voting State"
-          options={states}
-          defaultSelected={formData.voting_engagement_state}
+          options={locations.states.options}
+          defaultSelected={locations.selectedState?.name || ''}
           onChange={(opt) => {
-            if (opt) handleInputChange({ ...formData, voting_engagement_state: opt.value, lga: '', ward: '' });
+            if (opt) {
+              const loc = locations.states.data.find((s) => s.name === opt.value) || null;
+              locations.setSelectedState(loc);
+              handleInputChange({ ...formData, voting_engagement_state: opt.value, lga: '', ward: '' });
+            }
           }}
           required
         />
         <FormSelect
           label="LGA"
-          options={getLgas(formData.voting_engagement_state)}
-          defaultSelected={formData.lga}
+          options={locations.lgas.options}
+          defaultSelected={locations.selectedLGA?.name || ''}
           onChange={(opt) => {
-            if (opt) handleInputChange({ ...formData, lga: opt.value, ward: '' });
+            if (opt) {
+              const loc = locations.lgas.data.find((l) => l.name === opt.value) || null;
+              locations.setSelectedLGA(loc);
+              handleInputChange({ ...formData, lga: opt.value, ward: '' });
+            }
           }}
+          disabled={!locations.selectedState || locations.lgas.isLoading}
           required
         />
         <FormSelect
           label="Ward"
-          options={getWards(formData.voting_engagement_state, formData.lga)}
-          defaultSelected={formData.ward}
+          options={locations.wards.options}
+          defaultSelected={locations.selectedWard?.name || ''}
           onChange={(opt) => {
-            if (opt) handleInputChange({ ...formData, ward: opt.value });
+            if (opt) {
+              const loc = locations.wards.data.find((w) => w.name === opt.value) || null;
+              locations.setSelectedWard(loc);
+              handleInputChange({ ...formData, ward: opt.value });
+            }
           }}
+          disabled={!locations.selectedLGA || locations.wards.isLoading}
           required
         />
       </div>

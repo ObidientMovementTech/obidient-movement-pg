@@ -6,8 +6,8 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '../../utils/getCroppedImg';
 import compressImage from '../../utils/ImageCompression';
 import FormSelect from '../../components/select/FormSelect';
-import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
-import { getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from '../../utils/StateLGAWardPollingUnits';
+import { genderOptions, ageRangeOptions } from '../../utils/lookups';
+import useNigeriaLocations from '../../hooks/useNigeriaLocations';
 import { validateUsernameFormat, debouncedUsernameCheck } from '../../services/profileService';
 import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import axios from 'axios';
@@ -54,18 +54,7 @@ export default function EditProfileModal({
   const [stateOfOrigin, setStateOfOrigin] = useState(
     profile.stateOfOrigin || profile.personalInfo?.state_of_origin || ''
   );
-  const [votingState, setVotingState] = useState(
-    profile.votingState || profile.personalInfo?.voting_engagement_state || ''
-  );
-  const [votingLGA, setVotingLGA] = useState(
-    profile.votingLGA || profile.personalInfo?.lga || ''
-  );
-  const [votingWard, setVotingWard] = useState(
-    profile.votingWard || profile.personalInfo?.ward || ''
-  );
-  const [votingPU, setVotingPU] = useState(
-    profile.votingPU || ''
-  );
+
   const [citizenship, setCitizenship] = useState(
     profile.citizenship || profile.personalInfo?.citizenship || ''
   );
@@ -93,19 +82,14 @@ export default function EditProfileModal({
   const [bankAccountNumber, setBankAccountNumber] = useState(profile.bankAccountNumber || '');
   const [bankAccountName, setBankAccountName] = useState(profile.bankAccountName || '');
 
-  // Dropdown options state
-  const [states, setStates] = useState<OptionType[]>([]);
-
-  // Initialize states dropdown
-  useEffect(() => {
-    const stateNames = getStateNames();
-    const stateOptions = stateNames.map((stateName, i) => ({
-      id: i,
-      label: stateName, // Display UPPERCASE name (e.g., "ABIA")
-      value: stateName, // Send UPPERCASE to backend
-    }));
-    setStates(stateOptions);
-  }, []);
+  // Location hook with prefill from profile
+  const locations = useNigeriaLocations({
+    levels: 4,
+    initialState: profile.votingState || profile.personalInfo?.voting_engagement_state || '',
+    initialLGA: profile.votingLGA || profile.personalInfo?.lga || '',
+    initialWard: profile.votingWard || profile.personalInfo?.ward || '',
+    initialPU: profile.votingPU || '',
+  });
 
   // Handle username change with validation
   const handleUsernameChange = (newUsername: string) => {
@@ -153,46 +137,7 @@ export default function EditProfileModal({
     });
   };
 
-  // Helper functions for cascading dropdowns
-  const getLgas = (stateName: string): OptionType[] => {
-    if (!stateName) return [];
-    const formattedLGAs = getFormattedLGAs(stateName);
-    return formattedLGAs.map((lga, i) => ({
-      id: i,
-      label: lga.label, // Display with abbreviation (e.g., "01 - ABA NORTH")
-      value: lga.value // Send only name to backend (e.g., "ABA NORTH")
-    }));
-  };
 
-  const getWards = (stateName: string, lgaName: string): OptionType[] => {
-    if (!stateName || !lgaName) return [];
-    const formattedWards = getFormattedWards(stateName, lgaName);
-    return formattedWards.map((ward, i) => ({
-      id: i,
-      label: ward.label, // Display with abbreviation (e.g., "01 - EZIAMA")
-      value: ward.value // Send only name to backend (e.g., "EZIAMA")
-    }));
-  };
-
-  // Get polling units for the selected location
-  const getPollingUnits = (): OptionType[] => {
-    if (!votingState || !votingLGA || !votingWard) {
-      return [];
-    }
-
-    try {
-      // Use the new helper function that returns formatted polling units with abbreviations
-      const formattedPollingUnits = getFormattedPollingUnits(votingState, votingLGA, votingWard);
-      return formattedPollingUnits.map((pu, i) => ({
-        id: i,
-        label: pu.label, // Display with abbreviation (e.g., "005 - ABIA POLY - ABIA POLY I")
-        value: pu.value // Send only name to backend (e.g., "ABIA POLY - ABIA POLY I")
-      }));
-    } catch (error) {
-      console.error('Error getting polling units:', error);
-      return [];
-    }
-  };
 
   // Dropdown options
   const citizenshipOptions = [
@@ -219,9 +164,6 @@ export default function EditProfileModal({
       const newAgeRange = profile.ageRange || profile.personalInfo?.age_range || '';
       const newCitizenship = profile.citizenship || profile.personalInfo?.citizenship || '';
       const newStateOfOrigin = profile.stateOfOrigin || profile.personalInfo?.state_of_origin || '';
-      const newVotingState = profile.votingState || profile.personalInfo?.voting_engagement_state || '';
-      const newVotingLGA = profile.votingLGA || profile.personalInfo?.lga || '';
-      const newVotingWard = profile.votingWard || profile.personalInfo?.ward || '';
       const newIsVoter = profile.isVoter || profile.onboardingData?.votingBehavior?.is_registered || '';
       const newWillVote = profile.willVote || profile.onboardingData?.votingBehavior?.likely_to_vote || '';
 
@@ -230,10 +172,6 @@ export default function EditProfileModal({
       setAgeRange(newAgeRange);
       setCitizenship(newCitizenship);
       setStateOfOrigin(newStateOfOrigin);
-      setVotingState(newVotingState);
-      setVotingLGA(newVotingLGA);
-      setVotingWard(newVotingWard);
-      setVotingPU(profile.votingPU || '');
       setIsVoter(newIsVoter);
       setWillVote(newWillVote);
 
@@ -322,10 +260,10 @@ export default function EditProfileModal({
         countryCode: finalCountryCode,
         // Send location data as-is (UPPERCASE format)
         stateOfOrigin: stateOfOrigin || undefined,
-        votingState: votingState || undefined,
-        votingLGA: votingLGA || undefined,
-        votingWard: votingWard || undefined,
-        votingPU: votingPU || '', // Add polling unit
+        votingState: locations.selectedState?.name || undefined,
+        votingLGA: locations.selectedLGA?.name || undefined,
+        votingWard: locations.selectedWard?.name || undefined,
+        votingPU: locations.selectedPU?.name || '',
         isVoter,
         willVote,
         // Bank account details
@@ -575,12 +513,12 @@ export default function EditProfileModal({
               <div>
                 <FormSelect
                   label="State of Origin"
-                  options={states}
+                  options={locations.states.options}
                   defaultSelected={stateOfOrigin}
                   onChange={(opt) => {
                     if (opt) setStateOfOrigin(opt.value);
                   }}
-                  key={`stateOfOrigin-${stateOfOrigin}`} // Force re-render when stateOfOrigin changes
+                  key={`stateOfOrigin-${stateOfOrigin}`}
                 />
               </div>
 
@@ -588,17 +526,13 @@ export default function EditProfileModal({
               <div>
                 <FormSelect
                   label="Voting State"
-                  options={states}
-                  defaultSelected={votingState}
+                  options={locations.states.options}
+                  defaultSelected={locations.selectedState?.name || ''}
                   onChange={(opt) => {
-                    const newState = opt?.value || '';
-                    setVotingState(newState);
-                    // Reset dependent fields
-                    setVotingLGA('');
-                    setVotingWard('');
-                    setVotingPU('');
+                    const loc = opt ? locations.states.data.find((s) => s.name === opt.value) || null : null;
+                    locations.setSelectedState(loc);
                   }}
-                  key={`votingState-${votingState}`}
+                  key={`votingState-${locations.selectedState?.id || ''}`}
                 />
               </div>
 
@@ -606,17 +540,14 @@ export default function EditProfileModal({
               <div>
                 <FormSelect
                   label="Voting LGA"
-                  options={getLgas(votingState)}
-                  defaultSelected={votingLGA}
+                  options={locations.lgas.options}
+                  defaultSelected={locations.selectedLGA?.name || ''}
                   onChange={(opt) => {
-                    const newLGA = opt?.value || '';
-                    setVotingLGA(newLGA);
-                    // Reset dependent fields
-                    setVotingWard('');
-                    setVotingPU('');
+                    const loc = opt ? locations.lgas.data.find((l) => l.name === opt.value) || null : null;
+                    locations.setSelectedLGA(loc);
                   }}
-                  disabled={!votingState}
-                  key={`votingLGA-${votingLGA}`}
+                  disabled={!locations.selectedState || locations.lgas.isLoading}
+                  key={`votingLGA-${locations.selectedLGA?.id || ''}`}
                 />
               </div>
 
@@ -624,16 +555,14 @@ export default function EditProfileModal({
               <div>
                 <FormSelect
                   label="Voting Ward"
-                  options={getWards(votingState, votingLGA)}
-                  defaultSelected={votingWard}
+                  options={locations.wards.options}
+                  defaultSelected={locations.selectedWard?.name || ''}
                   onChange={(opt) => {
-                    const newWard = opt?.value || '';
-                    setVotingWard(newWard);
-                    // Reset polling unit when ward changes
-                    setVotingPU('');
+                    const loc = opt ? locations.wards.data.find((w) => w.name === opt.value) || null : null;
+                    locations.setSelectedWard(loc);
                   }}
-                  disabled={!votingLGA}
-                  key={`votingWard-${votingWard}`}
+                  disabled={!locations.selectedLGA || locations.wards.isLoading}
+                  key={`votingWard-${locations.selectedWard?.id || ''}`}
                 />
               </div>
 
@@ -641,15 +570,14 @@ export default function EditProfileModal({
               <div>
                 <FormSelect
                   label="Voting Polling Unit"
-                  options={getPollingUnits()}
-                  defaultSelected={votingPU}
+                  options={locations.pollingUnits.options}
+                  defaultSelected={locations.selectedPU?.name || ''}
                   onChange={(opt) => {
-                    const newPU = opt?.value || '';
-                    setVotingPU(newPU);
+                    const loc = opt ? locations.pollingUnits.data.find((p) => p.name === opt.value) || null : null;
+                    locations.setSelectedPU(loc);
                   }}
-                  disabled={!votingWard}
-                  key={`votingPU-${votingPU}`}
-                  placeholder="Select your polling unit"
+                  disabled={!locations.selectedWard || locations.pollingUnits.isLoading}
+                  key={`votingPU-${locations.selectedPU?.id || ''}`}
                 />
               </div>
 

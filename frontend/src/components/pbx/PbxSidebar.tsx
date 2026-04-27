@@ -21,6 +21,7 @@ import {
   IdCard,
   Settings,
   ShieldCheck,
+  Smartphone,
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import RBACGate from './RBACGate';
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { label: 'Mobilisation', icon: <Target size={20} />, path: '/pbx/mobilisation' },
   { label: 'Blog', icon: <FileText size={20} />, path: '/pbx/blog', minimumLevel: 'state' },
   { label: 'Communications', icon: <Megaphone size={20} />, path: '/pbx/communications', minimumLevel: 'state' },
+  { label: 'Mobile Feeds', icon: <Smartphone size={20} />, path: '/pbx/mobile-feeds', allowedRoles: ['admin'] },
   { label: 'ADC Verification', icon: <ShieldCheck size={20} />, path: '/pbx/adc', minimumLevel: 'state' },
   { label: 'Settings', icon: <Settings size={20} />, path: '/pbx/settings', allowedRoles: ['admin'] },
 ];

@@ -8,12 +8,7 @@ import Cropper from "react-easy-crop";
 import getCroppedImg from "../../utils/getCroppedImg";
 import compressImage from "../../utils/ImageCompression";
 import { genderOptions, ageRangeOptions, OptionType } from "../../utils/lookups";
-import {
-  getStateNames,
-  getFormattedLGAs,
-  getFormattedWards,
-  getFormattedPollingUnits,
-} from "../../utils/StateLGAWardPollingUnits";
+import useNigeriaLocations from "../../hooks/useNigeriaLocations";
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -35,15 +30,12 @@ export default function CompleteProfilePage() {
   const [gender, setGender] = useState("");
   const [ageRange, setAgeRange] = useState("");
   const [stateOfOrigin, setStateOfOrigin] = useState("");
-  const [votingState, setVotingState] = useState("");
-  const [votingLGA, setVotingLGA] = useState("");
-  const [votingWard, setVotingWard] = useState("");
-  const [votingPU, setVotingPU] = useState("");
   const [isVoter, setIsVoter] = useState("");
   const [willVote, setWillVote] = useState("");
 
-  const [states, setStates] = useState<OptionType[]>([]);
+  const [stateOfOriginOptions, setStateOfOriginOptions] = useState<OptionType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showIntroModal, setShowIntroModal] = useState(true);
   const [toastInfo, setToastInfo] = useState<{
     message: string;
     type: "success" | "error";
@@ -60,14 +52,6 @@ export default function CompleteProfilePage() {
     setStateOfOrigin(
       profile.stateOfOrigin || profile.personalInfo?.state_of_origin || ""
     );
-    setVotingState(
-      profile.votingState ||
-        profile.personalInfo?.voting_engagement_state ||
-        ""
-    );
-    setVotingLGA(profile.votingLGA || profile.personalInfo?.lga || "");
-    setVotingWard(profile.votingWard || profile.personalInfo?.ward || "");
-    setVotingPU(profile.votingPU || "");
     setIsVoter(
       profile.isVoter ||
         profile.onboardingData?.votingBehavior?.is_registered ||
@@ -80,13 +64,21 @@ export default function CompleteProfilePage() {
     );
   }, [profile]);
 
-  // ── Load Nigerian state names ───────────────────────────────
+  // ── Location hook with prefill from profile ────────────────
+  const locations = useNigeriaLocations({
+    levels: 4,
+    initialState: profile?.votingState || profile?.personalInfo?.voting_engagement_state || '',
+    initialLGA: profile?.votingLGA || profile?.personalInfo?.lga || '',
+    initialWard: profile?.votingWard || profile?.personalInfo?.ward || '',
+    initialPU: profile?.votingPU || '',
+  });
+
+  // ── State of Origin uses same states list ───────────────────
   useEffect(() => {
-    const stateNames = getStateNames();
-    setStates(
-      stateNames.map((s, i) => ({ id: i, label: s, value: s }))
-    );
-  }, []);
+    if (locations.states.options.length > 0) {
+      setStateOfOriginOptions(locations.states.options);
+    }
+  }, [locations.states.options]);
 
   // ── Redirect if already complete ────────────────────────────
   useEffect(() => {
@@ -97,36 +89,6 @@ export default function CompleteProfilePage() {
 
   // ── Completion stats ────────────────────────────────────────
   const completeness = profile ? getProfileCompleteness(profile) : null;
-
-  // ── Cascading dropdown helpers ──────────────────────────────
-  const getLgas = (state: string): OptionType[] => {
-    if (!state) return [];
-    return getFormattedLGAs(state).map((l, i) => ({
-      id: i,
-      label: l.label,
-      value: l.value,
-    }));
-  };
-
-  const getWards = (state: string, lga: string): OptionType[] => {
-    if (!state || !lga) return [];
-    return getFormattedWards(state, lga).map((w, i) => ({
-      id: i,
-      label: w.label,
-      value: w.value,
-    }));
-  };
-
-  const getPollingUnits = (): OptionType[] => {
-    if (!votingState || !votingLGA || !votingWard) return [];
-    try {
-      return getFormattedPollingUnits(votingState, votingLGA, votingWard).map(
-        (pu, i) => ({ id: i, label: pu.label, value: pu.value })
-      );
-    } catch {
-      return [];
-    }
-  };
 
   const yesNoOptions: OptionType[] = [
     { id: 1, label: "Yes", value: "Yes" },
@@ -194,10 +156,10 @@ export default function CompleteProfilePage() {
         gender,
         ageRange,
         stateOfOrigin: stateOfOrigin || undefined,
-        votingState: votingState || undefined,
-        votingLGA: votingLGA || undefined,
-        votingWard: votingWard || undefined,
-        votingPU: votingPU || undefined,
+        votingState: locations.selectedState?.name || undefined,
+        votingLGA: locations.selectedLGA?.name || undefined,
+        votingWard: locations.selectedWard?.name || undefined,
+        votingPU: locations.selectedPU?.name || undefined,
         isVoter,
         willVote,
       });
@@ -391,7 +353,7 @@ export default function CompleteProfilePage() {
             <FormSelect
               label="State of Origin"
               required
-              options={states}
+              options={stateOfOriginOptions}
               defaultSelected={stateOfOrigin}
               onChange={(opt) => opt && setStateOfOrigin(opt.value)}
               key={`stateOfOrigin-${stateOfOrigin}`}
@@ -410,50 +372,54 @@ export default function CompleteProfilePage() {
             <FormSelect
               label="Voting State"
               required
-              options={states}
-              defaultSelected={votingState}
+              options={locations.states.options}
+              defaultSelected={locations.selectedState?.name || ''}
               onChange={(opt) => {
-                setVotingState(opt?.value || "");
-                setVotingLGA("");
-                setVotingWard("");
-                setVotingPU("");
+                const loc = opt ? locations.states.data.find((s) => s.name === opt.value) || null : null;
+                locations.setSelectedState(loc);
               }}
-              key={`votingState-${votingState}`}
+              key={`votingState-${locations.selectedState?.id || ''}`}
             />
+            {locations.states.isLoading && <p className="text-xs text-gray-400">Loading states…</p>}
             <FormSelect
               label="Voting LGA"
               required
-              options={getLgas(votingState)}
-              defaultSelected={votingLGA}
+              options={locations.lgas.options}
+              defaultSelected={locations.selectedLGA?.name || ''}
               onChange={(opt) => {
-                setVotingLGA(opt?.value || "");
-                setVotingWard("");
-                setVotingPU("");
+                const loc = opt ? locations.lgas.data.find((l) => l.name === opt.value) || null : null;
+                locations.setSelectedLGA(loc);
               }}
-              disabled={!votingState}
-              key={`votingLGA-${votingLGA}`}
+              disabled={!locations.selectedState || locations.lgas.isLoading}
+              key={`votingLGA-${locations.selectedLGA?.id || ''}`}
             />
+            {locations.lgas.isLoading && <p className="text-xs text-gray-400">Loading LGAs…</p>}
             <FormSelect
               label="Voting Ward"
               required
-              options={getWards(votingState, votingLGA)}
-              defaultSelected={votingWard}
+              options={locations.wards.options}
+              defaultSelected={locations.selectedWard?.name || ''}
               onChange={(opt) => {
-                setVotingWard(opt?.value || "");
-                setVotingPU("");
+                const loc = opt ? locations.wards.data.find((w) => w.name === opt.value) || null : null;
+                locations.setSelectedWard(loc);
               }}
-              disabled={!votingLGA}
-              key={`votingWard-${votingWard}`}
+              disabled={!locations.selectedLGA || locations.wards.isLoading}
+              key={`votingWard-${locations.selectedWard?.id || ''}`}
             />
+            {locations.wards.isLoading && <p className="text-xs text-gray-400">Loading wards…</p>}
             <FormSelect
               label="Polling Unit"
               required
-              options={getPollingUnits()}
-              defaultSelected={votingPU}
-              onChange={(opt) => setVotingPU(opt?.value || "")}
-              disabled={!votingWard}
-              key={`votingPU-${votingPU}`}
+              options={locations.pollingUnits.options}
+              defaultSelected={locations.selectedPU?.name || ''}
+              onChange={(opt) => {
+                const loc = opt ? locations.pollingUnits.data.find((p) => p.name === opt.value) || null : null;
+                locations.setSelectedPU(loc);
+              }}
+              disabled={!locations.selectedWard || locations.pollingUnits.isLoading}
+              key={`votingPU-${locations.selectedPU?.id || ''}`}
             />
+            {locations.pollingUnits.isLoading && <p className="text-xs text-gray-400">Loading polling units…</p>}
           </div>
 
           {/* Section 4: Voter Questions */}
@@ -501,6 +467,58 @@ export default function CompleteProfilePage() {
           onClose={() => setToastInfo(null)}
         />
       )}
+
+      {/* Intro Modal */}
+      {showIntroModal && completeness && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowIntroModal(false)}
+          />
+          <div
+            className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-8 animate-in fade-in zoom-in-95"
+            style={{ animation: "modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
+          >
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+              Almost there
+            </h2>
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+              Your profile is{" "}
+              <span className="font-medium text-gray-700 dark:text-gray-200">
+                {completeness.percentage}% complete
+              </span>
+              . Fill in the remaining details so you can access your dashboard and start engaging.
+            </p>
+
+            {/* Minimal progress indicator */}
+            <div className="mt-5">
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+                <div
+                  className="bg-[#006837] h-1.5 rounded-full transition-all duration-700"
+                  style={{ width: `${completeness.percentage}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                {completeness.completedCount} of {completeness.totalCount} fields completed
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowIntroModal(false)}
+              className="mt-6 w-full py-2.5 rounded-lg bg-[#006837] text-white text-sm font-medium hover:bg-[#00592e] active:scale-[0.98] transition-all duration-150"
+            >
+              Complete Profile
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes modalIn {
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

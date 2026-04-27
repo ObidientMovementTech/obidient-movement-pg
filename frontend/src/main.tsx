@@ -54,6 +54,8 @@ const MemberCardPage = lazy(() => import("./pages/dashboard/MemberCardPage.tsx")
 const MyVotingBlocRedirect = lazy(() => import("./pages/dashboard/votingBloc/MyVotingBlocRedirect.tsx"));
 const LeaderboardPage = lazy(() => import("./pages/dashboard/votingBloc/LeaderboardPage.tsx"));
 const StateDashboard = lazy(() => import("./pages/dashboard/state/StateDashboard.tsx"));
+const MyTeamPage = lazy(() => import("./pages/dashboard/state/MyTeamPage.tsx"));
+const AssignLeaderPage = lazy(() => import("./pages/dashboard/state/AssignLeaderPage.tsx"));
 const AllNotificationsPage = lazy(() => import("./pages/dashboard/notifications/AllNotificationsPage.tsx"));
 const EligibilityChecker = lazy(() => import("./pages/dashboard/lead/eligibilityChecker/EligibilityChecker.tsx"));
 const ChatPage = lazy(() => import("./pages/dashboard/ChatPage.tsx"));
@@ -93,6 +95,7 @@ const PbxUsersPage = lazy(() => import("./pages/pbx/UsersPage.tsx"));
 const PbxCommunicationsPage = lazy(() => import("./pages/pbx/CommunicationsPage.tsx"));
 const PbxSettingsPage = lazy(() => import("./pages/pbx/SettingsPage.tsx"));
 const PbxAdcPage = lazy(() => import("./pages/pbx/AdcPage.tsx"));
+const PbxMobileFeedsPage = lazy(() => import("./pages/pbx/PbxMobileFeedsPage.tsx"));
 
 // Loading component
 const PageLoader = () => (
@@ -224,6 +227,8 @@ const router = createBrowserRouter([
       { path: "voting-bloc", element: <Suspense fallback={<PageLoader />}><MyVotingBlocRedirect /></Suspense> },
       { path: "leaderboard", element: <Suspense fallback={<PageLoader />}><LeaderboardPage /></Suspense> },
       { path: "state", element: <Suspense fallback={<PageLoader />}><StateDashboard /></Suspense> },
+      { path: "my-team", element: <Suspense fallback={<PageLoader />}><MyTeamPage /></Suspense> },
+      { path: "assign-leader", element: <Suspense fallback={<PageLoader />}><AssignLeaderPage /></Suspense> },
       { path: "card", element: <Suspense fallback={<PageLoader />}><MemberCardPage /></Suspense> },
       { path: "notifications", element: <Suspense fallback={<PageLoader />}><AllNotificationsPage /></Suspense> },
       { path: "profile", element: <Suspense fallback={<PageLoader />}><ProfilePage /></Suspense> },
@@ -396,6 +401,7 @@ const router = createBrowserRouter([
       { path: "users", element: <Suspense fallback={<PageLoader />}><PbxUsersPage /></Suspense> },
       { path: "communications", element: <Suspense fallback={<PageLoader />}><PbxCommunicationsPage /></Suspense> },
       { path: "adc", element: <Suspense fallback={<PageLoader />}><PbxAdcPage /></Suspense> },
+      { path: "mobile-feeds", element: <Suspense fallback={<PageLoader />}><PbxMobileFeedsPage /></Suspense> },
       { path: "settings", element: <Suspense fallback={<PageLoader />}><PbxSettingsPage /></Suspense> },
     ],
   },

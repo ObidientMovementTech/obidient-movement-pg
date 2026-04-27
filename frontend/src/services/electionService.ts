@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { statesLGAWardList } from '../utils/StateLGAWardPollingUnits';
+import { fetchStates, fetchLGAs, fetchWards } from './nigeriaLocationsService';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -244,29 +244,36 @@ export const electionService = {
   },
 
   // Get Nigerian states for form dropdown
-  getNigerianStates() {
-    return statesLGAWardList.map(stateData => stateData.state).sort();
+  async getNigerianStates() {
+    const states = await fetchStates();
+    return states.map(s => s.name).sort();
   },
 
   // Get LGAs for a specific state
-  getLGAsByState(state: string) {
-    const stateData = statesLGAWardList.find(s => s.state === state);
-    return stateData ? stateData.lgas.map(lga => ({
-      value: lga.lga,
-      label: lga.lga.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    })).sort((a, b) => a.label.localeCompare(b.label)) : [];
+  async getLGAsByState(state: string) {
+    const states = await fetchStates();
+    const stateObj = states.find(s => s.name === state);
+    if (!stateObj) return [];
+    const lgas = await fetchLGAs(stateObj.id);
+    return lgas.map(lga => ({
+      value: lga.name,
+      label: lga.name
+    })).sort((a, b) => a.label.localeCompare(b.label));
   },
 
   // Get wards for a specific LGA
-  getWardsByLGA(state: string, lga: string) {
-    const stateData = statesLGAWardList.find(s => s.state === state);
-    if (!stateData) return [];
-
-    const lgaData = stateData.lgas.find(l => l.lga === lga);
-    return lgaData ? lgaData.wards.map(ward => ({
-      value: ward,
-      label: ward.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    })).sort((a, b) => a.label.localeCompare(b.label)) : [];
+  async getWardsByLGA(state: string, lga: string) {
+    const states = await fetchStates();
+    const stateObj = states.find(s => s.name === state);
+    if (!stateObj) return [];
+    const lgas = await fetchLGAs(stateObj.id);
+    const lgaObj = lgas.find(l => l.name === lga);
+    if (!lgaObj) return [];
+    const wards = await fetchWards(lgaObj.id);
+    return wards.map(ward => ({
+      value: ward.name,
+      label: ward.name
+    })).sort((a, b) => a.label.localeCompare(b.label));
   },
 
   // Validate election date

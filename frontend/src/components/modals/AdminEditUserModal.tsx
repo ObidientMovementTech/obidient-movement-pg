@@ -5,10 +5,10 @@ import {
   CircularProgress, Avatar, TextField, Select, MenuItem,
   FormControlLabel, Checkbox, InputLabel, FormControl, Snackbar, Alert
 } from '@mui/material';
-import { getStateNames, getFormattedLGAs, getFormattedWards, getFormattedPollingUnits } from '../../utils/StateLGAWardPollingUnits';
+import useNigeriaLocations from '../../hooks/useNigeriaLocations';
 import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import FormSelect from '../select/FormSelect';
-import { genderOptions, ageRangeOptions, OptionType } from '../../utils/lookups';
+import { genderOptions, ageRangeOptions } from '../../utils/lookups';
 import { adminUserManagementService } from '../../services/adminUserManagementService';
 
 // Designation constants
@@ -132,55 +132,22 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     bankAccountName: ''
   });
 
-  // Dropdown options state
-  const [states, setStates] = useState<OptionType[]>([]);
+  // Location hooks for voting location (with prefill)
+  const votingLocations = useNigeriaLocations({
+    levels: 4,
+    initialState: editModal.user?.votingState || '',
+    initialLGA: editModal.user?.votingLGA || '',
+    initialWard: editModal.user?.votingWard || '',
+    initialPU: editModal.user?.votingPU || '',
+  });
 
-  // Initialize states dropdown
-  // Initialize states list
-  useEffect(() => {
-    const stateNames = getStateNames();
-    const stateOptions = stateNames.map((stateName, i) => ({
-      id: i,
-      label: stateName,
-      value: stateName,
-    }));
-    setStates(stateOptions);
-  }, []);
-
-  // Helper functions for cascading dropdowns
-  const getLgas = (stateName: string): OptionType[] => {
-    if (!stateName) return [];
-    const formattedLGAs = getFormattedLGAs(stateName);
-    return formattedLGAs.map((lga, i) => ({
-      id: i,
-      label: lga.label,
-      value: lga.value
-    }));
-  };
-
-  const getWards = (stateName: string, lgaName: string): OptionType[] => {
-    if (!stateName || !lgaName) return [];
-    const formattedWards = getFormattedWards(stateName, lgaName);
-    return formattedWards.map((ward, i) => ({
-      id: i,
-      label: ward.label,
-      value: ward.value
-    }));
-  };
-
-  // Get polling units for the selected location
-  const getPollingUnits = (): OptionType[] => {
-    if (!formData.votingState || !formData.votingLGA || !formData.votingWard) {
-      return [];
-    }
-
-    const formattedPollingUnits = getFormattedPollingUnits(formData.votingState, formData.votingLGA, formData.votingWard);
-    return formattedPollingUnits.map((pu, i) => ({
-      id: i,
-      label: pu.label,
-      value: pu.value
-    }));
-  };
+  // Location hook for assignment location (with prefill)
+  const assignLocations = useNigeriaLocations({
+    levels: 3,
+    initialState: editModal.user?.assignedState || '',
+    initialLGA: editModal.user?.assignedLGA || '',
+    initialWard: editModal.user?.assignedWard || '',
+  });
 
   // Dropdown options
   const citizenshipOptions = [
@@ -243,10 +210,10 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
         email: formData.email,
         phone: formData.phone,
         countryOfResidence: formData.countryOfResidence,
-        votingState: formData.votingState || undefined,
-        votingLGA: formData.votingLGA || undefined,
-        votingWard: formData.votingWard || undefined,
-        votingPU: formData.votingPU || '',
+        votingState: votingLocations.selectedState?.name || undefined,
+        votingLGA: votingLocations.selectedLGA?.name || undefined,
+        votingWard: votingLocations.selectedWard?.name || undefined,
+        votingPU: votingLocations.selectedPU?.name || '',
         gender: formData.gender || undefined,
         ageRange: formData.ageRange || undefined,
         citizenship: formData.citizenship || undefined,
@@ -269,9 +236,9 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
       try {
         await adminUserManagementService.updateUserDesignation(userId, {
           designation: formData.designation,
-          assignedState: formData.assignedState || null,
-          assignedLGA: formData.assignedLGA || null,
-          assignedWard: formData.assignedWard || null
+          assignedState: assignLocations.selectedState?.name || null,
+          assignedLGA: assignLocations.selectedLGA?.name || null,
+          assignedWard: assignLocations.selectedWard?.name || null
         });
       } catch (error: any) {
         console.error('Designation update failed:', error);
@@ -408,7 +375,7 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
               <Box>
                 <FormSelect
                   label="State of Origin"
-                  options={states}
+                  options={votingLocations.states.options}
                   defaultSelected={formData.stateOfOrigin}
                   onChange={(opt) => { if (opt) setFormData(prev => ({ ...prev, stateOfOrigin: opt.value })); }}
                   key={`stateOfOrigin-${formData.stateOfOrigin}`}
@@ -417,47 +384,52 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
               <Box>
                 <FormSelect
                   label="Voting State"
-                  options={states}
-                  defaultSelected={formData.votingState}
+                  options={votingLocations.states.options}
+                  defaultSelected={votingLocations.selectedState?.name || ''}
                   onChange={(opt) => {
-                    const newState = opt?.value || '';
-                    setFormData(prev => ({ ...prev, votingState: newState, votingLGA: '', votingWard: '', votingPU: '' }));
+                    const loc = opt ? votingLocations.states.data.find((s) => s.name === opt.value) || null : null;
+                    votingLocations.setSelectedState(loc);
                   }}
-                  key={`votingState-${formData.votingState}`}
+                  key={`votingState-${votingLocations.selectedState?.id || ''}`}
                 />
               </Box>
               <Box>
                 <FormSelect
                   label="Voting LGA"
-                  options={getLgas(formData.votingState)}
-                  defaultSelected={formData.votingLGA}
+                  options={votingLocations.lgas.options}
+                  defaultSelected={votingLocations.selectedLGA?.name || ''}
                   onChange={(opt) => {
-                    const newLGA = opt?.value || '';
-                    setFormData(prev => ({ ...prev, votingLGA: newLGA, votingWard: '', votingPU: '' }));
+                    const loc = opt ? votingLocations.lgas.data.find((l) => l.name === opt.value) || null : null;
+                    votingLocations.setSelectedLGA(loc);
                   }}
-                  disabled={!formData.votingState}
-                  key={`votingLGA-${formData.votingLGA}`}
+                  disabled={!votingLocations.selectedState || votingLocations.lgas.isLoading}
+                  key={`votingLGA-${votingLocations.selectedLGA?.id || ''}`}
                 />
               </Box>
               <Box>
                 <FormSelect
                   label="Voting Ward"
-                  options={getWards(formData.votingState, formData.votingLGA)}
-                  defaultSelected={formData.votingWard}
-                  onChange={(opt) => setFormData(prev => ({ ...prev, votingWard: opt?.value || '', votingPU: '' }))}
-                  disabled={!formData.votingLGA}
-                  key={`votingWard-${formData.votingWard}`}
+                  options={votingLocations.wards.options}
+                  defaultSelected={votingLocations.selectedWard?.name || ''}
+                  onChange={(opt) => {
+                    const loc = opt ? votingLocations.wards.data.find((w) => w.name === opt.value) || null : null;
+                    votingLocations.setSelectedWard(loc);
+                  }}
+                  disabled={!votingLocations.selectedLGA || votingLocations.wards.isLoading}
+                  key={`votingWard-${votingLocations.selectedWard?.id || ''}`}
                 />
               </Box>
               <Box>
                 <FormSelect
                   label="Polling Unit"
-                  options={getPollingUnits()}
-                  defaultSelected={formData.votingPU}
-                  onChange={(opt) => setFormData(prev => ({ ...prev, votingPU: opt?.value || '' }))}
-                  disabled={!formData.votingWard}
-                  key={`votingPU-${formData.votingPU}`}
-                  placeholder="Select polling unit"
+                  options={votingLocations.pollingUnits.options}
+                  defaultSelected={votingLocations.selectedPU?.name || ''}
+                  onChange={(opt) => {
+                    const loc = opt ? votingLocations.pollingUnits.data.find((p) => p.name === opt.value) || null : null;
+                    votingLocations.setSelectedPU(loc);
+                  }}
+                  disabled={!votingLocations.selectedWard || votingLocations.pollingUnits.isLoading}
+                  key={`votingPU-${votingLocations.selectedPU?.id || ''}`}
                 />
               </Box>
             </Box>
@@ -593,6 +565,7 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                 onChange={(e) => {
                   const newDesignation = e.target.value;
                   setFormData(prev => ({ ...prev, designation: newDesignation, assignedState: '', assignedLGA: '', assignedWard: '' }));
+                  assignLocations.setSelectedState(null);
                 }}
                 sx={{ fontFamily: FONT }}
               >
@@ -612,35 +585,38 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                 </Typography>
                 <FormSelect
                   label="Assigned State"
-                  options={states}
-                  defaultSelected={formData.assignedState}
+                  options={assignLocations.states.options}
+                  defaultSelected={assignLocations.selectedState?.name || ''}
                   onChange={(opt) => {
-                    const newState = opt?.value || '';
-                    setFormData(prev => ({ ...prev, assignedState: newState, assignedLGA: '', assignedWard: '' }));
+                    const loc = opt ? assignLocations.states.data.find((s) => s.name === opt.value) || null : null;
+                    assignLocations.setSelectedState(loc);
                   }}
-                  key={`assignedState-${formData.assignedState}`}
+                  key={`assignedState-${assignLocations.selectedState?.id || ''}`}
                 />
                 {(formData.designation === DESIGNATIONS.LGA_COORDINATOR || formData.designation === DESIGNATIONS.WARD_COORDINATOR) && (
                   <FormSelect
                     label="Assigned LGA"
-                    options={getLgas(formData.assignedState)}
-                    defaultSelected={formData.assignedLGA}
+                    options={assignLocations.lgas.options}
+                    defaultSelected={assignLocations.selectedLGA?.name || ''}
                     onChange={(opt) => {
-                      const newLGA = opt?.value || '';
-                      setFormData(prev => ({ ...prev, assignedLGA: newLGA, assignedWard: '' }));
+                      const loc = opt ? assignLocations.lgas.data.find((l) => l.name === opt.value) || null : null;
+                      assignLocations.setSelectedLGA(loc);
                     }}
-                    disabled={!formData.assignedState}
-                    key={`assignedLGA-${formData.assignedLGA}`}
+                    disabled={!assignLocations.selectedState || assignLocations.lgas.isLoading}
+                    key={`assignedLGA-${assignLocations.selectedLGA?.id || ''}`}
                   />
                 )}
                 {formData.designation === DESIGNATIONS.WARD_COORDINATOR && (
                   <FormSelect
                     label="Assigned Ward"
-                    options={getWards(formData.assignedState, formData.assignedLGA)}
-                    defaultSelected={formData.assignedWard}
-                    onChange={(opt) => setFormData(prev => ({ ...prev, assignedWard: opt?.value || '' }))}
-                    disabled={!formData.assignedLGA}
-                    key={`assignedWard-${formData.assignedWard}`}
+                    options={assignLocations.wards.options}
+                    defaultSelected={assignLocations.selectedWard?.name || ''}
+                    onChange={(opt) => {
+                      const loc = opt ? assignLocations.wards.data.find((w) => w.name === opt.value) || null : null;
+                      assignLocations.setSelectedWard(loc);
+                    }}
+                    disabled={!assignLocations.selectedLGA || assignLocations.wards.isLoading}
+                    key={`assignedWard-${assignLocations.selectedWard?.id || ''}`}
                   />
                 )}
                 <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#b45309' }}>

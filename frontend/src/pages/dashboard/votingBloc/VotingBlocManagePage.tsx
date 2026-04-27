@@ -50,7 +50,7 @@ import PrivateMessageModal from "../../../components/modals/PrivateMessageModal"
 import FlyerModal from "../../../components/modals/FlyerModal";
 
 import { formatPhoneForWhatsApp } from "../../../utils/phoneUtils";
-import { getStateNames, getFormattedLGAs } from "../../../utils/StateLGAWardPollingUnits";
+import { getStateNamesAsync, getFormattedLGAsAsync } from "../../../services/nigeriaLocationsService";
 import { getPollingUnitMembers } from "../../../services/userService";
 
 export default function VotingBlocManagePage() {
@@ -2371,6 +2371,11 @@ function ManualMemberModal({ isOpen, onClose, onAdd, loading }: ManualMemberModa
 
   const [availableLGAs, setAvailableLGAs] = useState<any[]>([]);
   const [availableWards, setAvailableWards] = useState<any[]>([]);
+  const [stateNames, setStateNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    getStateNamesAsync().then(setStateNames);
+  }, []);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -2390,11 +2395,12 @@ function ManualMemberModal({ isOpen, onClose, onAdd, loading }: ManualMemberModa
   // Update LGAs when state changes
   useEffect(() => {
     if (formData.state) {
-      const formattedLGAs = getFormattedLGAs(formData.state);
-      const lgaList = formattedLGAs.map(lga => ({ lga: lga.value }));
-      setAvailableLGAs(lgaList);
-      setFormData(prev => ({ ...prev, lga: '', ward: '' }));
-      setAvailableWards([]);
+      getFormattedLGAsAsync(formData.state).then(formattedLGAs => {
+        const lgaList = formattedLGAs.map(lga => ({ lga: lga.value }));
+        setAvailableLGAs(lgaList);
+        setFormData(prev => ({ ...prev, lga: '', ward: '' }));
+        setAvailableWards([]);
+      });
     }
   }, [formData.state]);
 
@@ -2507,7 +2513,7 @@ function ManualMemberModal({ isOpen, onClose, onAdd, loading }: ManualMemberModa
                   disabled={loading}
                 >
                   <option value="">Select State</option>
-                  {getStateNames().map((state) => (
+                  {stateNames.map((state) => (
                     <option key={state} value={state}>
                       {state}
                     </option>

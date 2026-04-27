@@ -11,7 +11,7 @@ import validatePassword from "../../utils/validatePassword.js";
 import { registerUser } from "../../services/authService.js";
 import { useUserContext } from "../../context/UserContext.js";
 import FormSelect from "../../components/select/FormSelect.js";
-import { getFormattedLGAs, getFormattedWards } from "../../utils/StateLGAWardPollingUnits";
+import { getFormattedLGAsAsync, getFormattedWardsAsync } from "../../services/nigeriaLocationsService";
 import { OptionType } from "../../utils/lookups.js";
 import { formatPhoneForStorage } from "../../utils/phoneUtils.js";
 import ListBoxComp from "../../components/select/ListBox.js";
@@ -35,6 +35,9 @@ const AnambraSignupPage = () => {
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [lgaOptions, setLgaOptions] = useState<OptionType[]>([]);
+  const [wardOptions, setWardOptions] = useState<OptionType[]>([]);
+
   // Redirect to dashboard if user is already authenticated
   useEffect(() => {
     if (!isAuthLoading && profile) {
@@ -42,24 +45,34 @@ const AnambraSignupPage = () => {
     }
   }, [profile, isAuthLoading, navigate]);
 
-  // Get Anambra LGAs and Wards using the new helper functions
-  const getLgas = (): OptionType[] => {
-    const formattedLGAs = getFormattedLGAs("ANAMBRA");
-    return formattedLGAs.map((lga, i) => ({
-      id: i,
-      label: lga.label, // Display with abbreviation (e.g., "01 - AGUATA")
-      value: lga.value // Send only name to backend (e.g., "AGUATA")
-    }));
-  };
+  // Load Anambra LGAs on mount
+  useEffect(() => {
+    getFormattedLGAsAsync("ANAMBRA").then(lgas => {
+      setLgaOptions(lgas.map((lga, i) => ({
+        id: i,
+        label: lga.label,
+        value: lga.value
+      })));
+    });
+  }, []);
 
-  const getWards = (lgaName: string): OptionType[] => {
-    const formattedWards = getFormattedWards("ANAMBRA", lgaName);
-    return formattedWards.map((ward, i) => ({
-      id: i,
-      label: ward.label, // Display with abbreviation (e.g., "01 - ACHINA I")
-      value: ward.value // Send only name to backend (e.g., "ACHINA I")
-    }));
-  };
+  // Load wards when LGA changes
+  useEffect(() => {
+    if (votingLGA) {
+      getFormattedWardsAsync("ANAMBRA", votingLGA).then(wards => {
+        setWardOptions(wards.map((ward, i) => ({
+          id: i,
+          label: ward.label,
+          value: ward.value
+        })));
+      });
+    }
+  }, [votingLGA]);
+
+  // Get Anambra LGAs and Wards
+  const getLgas = (): OptionType[] => lgaOptions;
+
+  const getWards = (_lgaName: string): OptionType[] => wardOptions;
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -138,7 +151,7 @@ const AnambraSignupPage = () => {
       setMessage(result.message || "Signup successful! Please check your email.");
       setToastType("success");
       setShowToast(true);
-      navigate("/auth/verify");
+      navigate("/auth/verify", { state: { email } });
     } catch (error: any) {
       console.log('Registration error:', error);
 

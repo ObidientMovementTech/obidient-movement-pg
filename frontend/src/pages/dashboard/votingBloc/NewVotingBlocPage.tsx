@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Upload, Plus, Trash2 } from "lucide-react";
 import { createVotingBloc, uploadVotingBlocBannerImage, uploadRichDescriptionImage } from "../../../services/votingBlocService";
-import { getStateNames, getFormattedLGAs, getFormattedWards } from "../../../utils/StateLGAWardPollingUnits";
+import { getStateNamesAsync, getFormattedLGAsAsync, getFormattedWardsAsync } from "../../../services/nigeriaLocationsService";
 import RichTextEditor from "../../../components/inputs/RichTextEditor";
 import Toast from "../../../components/Toast";
 // import { useUserContext } from "../../../context/UserContext";
@@ -35,9 +35,14 @@ export default function NewVotingBlocPage() {
   const [loading, setLoading] = useState(false);
   const [lgaOptions, setLgaOptions] = useState<string[]>([]);
   const [wardOptions, setWardOptions] = useState<string[]>([]);
+  const [stateNames, setStateNames] = useState<string[]>([]);
   const [toastInfo, setToastInfo] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // KYC verification removed - all users can now create voting blocs
+
+  useEffect(() => {
+    getStateNamesAsync().then(setStateNames);
+  }, []);
 
   useEffect(() => {
     if (success) {
@@ -49,24 +54,26 @@ export default function NewVotingBlocPage() {
   // Update LGA options when state changes
   useEffect(() => {
     if (formData.location.state) {
-      const formattedLGAs = getFormattedLGAs(formData.location.state);
-      setLgaOptions(formattedLGAs.map(lga => lga.value));
-      setFormData(prev => ({
-        ...prev,
-        location: { ...prev.location, lga: "", ward: "" }
-      }));
+      getFormattedLGAsAsync(formData.location.state).then(formattedLGAs => {
+        setLgaOptions(formattedLGAs.map(lga => lga.value));
+        setFormData(prev => ({
+          ...prev,
+          location: { ...prev.location, lga: "", ward: "" }
+        }));
+      });
     }
   }, [formData.location.state]);
 
   // Update Ward options when LGA changes
   useEffect(() => {
     if (formData.location.state && formData.location.lga) {
-      const formattedWards = getFormattedWards(formData.location.state, formData.location.lga);
-      setWardOptions(formattedWards.map(ward => ward.value));
-      setFormData(prev => ({
-        ...prev,
-        location: { ...prev.location, ward: "" }
-      }));
+      getFormattedWardsAsync(formData.location.state, formData.location.lga).then(formattedWards => {
+        setWardOptions(formattedWards.map(ward => ward.value));
+        setFormData(prev => ({
+          ...prev,
+          location: { ...prev.location, ward: "" }
+        }));
+      });
     }
   }, [formData.location.state, formData.location.lga]);
 
@@ -289,7 +296,7 @@ export default function NewVotingBlocPage() {
                     required
                   >
                     <option value="">Select state</option>
-                    {getStateNames().map(state => (
+                    {stateNames.map(state => (
                       <option key={state} value={state}>{state}</option>
                     ))}
                   </select>
@@ -312,13 +319,9 @@ export default function NewVotingBlocPage() {
                     disabled={!formData.location.state}
                   >
                     <option value="">Select LGA</option>
-                    {lgaOptions.map(lga => {
-                      const formattedLGAs = getFormattedLGAs(formData.location.state);
-                      const lgaData = formattedLGAs.find(l => l.value === lga);
-                      return (
-                        <option key={lga} value={lga}>{lgaData?.label || lga}</option>
-                      );
-                    })}
+                    {lgaOptions.map(lga => (
+                      <option key={lga} value={lga}>{lga}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -337,13 +340,9 @@ export default function NewVotingBlocPage() {
                     disabled={!formData.location.lga}
                   >
                     <option value="">Select Ward</option>
-                    {wardOptions.map(ward => {
-                      const formattedWards = getFormattedWards(formData.location.state, formData.location.lga);
-                      const wardData = formattedWards.find(w => w.value === ward);
-                      return (
-                        <option key={ward} value={ward}>{wardData?.label || ward}</option>
-                      );
-                    })}
+                    {wardOptions.map(ward => (
+                      <option key={ward} value={ward}>{ward}</option>
+                    ))}
                   </select>
                 </div>
               </div>

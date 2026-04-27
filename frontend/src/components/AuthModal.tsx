@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Mail, Lock, User, Phone, Eye, EyeOff } from "lucide-react";
 import { registerUser, loginUser, resendVerificationEmail } from "../services/authService.js";
 import FormSelect from "./select/FormSelect.js";
-import { getStateNames, getFormattedLGAs } from "../utils/StateLGAWardPollingUnits";
-import { OptionType } from "../utils/lookups.js";
+import useNigeriaLocations from "../hooks/useNigeriaLocations";
 import { formatPhoneForStorage } from "../utils/phoneUtils.js";
 import ListBoxComp from "./select/ListBox.js";
 
@@ -29,10 +28,11 @@ export default function AuthModal({
   const [error, setError] = useState('');
   const [showResendVerification, setShowResendVerification] = useState(false);
   const [resendingVerification, setResendingVerification] = useState(false);
-  const [states, setStates] = useState<OptionType[]>([]);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const locations = useNigeriaLocations({ levels: 2 });
 
   // Login form state
   const [loginData, setLoginData] = useState({
@@ -48,31 +48,11 @@ export default function AuthModal({
     confirmPassword: '',
     phone: '',
     countryCode: '+234', // Default to Nigeria
-    votingState: '',
-    votingLGA: '',
     isDiaspora: false,
     country: ''
   });
 
-  // Initialize states list
-  useEffect(() => {
-    const stateNames = getStateNames();
-    const stateOptions = stateNames.map((stateName, i) => ({
-      id: i,
-      label: stateName, // Display UPPERCASE name (e.g., "ABIA")
-      value: stateName, // Send UPPERCASE to backend
-    }));
-    setStates(stateOptions);
-  }, []);
 
-  const getLgas = (stateName: string): OptionType[] => {
-    const formattedLGAs = getFormattedLGAs(stateName);
-    return formattedLGAs.map((lga, i) => ({
-      id: i,
-      label: lga.label, // Display with abbreviation (e.g., "01 - ABA NORTH")
-      value: lga.value // Send only name to backend (e.g., "ABA NORTH")
-    }));
-  };
 
   const validatePhone = (phone: string): boolean => {
     // Accepts numbers with optional +, dashes, and must be 8-20 digits
@@ -190,8 +170,8 @@ export default function AuthModal({
         phone: formattedPhone,
         countryCode: signupData.countryCode,
         // Send location data as-is (UPPERCASE format)
-        votingState: !signupData.isDiaspora && signupData.votingState ? signupData.votingState : undefined,
-        votingLGA: !signupData.isDiaspora && signupData.votingLGA ? signupData.votingLGA : undefined,
+        votingState: !signupData.isDiaspora && locations.selectedState ? locations.selectedState.name : undefined,
+        votingLGA: !signupData.isDiaspora && locations.selectedLGA ? locations.selectedLGA.name : undefined,
         country: signupData.isDiaspora ? signupData.country : undefined,
         isDiaspora: signupData.isDiaspora
       };
@@ -440,11 +420,11 @@ export default function AuthModal({
                       setSignupData(prev => ({
                         ...prev,
                         isDiaspora: e.target.checked,
-                        // Clear opposing fields when switching modes
-                        votingState: e.target.checked ? '' : prev.votingState,
-                        votingLGA: e.target.checked ? '' : prev.votingLGA,
                         country: e.target.checked ? prev.country : ''
                       }));
+                      if (e.target.checked) {
+                        locations.setSelectedState(null);
+                      }
                     }}
                     className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                   />
@@ -475,39 +455,40 @@ export default function AuthModal({
                     <div>
                       <FormSelect
                         label="Voting State"
-                        options={states}
-                        defaultSelected={signupData.votingState}
+                        options={locations.states.options}
+                        defaultSelected={locations.selectedState?.name || ''}
                         onChange={(opt) => {
                           if (opt) {
-                            setSignupData(prev => ({
-                              ...prev,
-                              votingState: opt.value,
-                              votingLGA: '' // Reset LGA when state changes
-                            }));
+                            const loc = locations.states.data.find((s) => s.name === opt.value);
+                            locations.setSelectedState(loc || null);
                           } else {
-                            setSignupData(prev => ({
-                              ...prev,
-                              votingState: '',
-                              votingLGA: ''
-                            }));
+                            locations.setSelectedState(null);
                           }
                         }}
                       />
+                      {locations.states.isLoading && (
+                        <p className="text-xs text-gray-400 mt-1">Loading states…</p>
+                      )}
                     </div>
 
                     <div>
                       <FormSelect
                         label="Voting LGA"
-                        options={getLgas(signupData.votingState)}
-                        defaultSelected={signupData.votingLGA}
+                        options={locations.lgas.options}
+                        defaultSelected={locations.selectedLGA?.name || ''}
                         onChange={(opt) => {
-                          setSignupData(prev => ({
-                            ...prev,
-                            votingLGA: opt ? opt.value : ''
-                          }));
+                          if (opt) {
+                            const loc = locations.lgas.data.find((l) => l.name === opt.value);
+                            locations.setSelectedLGA(loc || null);
+                          } else {
+                            locations.setSelectedLGA(null);
+                          }
                         }}
-                        disabled={!signupData.votingState}
+                        disabled={!locations.selectedState || locations.lgas.isLoading}
                       />
+                      {locations.lgas.isLoading && (
+                        <p className="text-xs text-gray-400 mt-1">Loading LGAs…</p>
+                      )}
                     </div>
                   </div>
                 )}

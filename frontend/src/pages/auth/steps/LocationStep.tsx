@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React from 'react';
 import { MapPin, ChevronDown, Loader2 } from 'lucide-react';
+import useNigeriaLocations from '../../../hooks/useNigeriaLocations';
 
 interface Props {
   data: any;
@@ -9,155 +10,70 @@ interface Props {
 }
 
 const LocationStep: React.FC<Props> = ({ data, updateData, nextStep, prevStep }) => {
-  const [selectedState, setSelectedState] = useState(data.votingState || '');
-  const [selectedLGA, setSelectedLGA] = useState(data.votingLGA || '');
-  const [selectedWard, setSelectedWard] = useState(data.votingWard || '');
-  const [selectedPU, setSelectedPU] = useState(data.votingPU || '');
-  const [locationData, setLocationData] = useState<any>(null);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   const isPUAgent = data.designation === 'Polling Unit Agent';
 
-  // Lazy load the massive location data file
-  useEffect(() => {
-    let isMounted = true;
+  const locations = useNigeriaLocations({
+    levels: 4,
+    initialState: data.votingState || data.voterData?.state || '',
+    initialLGA: data.votingLGA || data.voterData?.lga || '',
+    initialWard: data.votingWard || data.voterData?.ward || '',
+    initialPU: data.votingPU || data.voterData?.polling_unit || '',
+  });
 
-    const loadLocationData = async () => {
-      try {
-        setIsLoadingData(true);
-        const module = await import('../../../utils/StateLGAWardPollingUnits');
-        if (isMounted) {
-          setLocationData(module.StateLGAWardPollingUnits);
-        }
-      } catch (error) {
-        console.error('Failed to load location data:', error);
-      } finally {
-        if (isMounted) {
-          setIsLoadingData(false);
-        }
-      }
-    };
-
-    loadLocationData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const states = useMemo(() => {
-    if (!locationData) return [];
-    return Object.keys(locationData).sort();
-  }, [locationData]);
-
-  const lgas = useMemo(() => {
-    if (!selectedState || !locationData || !locationData[selectedState]) return [];
-    return Object.keys(locationData[selectedState].lgas).sort();
-  }, [locationData, selectedState]);
-
-  const wards = useMemo(() => {
-    if (!selectedState || !selectedLGA || !locationData) return [];
-    const state = locationData[selectedState];
-    if (!state?.lgas[selectedLGA]) return [];
-    return Object.keys(state.lgas[selectedLGA].wards).sort();
-  }, [locationData, selectedState, selectedLGA]);
-
-  const pollingUnits = useMemo(() => {
-    if (!selectedState || !selectedLGA || !selectedWard || !locationData) return [];
-    const state = locationData[selectedState];
-    if (!state?.lgas[selectedLGA]?.wards[selectedWard]) return [];
-    return state.lgas[selectedLGA].wards[selectedWard].pollingUnits;
-  }, [locationData, selectedState, selectedLGA, selectedWard]);
-
-  const selectedPUDetails = useMemo(() => {
-    if (!isPUAgent || !selectedPU) return null;
-    return pollingUnits.find((pu: any) => pu.name === selectedPU) || null;
-  }, [isPUAgent, pollingUnits, selectedPU]);
-
-  // Get abbreviations for display
-  const getAbbreviation = (type: string, name: string) => {
-    if (!locationData) return '';
-    try {
-      if (type === 'lga' && selectedState) {
-        return locationData[selectedState]?.lgas[name]?.abbreviation || '';
-      }
-      if (type === 'ward' && selectedState && selectedLGA) {
-        return locationData[selectedState]?.lgas[selectedLGA]?.wards[name]?.abbreviation || '';
-      }
-      if (type === 'pu') {
-        return name; // PU abbreviation is in the polling unit object itself
-      }
-    } catch (e) {
-      return '';
-    }
-    return '';
+  const handleStateChange = (name: string) => {
+    const loc = locations.states.data.find((s) => s.name === name) || null;
+    locations.setSelectedState(loc);
   };
 
-  const handleStateChange = (state: string) => {
-    setSelectedState(state);
-    setSelectedLGA('');
-    setSelectedWard('');
-    setSelectedPU('');
+  const handleLGAChange = (name: string) => {
+    const loc = locations.lgas.data.find((l) => l.name === name) || null;
+    locations.setSelectedLGA(loc);
   };
 
-  const handleLGAChange = (lga: string) => {
-    setSelectedLGA(lga);
-    setSelectedWard('');
-    setSelectedPU('');
+  const handleWardChange = (name: string) => {
+    const loc = locations.wards.data.find((w) => w.name === name) || null;
+    locations.setSelectedWard(loc);
   };
 
-  const handleWardChange = (ward: string) => {
-    setSelectedWard(ward);
-    setSelectedPU('');
+  const handlePUChange = (name: string) => {
+    const loc = locations.pollingUnits.data.find((p) => p.name === name) || null;
+    locations.setSelectedPU(loc);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation based on designation
-    if (!selectedState || !selectedLGA) {
+    if (!locations.selectedState || !locations.selectedLGA) {
       alert('Please select at least State and LGA');
       return;
     }
 
-    if (data.designation === 'Polling Unit Agent' && (!selectedWard || !selectedPU)) {
+    if (isPUAgent && (!locations.selectedWard || !locations.selectedPU)) {
       alert('Polling Unit Agents must select Ward and Polling Unit');
       return;
     }
 
     updateData({
-      votingState: selectedState,
-      votingLGA: selectedLGA,
-      votingWard: selectedWard,
-      votingPU: selectedPU,
+      votingState: locations.selectedState.name,
+      votingLGA: locations.selectedLGA.name,
+      votingWard: locations.selectedWard?.name || '',
+      votingPU: locations.selectedPU?.name || '',
       pollingUnitCode: isPUAgent
-        ? selectedPUDetails?.delimitation || selectedPUDetails?.abbreviation || null
+        ? locations.selectedPU?.delimitation || locations.selectedPU?.abbreviation || null
         : null,
     });
 
     nextStep();
   };
 
-  // Pre-fill from voter data if available
-  useEffect(() => {
-    if (data.voterData && !selectedState) {
-      setSelectedState(data.voterData.state || '');
-      setSelectedLGA(data.voterData.lga || '');
-      setSelectedWard(data.voterData.ward || '');
-      setSelectedPU(data.voterData.polling_unit || '');
-    }
-  }, [data.voterData, selectedState]);
-
-  // Show loading state while location data is being loaded
-  if (isLoadingData) {
+  // Show loading state while states are being loaded
+  if (locations.states.isLoading && locations.states.data.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-12 max-w-2xl mx-auto text-center">
         <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
         <h2 className="text-xl font-bold text-gray-900 mb-2">Loading Location Data</h2>
         <p className="text-gray-600">
-          Please wait while we load Nigeria's polling unit database...
-        </p>
-        <p className="text-sm text-gray-500 mt-4">
-          This may take a few seconds on first load
+          Please wait while we load location data...
         </p>
       </div>
     );
@@ -196,15 +112,15 @@ const LocationStep: React.FC<Props> = ({ data, updateData, nextStep, prevStep })
           </label>
           <div className="relative">
             <select
-              value={selectedState}
+              value={locations.selectedState?.name || ''}
               onChange={(e) => handleStateChange(e.target.value)}
               className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent appearance-none bg-white"
               required
             >
               <option value="">Select State</option>
-              {states.map((state) => (
-                <option key={state} value={state}>
-                  {state}
+              {locations.states.data.map((state) => (
+                <option key={state.id} value={state.name}>
+                  {state.name}
                 </option>
               ))}
             </select>
@@ -219,16 +135,16 @@ const LocationStep: React.FC<Props> = ({ data, updateData, nextStep, prevStep })
           </label>
           <div className="relative">
             <select
-              value={selectedLGA}
+              value={locations.selectedLGA?.name || ''}
               onChange={(e) => handleLGAChange(e.target.value)}
-              disabled={!selectedState}
+              disabled={!locations.selectedState || locations.lgas.isLoading}
               className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
               required
             >
-              <option value="">Select LGA</option>
-              {lgas.map((lga) => (
-                <option key={lga} value={lga}>
-                  {lga} ({getAbbreviation('lga', lga)})
+              <option value="">{locations.lgas.isLoading ? 'Loading LGAs\u2026' : 'Select LGA'}</option>
+              {locations.lgas.data.map((lga) => (
+                <option key={lga.id} value={lga.name}>
+                  {lga.abbreviation ? `${lga.name} (${lga.abbreviation})` : lga.name}
                 </option>
               ))}
             </select>
@@ -244,16 +160,16 @@ const LocationStep: React.FC<Props> = ({ data, updateData, nextStep, prevStep })
             </label>
             <div className="relative">
               <select
-                value={selectedWard}
+                value={locations.selectedWard?.name || ''}
                 onChange={(e) => handleWardChange(e.target.value)}
-                disabled={!selectedLGA}
+                disabled={!locations.selectedLGA || locations.wards.isLoading}
                 className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                 required={isPUAgent}
               >
-                <option value="">Select Ward</option>
-                {wards.map((ward) => (
-                  <option key={ward} value={ward}>
-                    {ward} ({getAbbreviation('ward', ward)})
+                <option value="">{locations.wards.isLoading ? 'Loading wards\u2026' : 'Select Ward'}</option>
+                {locations.wards.data.map((ward) => (
+                  <option key={ward.id} value={ward.name}>
+                    {ward.abbreviation ? `${ward.name} (${ward.abbreviation})` : ward.name}
                   </option>
                 ))}
               </select>
@@ -270,40 +186,40 @@ const LocationStep: React.FC<Props> = ({ data, updateData, nextStep, prevStep })
             </label>
             <div className="relative">
               <select
-                value={selectedPU}
-                onChange={(e) => setSelectedPU(e.target.value)}
-                disabled={!selectedWard}
+                value={locations.selectedPU?.name || ''}
+                onChange={(e) => handlePUChange(e.target.value)}
+                disabled={!locations.selectedWard || locations.pollingUnits.isLoading}
                 className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed max-h-60"
                 required={isPUAgent}
               >
-                <option value="">Select Polling Unit</option>
-                {pollingUnits.map((pu: any) => (
+                <option value="">{locations.pollingUnits.isLoading ? 'Loading polling units\u2026' : 'Select Polling Unit'}</option>
+                {locations.pollingUnits.data.map((pu) => (
                   <option key={pu.id} value={pu.name}>
-                    {pu.abbreviation} - {pu.name}
+                    {pu.abbreviation ? `${pu.abbreviation} - ${pu.name}` : pu.name}
                   </option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
-            {selectedWard && pollingUnits.length > 0 && (
+            {locations.selectedWard && locations.pollingUnits.data.length > 0 && (
               <p className="text-sm text-gray-500 mt-2">
-                {pollingUnits.length} polling units available in this ward
+                {locations.pollingUnits.data.length} polling units available in this ward
               </p>
             )}
           </div>
         )}
 
         {/* Selection Summary */}
-        {selectedState && (
+        {locations.selectedState && (
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <p className="text-sm font-medium text-gray-700 mb-2">Selected Location:</p>
             <div className="space-y-1 text-sm text-gray-600">
-              <p><strong>State:</strong> {selectedState}</p>
-              {selectedLGA && <p><strong>LGA:</strong> {selectedLGA}</p>}
-              {selectedWard && <p><strong>Ward:</strong> {selectedWard}</p>}
-              {selectedPU && <p><strong>Polling Unit:</strong> {selectedPU}</p>}
-              {selectedPUDetails?.delimitation && (
-                <p><strong>PU Code:</strong> {selectedPUDetails.delimitation}</p>
+              <p><strong>State:</strong> {locations.selectedState.name}</p>
+              {locations.selectedLGA && <p><strong>LGA:</strong> {locations.selectedLGA.name}</p>}
+              {locations.selectedWard && <p><strong>Ward:</strong> {locations.selectedWard.name}</p>}
+              {locations.selectedPU && <p><strong>Polling Unit:</strong> {locations.selectedPU.name}</p>}
+              {locations.selectedPU?.delimitation && (
+                <p><strong>PU Code:</strong> {locations.selectedPU.delimitation}</p>
               )}
             </div>
           </div>
@@ -315,7 +231,7 @@ const LocationStep: React.FC<Props> = ({ data, updateData, nextStep, prevStep })
             onClick={() => prevStep(data.skipGoogle ? 2 : 1)}
             className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
           >
-            ← Back
+            \u2190 Back
           </button>
           <button
             type="submit"
