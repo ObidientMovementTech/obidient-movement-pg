@@ -13,6 +13,8 @@ import { query } from '../config/db.js';
  */
 export async function pushDirectMessage(conversationId, senderId, senderName, messagePreview) {
   try {
+    console.log(`[ChatPush] DM push called: convo=${conversationId}, sender=${senderId}`);
+
     // Get other participants in this conversation
     const result = await query(
       `SELECT user_id FROM conversation_participants
@@ -20,11 +22,15 @@ export async function pushDirectMessage(conversationId, senderId, senderName, me
       [conversationId, senderId]
     );
 
-    const offlineUserIds = result.rows
-      .map(r => r.user_id)
-      .filter(uid => !isUserOnline(uid));
+    const allRecipients = result.rows.map(r => r.user_id);
+    const offlineUserIds = allRecipients.filter(uid => !isUserOnline(uid));
 
-    if (offlineUserIds.length === 0) return;
+    console.log(`[ChatPush] Recipients: ${allRecipients.length} total, ${offlineUserIds.length} offline, ${allRecipients.length - offlineUserIds.length} online (skipped)`);
+
+    if (offlineUserIds.length === 0) {
+      console.log('[ChatPush] All recipients online — no push sent');
+      return;
+    }
 
     await sendPushNotification(
       offlineUserIds,
@@ -36,6 +42,7 @@ export async function pushDirectMessage(conversationId, senderId, senderName, me
         senderId,
       }
     );
+    console.log(`[ChatPush] DM push sent to ${offlineUserIds.length} user(s)`);
   } catch (err) {
     // Push failures should never break the message flow
     console.error('[ChatPush] Direct message push error:', err.message);
@@ -54,16 +61,34 @@ export async function pushDirectMessage(conversationId, senderId, senderName, me
  * @param {string} messagePreview
  */
 
-// Simple in-memory throttle: roomId → last push timestamp
+// In-memory throttle: roomId → { lastPush: timestamp, messageCount: number }
 const roomPushThrottle = new Map();
 const ROOM_PUSH_INTERVAL_MS = 30_000; // 30 seconds between pushes per room
 
 export async function pushRoomMessage(roomId, senderId, senderName, roomTitle, messagePreview) {
   try {
-    // Throttle: skip if this room had a push recently
-    const lastPush = roomPushThrottle.get(roomId) || 0;
-    if (Date.now() - lastPush < ROOM_PUSH_INTERVAL_MS) return;
-    roomPushThrottle.set(roomId, Date.now());
+    console.log(`[ChatPush] Room push called: room=${roomId}, sender=${senderId}, title="${roomTitle}"`);
+    const now = Date.now();
+    const entry = roomPushThrottle.get(roomId) || { lastPush: 0, messageCount: 0 };
+
+    // If within throttle window, just count the message
+    if (now - entry.lastPush < ROOM_PUSH_INTERVAL_MS) {
+      entry.messageCount++;
+      roomPushThrottle.set(roomId, entry);
+      console.log(`[ChatPush] Room ${roomId} throttled — ${entry.messageCount} messages queued`);
+      return;
+    }
+
+    // Build push body — include summary if messages were skipped during throttle
+    let body;
+    if (entry.messageCount > 0) {
+      body = `${entry.messageCount + 1} new messages in ${roomTitle}`;
+    } else {
+      body = `${senderName}: ${messagePreview}`;
+    }
+
+    // Reset throttle
+    roomPushThrottle.set(roomId, { lastPush: now, messageCount: 0 });
 
     // Get participants who are offline AND not muted in this room
     const result = await query(
@@ -79,12 +104,17 @@ export async function pushRoomMessage(roomId, senderId, senderName, roomTitle, m
       .map(r => r.user_id)
       .filter(uid => !isUserOnline(uid));
 
-    if (offlineUserIds.length === 0) return;
+    console.log(`[ChatPush] Room ${roomId}: ${result.rows.length} non-muted participants, ${offlineUserIds.length} offline`);
+
+    if (offlineUserIds.length === 0) {
+      console.log(`[ChatPush] Room ${roomId}: all participants online — no push`);
+      return;
+    }
 
     await sendPushNotification(
       offlineUserIds,
       roomTitle,
-      `${senderName}: ${messagePreview}`,
+      body,
       {
         type: 'room_message',
         roomId,

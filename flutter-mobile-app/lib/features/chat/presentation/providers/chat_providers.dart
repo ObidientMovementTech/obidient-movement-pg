@@ -174,6 +174,9 @@ final roomsProvider =
 );
 
 class RoomsNotifier extends AsyncNotifier<List<Room>> {
+  /// The room currently open on screen (so we don't show in-app banners for it).
+  String? activeRoomId;
+
   @override
   Future<List<Room>> build() async {
     final ds = ref.read(roomDataSourceProvider);

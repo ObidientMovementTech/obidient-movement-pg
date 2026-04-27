@@ -8,6 +8,7 @@ import { uploadToS3 } from '../utils/s3Upload.js';
 import { sendVotingBlocBroadcastEmail, sendVotingBlocPrivateMessageEmail, sendVotingBlocInvitationEmail, sendVotingBlocRemovalEmail } from '../utils/emailHandler.js';
 import { transformVotingBloc, transformUser } from '../utils/mongoCompat.js';
 import { query } from '../config/db.js';
+import { sendPushNotification } from '../services/pushNotificationService.js';
 import crypto from 'crypto';
 
 // Helper function to safely extract ID from object or string
@@ -150,6 +151,22 @@ export const joinVotingBloc = async (req, res) => {
     }
 
     await votingBloc.save();
+
+    // Notify bloc creator that someone joined
+    try {
+      const creatorId = getId(votingBloc.creator);
+      if (creatorId && creatorId !== req.userId) {
+        const userName = user.name || user.email || 'Someone';
+        await sendPushNotification(
+          [creatorId],
+          `New Member 🎉`,
+          `${userName} joined your voting bloc "${votingBloc.name}"`,
+          { type: 'voting_bloc_join', blocId: getId(votingBloc) }
+        );
+      }
+    } catch (pushErr) {
+      console.error('[VotingBloc] Join push error:', pushErr.message);
+    }
 
     res.status(200).json({
       success: true,

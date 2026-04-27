@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
+
 enum Environment { dev, staging, prod }
 
 class Env {
-  static Environment current = Environment.dev;
+  static Environment current =
+      kReleaseMode ? Environment.prod : Environment.dev;
 
   /// Override for dev when testing on physical device (set to Mac's local IP)
   static String? devHostOverride;

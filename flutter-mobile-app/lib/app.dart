@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/notifications/in_app_notification_service.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -35,11 +36,14 @@ class _ObidientAppState extends ConsumerState<ObidientApp> {
       final wasAuth = previous is Authenticated;
       final isAuth = next is Authenticated;
       final push = ref.read(pushNotificationServiceProvider);
+      final inApp = ref.read(inAppNotificationServiceProvider);
       if (isAuth && !wasAuth) {
         // Fire-and-forget; service handles its own errors.
         push.init();
+        inApp.start();
       } else if (!isAuth && wasAuth) {
         push.deleteTokenAndUnregister();
+        inApp.stop();
       }
     });
 

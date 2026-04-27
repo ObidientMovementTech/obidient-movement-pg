@@ -64,10 +64,12 @@ class CoordinatorRemoteDataSource {
     int page = 1,
     int limit = 20,
     String? designation,
+    String? q,
   }) async {
     try {
       final params = <String, dynamic>{'page': page, 'limit': limit};
       if (designation != null) params['designation'] = designation;
+      if (q != null && q.isNotEmpty) params['q'] = q;
 
       final res = await _api.get(
         ApiEndpoints.coordinatorSubordinates,

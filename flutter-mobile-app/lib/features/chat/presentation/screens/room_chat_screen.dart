@@ -47,6 +47,8 @@ class _RoomChatScreenState extends ConsumerState<RoomChatScreen> {
     final socket = ref.read(socketServiceProvider);
     socket.joinRoom(widget.roomId);
     socket.markRoomRead(widget.roomId);
+    // Tell the rooms notifier we're viewing this room
+    ref.read(roomsProvider.notifier).activeRoomId = widget.roomId;
     // Clear local unread badge after build completes
     Future(() {
       ref.read(roomsProvider.notifier).updateRoom(widget.roomId, unreadCount: 0);
@@ -122,6 +124,8 @@ class _RoomChatScreenState extends ConsumerState<RoomChatScreen> {
     _reactionSub?.cancel();
     _msgDeletedSub?.cancel();
     SocketService.instance.leaveRoom(widget.roomId);
+    // Clear active room so in-app banners resume for this room
+    ref.read(roomsProvider.notifier).activeRoomId = null;
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();

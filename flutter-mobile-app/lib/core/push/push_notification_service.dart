@@ -191,8 +191,18 @@ class PushNotificationService {
 
   void _onForegroundMessage(RemoteMessage message) {
     final n = message.notification;
+    _log('foreground msg: type=${message.data['type']}, title=${n?.title}, body=${n?.body}');
     if (n == null) return; // data-only — stay silent
 
+    // Skip system notification for chat messages when app is in foreground —
+    // the InAppNotificationService shows a slide-down banner instead.
+    final type = (message.data['type'] as String?)?.toLowerCase();
+    if (type == 'chat_message' || type == 'room_message') {
+      _log('foreground msg suppressed (in-app banner handles it)');
+      return;
+    }
+
+    _log('showing local notification: "${n.title}"');
     final payload = _encodeData(message.data);
 
     _localNotifications.show(
@@ -253,6 +263,33 @@ class PushNotificationService {
         if (broadcastId != null) qp['openId'] = broadcastId;
         final uri = Uri(path: '/feeds', queryParameters: qp);
         ctx.go(uri.toString());
+        break;
+      case 'blog_post':
+        final slug = data['slug'] as String?;
+        if (slug != null && slug.isNotEmpty) {
+          ctx.go('/feeds?tab=news&slug=$slug');
+        } else {
+          ctx.go('/feeds?tab=news');
+        }
+        break;
+      case 'designation':
+        ctx.go('/state-dashboard');
+        break;
+      case 'chat_message':
+        final convId = data['conversationId'] as String?;
+        if (convId != null && convId.isNotEmpty) {
+          ctx.go('/chat/$convId');
+        } else {
+          ctx.go('/chat');
+        }
+        break;
+      case 'room_message':
+        final roomId = data['roomId'] as String?;
+        if (roomId != null && roomId.isNotEmpty) {
+          ctx.go('/chat/room/$roomId');
+        } else {
+          ctx.go('/chat');
+        }
         break;
       case 'message':
       case 'leadership_message':

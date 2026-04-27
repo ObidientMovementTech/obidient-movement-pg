@@ -729,19 +729,27 @@ const createMobileFeed = async (req, res) => {
 
       console.log(`[MOBILE_FEED] Found ${usersResult.rows.length} users to notify`);
 
-      // Create notification records for all users (simple approach like admin broadcast)
-      // const notifications = await Promise.all(
-      //   usersResult.rows.map((user) =>
-      //     Notification.create({
-      //       recipient: user.id,
-      //       type: 'feed',
-      //       title: notificationTitle,
-      //       message: notificationMessage
-      //     })
-      //   )
-      // );
-
-      // console.log(`[MOBILE_FEED] Created ${notifications.length} dashboard notifications`);
+      // Create in-app notification records for all users
+      const BATCH_SIZE = 500;
+      let created = 0;
+      for (let i = 0; i < usersResult.rows.length; i += BATCH_SIZE) {
+        const batch = usersResult.rows.slice(i, i + BATCH_SIZE);
+        const values = batch.map((_, idx) => {
+          const base = idx * 3;
+          return `(gen_random_uuid(), $${base + 1}, 'feed', $${base + 2}, $${base + 3}, NOW())`;
+        }).join(', ');
+        const params = batch.flatMap(user => [
+          user.id,
+          notificationTitle,
+          notificationMessage,
+        ]);
+        await query(
+          `INSERT INTO notifications (id, "userId", type, title, message, "createdAt") VALUES ${values}`,
+          params,
+        );
+        created += batch.length;
+      }
+      console.log(`[MOBILE_FEED] Created ${created} in-app notifications`);
 
       // Send push notifications to mobile users with enabled notifications
       const pushResult = await sendBroadcastPush(

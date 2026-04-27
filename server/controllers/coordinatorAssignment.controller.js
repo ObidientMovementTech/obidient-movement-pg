@@ -1,4 +1,5 @@
 import { query, pool } from '../config/db.js';
+import { sendPushNotification } from '../services/pushNotificationService.js';
 
 // ── Designation hierarchy (higher index = higher rank) ────────────
 const DESIGNATION_RANK = {
@@ -246,19 +247,25 @@ export const assignDesignation = async (req, res) => {
     );
 
     // Create notification for the assigned user
+    const notifMessage = `You have been assigned as ${designation}${assignedState ? ` for ${assignedState}` : ''}${assignedLGA ? ` - ${assignedLGA}` : ''}${assignedWard ? ` - ${assignedWard}` : ''}.`;
     try {
       await query(
         `INSERT INTO notifications (id, "userId", type, title, message, "createdAt")
          VALUES (gen_random_uuid(), $1, 'designation', $2, $3, NOW())`,
-        [
-          userId,
-          'New Role Assigned',
-          `You have been assigned as ${designation}${assignedState ? ` for ${assignedState}` : ''}${assignedLGA ? ` - ${assignedLGA}` : ''}${assignedWard ? ` - ${assignedWard}` : ''}.`,
-        ],
+        [userId, 'New Role Assigned', notifMessage],
       );
     } catch (notifErr) {
       console.error('Failed to create assignment notification:', notifErr.message);
-      // Non-critical, don't fail the request
+    }
+
+    // Send FCM push notification
+    try {
+      await sendPushNotification([userId], 'New Role Assigned', notifMessage, {
+        type: 'designation',
+        designation,
+      });
+    } catch (pushErr) {
+      console.error('Failed to send assignment push:', pushErr.message);
     }
 
     res.json({
@@ -455,14 +462,24 @@ export const removeDesignation = async (req, res) => {
     );
 
     // Notify user
+    const removalMessage = `Your "${target.designation}" designation has been removed. You are now a Community Member.`;
     try {
       await query(
         `INSERT INTO notifications (id, "userId", type, title, message, "createdAt")
          VALUES (gen_random_uuid(), $1, 'designation', $2, $3, NOW())`,
-        [userId, 'Role Removed', `Your "${target.designation}" designation has been removed. You are now a Community Member.`],
+        [userId, 'Role Removed', removalMessage],
       );
     } catch (notifErr) {
       console.error('Failed to create removal notification:', notifErr.message);
+    }
+
+    // Send FCM push notification
+    try {
+      await sendPushNotification([userId], 'Role Removed', removalMessage, {
+        type: 'designation',
+      });
+    } catch (pushErr) {
+      console.error('Failed to send removal push:', pushErr.message);
     }
 
     res.json({

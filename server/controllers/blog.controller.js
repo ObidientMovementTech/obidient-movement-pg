@@ -1,6 +1,8 @@
 import BlogPost from '../models/blogPost.model.js';
 import Reaction from '../models/reaction.model.js';
 import { uploadBufferToS3 } from '../utils/s3Upload.js';
+import { sendBroadcastPush } from '../services/pushNotificationService.js';
+import { query } from '../config/db.js';
 
 // Predefined blog categories
 export const BLOG_CATEGORIES = [
@@ -236,10 +238,32 @@ export const deletePost = async (req, res) => {
 export const publishPost = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Check if this is a first-time publish (published_at was NULL before)
+    const before = await query('SELECT published_at FROM blog_posts WHERE id = $1', [id]);
+    const isFirstPublish = before.rows.length > 0 && before.rows[0].published_at == null;
+
     const post = await BlogPost.publish(id);
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
+
+    // Send push notification only on first publish
+    if (isFirstPublish) {
+      try {
+        const title = '📰 New Blog Post';
+        const body = (post.title || '').substring(0, 120);
+        await sendBroadcastPush(title, body, {
+          type: 'blog_post',
+          postId: post.id.toString(),
+          slug: post.slug || '',
+        });
+        console.log(`[Blog] Push sent for post "${post.title}"`);
+      } catch (pushErr) {
+        console.error('[Blog] Push notification error:', pushErr.message);
+      }
+    }
+
     res.json({ post });
   } catch (error) {
     console.error('Error publishing post:', error);

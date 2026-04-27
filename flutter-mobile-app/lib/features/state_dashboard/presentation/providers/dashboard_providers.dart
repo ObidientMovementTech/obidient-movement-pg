@@ -143,10 +143,19 @@ final coordinatorSearchProvider = FutureProvider.autoDispose
 
 // ── Subordinates ─────────────────────────────────────────────
 
-final subordinatesProvider = FutureProvider.autoDispose<
-    ({List<SearchedUser> subordinates, int total, int pages})>((ref) {
+/// Parameters for the subordinates query.
+typedef SubordinatesParams = ({int page, String? designation, String? q});
+
+final subordinatesProvider = FutureProvider.autoDispose
+    .family<({List<SearchedUser> subordinates, int total, int pages}),
+        SubordinatesParams>((ref, params) {
   final ds = ref.watch(coordinatorDsProvider);
-  return ds.getSubordinates();
+  return ds.getSubordinates(
+    page: params.page,
+    limit: 30,
+    designation: params.designation,
+    q: params.q,
+  );
 });
 
 // ── Nigeria locations (cascading) ────────────────────────────
