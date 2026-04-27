@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../chat/presentation/providers/chat_providers.dart';
@@ -19,6 +20,7 @@ class MainShell extends ConsumerWidget {
   }
 
   void _onTap(BuildContext context, int index) {
+    HapticFeedback.lightImpact();
     switch (index) {
       case 0:
         context.go('/home');
@@ -38,7 +40,14 @@ class MainShell extends ConsumerWidget {
     final idx = _currentIndex(context);
     final chatUnread = ref.watch(chatUnreadCountProvider);
 
-    return Scaffold(
+    return PopScope(
+      canPop: idx == 0,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
       body: child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -85,6 +94,7 @@ class MainShell extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

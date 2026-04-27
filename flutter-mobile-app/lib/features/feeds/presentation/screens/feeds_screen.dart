@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/blog_post.dart';
 import '../../data/models/unified_feed_item.dart';
@@ -142,11 +143,7 @@ class _NewsTab extends ConsumerWidget {
   }
 
   void _openBlogDetail(BuildContext context, BlogPost post) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _BlogDetailPage(post: post),
-      ),
-    );
+    context.push('/feeds/blog/${post.id}', extra: post);
   }
 }
 
@@ -230,9 +227,9 @@ class _AlertsTabState extends ConsumerState<_AlertsTab> {
 // INLINE BLOG DETAIL PAGE (pushed via Navigator)
 // ═══════════════════════════════════════════════════════════════════
 
-class _BlogDetailPage extends StatelessWidget {
+class BlogDetailPage extends StatelessWidget {
   final BlogPost post;
-  const _BlogDetailPage({required this.post});
+  const BlogDetailPage({super.key, required this.post});
 
   @override
   Widget build(BuildContext context) {

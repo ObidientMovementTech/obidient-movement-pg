@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
-import '../../../dashboard/data/datasources/user_remote_datasource.dart';
 import '../../../dashboard/presentation/providers/dashboard_providers.dart';
 import '../../../state_dashboard/data/models/coordinator_models.dart';
 import '../../../state_dashboard/presentation/providers/dashboard_providers.dart'
@@ -330,7 +329,7 @@ class _ProfileCompletionScreenState
                   ),
                   TextButton(
                     onPressed: _logout,
-                    child: Text(
+                    child: const Text(
                       'Log out',
                       style: TextStyle(
                         color: AppColors.error,
@@ -358,7 +357,7 @@ class _ProfileCompletionScreenState
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.info_outline_rounded,
                         size: 18,
                         color: AppColors.warning,
@@ -368,7 +367,7 @@ class _ProfileCompletionScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Still needed',
                               style: TextStyle(
                                 fontSize: 12,

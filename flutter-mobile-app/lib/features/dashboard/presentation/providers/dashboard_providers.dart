@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/api_endpoints.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../feeds/data/models/unified_feed_item.dart';
 import '../../../feeds/presentation/providers/feeds_providers.dart';
@@ -42,4 +43,32 @@ final recentNotificationsProvider =
   final ds = ref.watch(feedsDataSourceProvider);
   final result = await ds.getUnifiedFeed(page: 1, limit: 5);
   return result.items;
+});
+
+/// CTA links from admin settings (volunteer, run for office, donate, feedback).
+final ctaLinksProvider =
+    FutureProvider.autoDispose<Map<String, String>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  const keys = [
+    'cta_volunteer_url',
+    'cta_run_for_office_url',
+    'cta_donate_url',
+    'cta_feedback_url',
+  ];
+  final results = await Future.wait(
+    keys.map((key) async {
+      try {
+        final res = await client.get(ApiEndpoints.appSetting(key));
+        final value = (res.data['value'] as String?) ?? '';
+        return MapEntry(key, value);
+      } catch (_) {
+        return MapEntry(key, '');
+      }
+    }),
+  );
+  final links = <String, String>{};
+  for (final entry in results) {
+    if (entry.value.isNotEmpty) links[entry.key] = entry.value;
+  }
+  return links;
 });

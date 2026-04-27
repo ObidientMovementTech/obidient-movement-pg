@@ -193,14 +193,14 @@ class _ProfileSettingsTabState extends ConsumerState<ProfileSettingsTab> {
                   color: AppColors.primary.withOpacity(0.3),
                 ),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.bug_report_rounded,
                     size: 18,
                     color: AppColors.primary,
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Send test push (debug)',
@@ -211,7 +211,7 @@ class _ProfileSettingsTabState extends ConsumerState<ProfileSettingsTab> {
                       ),
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.send_rounded,
                     size: 16,
                     color: AppColors.primary,

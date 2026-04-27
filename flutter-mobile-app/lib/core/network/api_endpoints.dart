@@ -177,4 +177,7 @@ class ApiEndpoints {
   // ── Location ─────────────────────────────────────────────────
   static const locationStates = '/location/states';
   static String locationLgas(String state) => '/location/states/$state/lgas';
+
+  // ── App Settings (/api/settings) ────────────────────────────
+  static String appSetting(String key) => '/api/settings/$key';
 }

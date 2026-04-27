@@ -27,6 +27,7 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(profileCompletionProvider);
           ref.invalidate(leadersProvider);
           ref.invalidate(recentNotificationsProvider);
+          ref.invalidate(ctaLinksProvider);
         },
         child: CustomScrollView(
           slivers: [
@@ -34,6 +35,7 @@ class HomeScreen extends ConsumerWidget {
             SliverToBoxAdapter(child: _JurisdictionStrip(user: user)),
             SliverToBoxAdapter(child: _LeadershipSection(ref: ref, user: user)),
             const SliverToBoxAdapter(child: _QuickActions()),
+            SliverToBoxAdapter(child: _GetInvolvedSection(ref: ref)),
             SliverToBoxAdapter(child: _RecentNotifications(ref: ref)),
             const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
           ],
@@ -84,31 +86,37 @@ class _HeroHeader extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(2.5),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.4),
-                        width: 2,
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      GoRouter.of(context).go('/profile');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.4),
+                          width: 2,
+                        ),
                       ),
-                    ),
-                    child: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.white.withOpacity(0.15),
-                      backgroundImage: user?.profileImage != null
-                          ? CachedNetworkImageProvider(user!.profileImage!)
-                          : null,
-                      child: user?.profileImage == null
-                          ? Text(
-                              (user?.name ?? 'U')[0].toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        backgroundImage: user?.profileImage != null
+                            ? CachedNetworkImageProvider(user!.profileImage!)
+                            : null,
+                        child: user?.profileImage == null
+                            ? Text(
+                                (user?.name ?? 'U')[0].toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            : null,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -767,6 +775,192 @@ class _ActionCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 color: theme.colorScheme.onSurface,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GET INVOLVED — dynamic CTA cards from admin settings
+// ═══════════════════════════════════════════════════════════════════
+
+class _GetInvolvedSection extends ConsumerWidget {
+  final WidgetRef ref;
+  const _GetInvolvedSection({required this.ref});
+
+  static const _ctaConfigs = <String, _CtaConfig>{
+    'cta_volunteer_url': _CtaConfig(
+      title: 'Volunteer',
+      desc: 'Join a directorate — help build from your community.',
+      icon: Icons.person_add_rounded,
+      gradient: LinearGradient(colors: [Color(0xFF059669), Color(0xFF10B981)]),
+      shadow: Color(0x40059669),
+    ),
+    'cta_run_for_office_url': _CtaConfig(
+      title: 'Run for Office',
+      desc: 'Ready to serve? Submit your interest for elections.',
+      icon: Icons.how_to_vote_rounded,
+      gradient: LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF3B82F6)]),
+      shadow: Color(0x402563EB),
+    ),
+    'cta_donate_url': _CtaConfig(
+      title: 'Donate',
+      desc: 'Support the movement — every contribution fuels change.',
+      icon: Icons.favorite_rounded,
+      gradient: LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)]),
+      shadow: Color(0x407C3AED),
+    ),
+    'cta_feedback_url': _CtaConfig(
+      title: 'Give Feedback',
+      desc: 'Your voice matters — share ideas, shape direction.',
+      icon: Icons.chat_bubble_rounded,
+      gradient: LinearGradient(colors: [Color(0xFFD97706), Color(0xFFF59E0B)]),
+      shadow: Color(0x40D97706),
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final linksAsync = ref.watch(ctaLinksProvider);
+
+    return linksAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (links) {
+        if (links.isEmpty) return const SizedBox.shrink();
+
+        final cards = _ctaConfigs.entries
+            .where((e) => links.containsKey(e.key))
+            .map((e) => _CtaCard(
+                  config: e.value,
+                  url: links[e.key]!,
+                ))
+            .toList();
+
+        if (cards.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Get Involved',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface.withOpacity(0.55),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 140,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: cards.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (_, i) => cards[i],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CtaConfig {
+  final String title;
+  final String desc;
+  final IconData icon;
+  final LinearGradient gradient;
+  final Color shadow;
+  const _CtaConfig({
+    required this.title,
+    required this.desc,
+    required this.icon,
+    required this.gradient,
+    required this.shadow,
+  });
+}
+
+class _CtaCard extends StatelessWidget {
+  final _CtaConfig config;
+  final String url;
+  const _CtaCard({required this.config, required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        GoRouter.of(context).push(
+          Uri(path: '/webview', queryParameters: {
+            'url': url,
+            'title': config.title,
+          }).toString(),
+        );
+      },
+      child: Container(
+        width: 160,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: config.gradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: config.shadow,
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(config.icon, size: 18, color: Colors.white),
+                ),
+                Icon(
+                  Icons.arrow_outward_rounded,
+                  size: 16,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              config.title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              config.desc,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

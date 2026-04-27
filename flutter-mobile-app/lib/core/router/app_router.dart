@@ -10,6 +10,7 @@ import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/dashboard/presentation/screens/main_shell.dart';
 import '../../features/dashboard/presentation/screens/home_screen.dart';
 import '../../features/feeds/presentation/screens/feeds_screen.dart';
+import '../../features/feeds/data/models/blog_post.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../../features/chat/presentation/screens/chat_detail_screen.dart';
 import '../../features/chat/presentation/screens/room_chat_screen.dart';
@@ -157,6 +158,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/member-card',
         builder: (context, state) => const MemberCardScreen(),
+      ),
+
+      // ── Blog detail (full-screen, no bottom nav) ─────────────
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/feeds/blog/:blogId',
+        builder: (context, state) {
+          final post = state.extra as BlogPost;
+          return BlogDetailPage(post: post);
+        },
       ),
 
       // ── Chat Privacy Settings ────────────────────────────────
