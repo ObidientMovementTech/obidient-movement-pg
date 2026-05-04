@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        registerType: 'prompt',
+        registerType: 'autoUpdate',
         includeAssets: ['obi-icon.svg', 'obidientLogoGreen.svg', 'obidientLogo.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
           name: 'Obidient Movement',
