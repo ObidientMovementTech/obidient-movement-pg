@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import helmet from 'helmet';
 import xss from 'xss';
 import hpp from 'hpp';
@@ -37,48 +37,63 @@ if (!isProduction) {
   }));
 }
 
-// Rate limiting for registration (most restrictive)
+// Rate limiting for registration — compound key (IP + email/phone) to avoid CGNAT collisions
 export const registerRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // limit each IP to 3 registration attempts per windowMs
+  max: 5, // 5 attempts per unique identity per window
+  keyGenerator: (req) => {
+    // Use email or phone from request body as part of the key so users behind
+    // the same CGNAT IP each get their own rate-limit bucket.
+    const ip = ipKeyGenerator(req);
+    const identity = req.body?.email || req.body?.phone || '';
+    return `${ip}:${identity.toLowerCase().trim()}`;
+  },
   message: {
-    error: 'Too many registration attempts from this IP, please try again after 15 minutes.'
+    error: 'Too many registration attempts, please try again after 15 minutes.'
   },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    logger.warn(`Registration rate limit exceeded for IP: ${req.ip}`, {
+    const identity = req.body?.email || req.body?.phone || 'unknown';
+    logger.warn(`Registration rate limit exceeded`, {
       ip: req.ip,
+      identity,
       userAgent: req.get('User-Agent'),
       timestamp: new Date().toISOString()
     });
     res.status(429).json({
       success: false,
-      message: 'Too many registration attempts from this IP, please try again after 15 minutes.',
+      message: 'Too many registration attempts, please try again after 15 minutes.',
       errorType: 'RATE_LIMIT_EXCEEDED'
     });
   }
 });
 
-// Rate limiting for login
+// Rate limiting for login — compound key (IP + email/phone)
 export const loginRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 login attempts per windowMs
+  max: 8, // 8 attempts per unique identity per window
+  keyGenerator: (req) => {
+    const ip = ipKeyGenerator(req);
+    const identity = req.body?.email || req.body?.phone || '';
+    return `${ip}:${identity.toLowerCase().trim()}`;
+  },
   message: {
-    error: 'Too many login attempts from this IP, please try again after 15 minutes.'
+    error: 'Too many login attempts, please try again after 15 minutes.'
   },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    logger.warn(`Login rate limit exceeded for IP: ${req.ip}`, {
+    const identity = req.body?.email || req.body?.phone || 'unknown';
+    logger.warn(`Login rate limit exceeded`, {
       ip: req.ip,
-      email: req.body.email,
+      identity,
       userAgent: req.get('User-Agent'),
       timestamp: new Date().toISOString()
     });
     res.status(429).json({
       success: false,
-      message: 'Too many login attempts from this IP, please try again after 15 minutes.',
+      message: 'Too many login attempts, please try again after 15 minutes.',
       errorType: 'RATE_LIMIT_EXCEEDED'
     });
   }
