@@ -8,14 +8,9 @@ import {
   Avatar,
   Chip,
   Grid,
-  Alert,
   Button,
   Skeleton,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
 } from '@mui/material';
 import {
   Users,
@@ -26,8 +21,6 @@ import {
   Bell,
   ExternalLink,
   Package,
-  Upload,
-  CheckCircle,
   X,
   Heart,
   Vote,
@@ -42,7 +35,6 @@ import {
   getJoinedVotingBlocs,
 } from '../../services/votingBlocService';
 import { getNotifications } from '../../services/notificationService';
-import { submitAdcCard } from '../../services/adcService';
 import type { ChatContact } from '../../services/conversationService';
 import { useMyLeaders } from './overview/hooks/useMyLeaders';
 import LeaderInfoModal from './components/LeaderInfoModal';
@@ -70,13 +62,7 @@ export default function DashboardHome() {
   const [mobilizationUrl, setMobilizationUrl] = useState('');
   const [ctaLinks, setCtaLinks] = useState<Record<string, string>>({});
 
-  // ADC Registration
-  const [adcModalOpen, setAdcModalOpen] = useState(false);
-  const [adcStep, setAdcStep] = useState<'ask' | 'upload' | 'done'>('ask');
-  const [adcUploading, setAdcUploading] = useState(false);
-  const [adcPreview, setAdcPreview] = useState<string | null>(null);
-  const [adcBase64, setAdcBase64] = useState<string | null>(null);
-  const [adcError, setAdcError] = useState('');
+
 
   // Leadership
   const { leaders, loading: leadersLoading } = useMyLeaders();
@@ -124,45 +110,6 @@ export default function DashboardHome() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  /* ─── ADC Handlers ─── */
-  const openAdcModal = () => {
-    setAdcStep('ask');
-    setAdcPreview(null);
-    setAdcBase64(null);
-    setAdcError('');
-    setAdcModalOpen(true);
-  };
-
-  const handleAdcFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setAdcError('File must be under 5MB');
-      return;
-    }
-    setAdcError('');
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAdcPreview(reader.result as string);
-      setAdcBase64(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleAdcSubmit = async () => {
-    if (!adcBase64) return;
-    setAdcUploading(true);
-    setAdcError('');
-    try {
-      await submitAdcCard(adcBase64);
-      setAdcStep('done');
-    } catch (err: any) {
-      setAdcError(err.response?.data?.message || 'Upload failed');
-    } finally {
-      setAdcUploading(false);
-    }
-  };
 
   /* ─── Quick Actions Config ─── */
   const quickActions = [
@@ -350,34 +297,7 @@ export default function DashboardHome() {
                 : 'rgba(255,255,255,0.2)',
             }}
           />
-          <Chip
-            size="small"
-            label={`ADC: ${profile?.adcStatus === 'verified' ? 'Verified' : profile?.adcStatus === 'pending' ? 'Pending' : profile?.adcStatus === 'rejected' ? 'Rejected' : 'Not Registered'}`}
-            sx={{
-              fontFamily: FONT,
-              fontWeight: 700,
-              fontSize: '0.65rem',
-              letterSpacing: '0.02em',
-              height: 28,
-              borderRadius: 2,
-              bgcolor:
-                profile?.adcStatus === 'verified' ? 'rgba(74,222,128,0.2)'
-                : profile?.adcStatus === 'pending' ? 'rgba(250,204,21,0.25)'
-                : profile?.adcStatus === 'rejected' ? 'rgba(248,113,113,0.2)'
-                : 'rgba(255,255,255,0.15)',
-              color:
-                profile?.adcStatus === 'verified' ? '#bbf7d0'
-                : profile?.adcStatus === 'pending' ? '#fef08a'
-                : profile?.adcStatus === 'rejected' ? '#fecaca'
-                : 'rgba(255,255,255,0.7)',
-              border: '1px solid',
-              borderColor:
-                profile?.adcStatus === 'verified' ? 'rgba(74,222,128,0.3)'
-                : profile?.adcStatus === 'pending' ? 'rgba(250,204,21,0.3)'
-                : profile?.adcStatus === 'rejected' ? 'rgba(248,113,113,0.3)'
-                : 'rgba(255,255,255,0.2)',
-            }}
-          />
+
         </Box>
       </Card>
 
@@ -527,81 +447,7 @@ export default function DashboardHome() {
         </Card>
       )}
 
-      {/* ═══ ADC Membership Banner ═══ */}
-      {profile?.adcStatus !== 'verified' && (
-        <Card
-          elevation={0}
-          sx={{
-            bgcolor: profile?.adcStatus === 'rejected' ? '#fee2e2' : profile?.adcStatus === 'pending' ? '#eff6ff' : '#f0fdf4',
-            borderRadius: 4,
-            border: '1px solid',
-            borderColor: profile?.adcStatus === 'rejected' ? 'rgba(220,38,38,0.15)' : profile?.adcStatus === 'pending' ? 'rgba(59,130,246,0.15)' : 'rgba(0,104,55,0.12)',
-            overflow: 'hidden',
-          }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              justifyContent: 'space-between',
-              flexDirection: { xs: 'column', sm: 'row' },
-              gap: 2,
-              p: { xs: 2.5, sm: 3 },
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  bgcolor: profile?.adcStatus === 'rejected' ? 'rgba(220,38,38,0.1)' : profile?.adcStatus === 'pending' ? 'rgba(59,130,246,0.1)' : `${PRIMARY}0D`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <CreditCard size={20} color={profile?.adcStatus === 'rejected' ? '#dc2626' : profile?.adcStatus === 'pending' ? '#2563eb' : PRIMARY} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.9rem', color: profile?.adcStatus === 'rejected' ? '#991b1b' : profile?.adcStatus === 'pending' ? '#1e40af' : '#14532d' }}>
-                  {profile?.adcStatus === 'rejected'
-                    ? 'ADC Card Rejected'
-                    : profile?.adcStatus === 'pending'
-                    ? 'ADC Verification In Progress'
-                    : 'ADC Membership Required'}
-                </Typography>
-                <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', color: profile?.adcStatus === 'rejected' ? '#b91c1c' : profile?.adcStatus === 'pending' ? '#3b82f6' : '#15803d', mt: 0.25 }}>
-                  {profile?.adcStatus === 'rejected'
-                    ? 'Your membership card was rejected. Please re-upload a valid card.'
-                    : profile?.adcStatus === 'pending'
-                    ? 'Your ADC card is being reviewed. You\'ll be notified once verified.'
-                    : 'Register as an ADC member and upload your membership card to unlock full access.'}
-                </Typography>
-              </Box>
-            </Box>
-            {profile?.adcStatus !== 'pending' && (
-              <Button
-                onClick={openAdcModal}
-                sx={{
-                  fontFamily: FONT,
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  textTransform: 'none',
-                  color: profile?.adcStatus === 'rejected' ? '#991b1b' : '#14532d',
-                  px: 2,
-                  borderRadius: 2,
-                  whiteSpace: 'nowrap',
-                  '&:hover': { bgcolor: profile?.adcStatus === 'rejected' ? 'rgba(220,38,38,0.08)' : 'rgba(0,104,55,0.08)' },
-                }}
-              >
-                {profile?.adcStatus === 'rejected' ? 'Re-upload Card' : 'Get Started'}
-              </Button>
-            )}
-          </Box>
-        </Card>
-      )}
+
 
       {/* ═══ Your Leadership ═══ */}
       <Box>
@@ -1408,199 +1254,6 @@ export default function DashboardHome() {
             </Box>
           </Box>
         </Box>
-      </Dialog>
-
-      {/* ═══ ADC Registration Modal ═══ */}
-      <Dialog
-        open={adcModalOpen}
-        onClose={() => setAdcModalOpen(false)}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 5, overflow: 'hidden' } }}
-      >
-        {adcStep === 'ask' && (
-          <>
-            <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, textAlign: 'center', pt: 3 }}>
-              ADC Registration
-            </DialogTitle>
-            <DialogContent sx={{ textAlign: 'center', pb: 1 }}>
-              <Typography sx={{ fontFamily: FONT, fontSize: '0.9rem', color: '#555', mb: 1 }}>
-                Have you already registered as an ADC member?
-              </Typography>
-              {profile?.adcStatus === 'rejected' && (
-                <Alert severity="warning" sx={{ mt: 1, fontFamily: FONT, fontSize: '0.8rem', textAlign: 'left' }}>
-                  Your previous submission was rejected. Please upload a valid membership card.
-                </Alert>
-              )}
-            </DialogContent>
-            <DialogActions sx={{ justifyContent: 'center', gap: 1.5, pb: 3, px: 3 }}>
-              <Button
-                variant="contained"
-                onClick={() => setAdcStep('upload')}
-                sx={{
-                  fontFamily: FONT,
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  px: 4,
-                  bgcolor: PRIMARY,
-                  '&:hover': { bgcolor: '#005530' },
-                }}
-              >
-                Yes, Upload Card
-              </Button>
-              <Button
-                variant="outlined"
-                component="a"
-                href="https://adcregistration.ng/"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setAdcModalOpen(false)}
-                sx={{
-                  fontFamily: FONT,
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  px: 4,
-                  color: PRIMARY,
-                  borderColor: PRIMARY,
-                  '&:hover': { borderColor: '#005530', bgcolor: 'rgba(0,104,55,0.04)' },
-                }}
-              >
-                No, Register Now
-              </Button>
-            </DialogActions>
-          </>
-        )}
-
-        {adcStep === 'upload' && (
-          <>
-            <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, textAlign: 'center', pt: 3 }}>
-              Upload ADC Membership Card
-            </DialogTitle>
-            <DialogContent sx={{ textAlign: 'center' }}>
-              <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: '#666', mb: 2.5 }}>
-                Take a clear photo of your ADC membership card and upload it below.
-              </Typography>
-
-              {adcPreview ? (
-                <Box sx={{ mb: 2 }}>
-                  <Box
-                    component="img"
-                    src={adcPreview}
-                    alt="Card preview"
-                    sx={{
-                      maxWidth: '100%',
-                      maxHeight: 220,
-                      borderRadius: 2,
-                      border: '2px solid',
-                      borderColor: 'divider',
-                      objectFit: 'contain',
-                    }}
-                  />
-                  <Typography
-                    onClick={() => { setAdcPreview(null); setAdcBase64(null); }}
-                    sx={{
-                      fontFamily: FONT,
-                      fontSize: '0.75rem',
-                      color: '#d32f2f',
-                      mt: 1,
-                      cursor: 'pointer',
-                      '&:hover': { textDecoration: 'underline' },
-                    }}
-                  >
-                    Remove & re-upload
-                  </Typography>
-                </Box>
-              ) : (
-                <Button
-                  variant="outlined"
-                  component="label"
-                  startIcon={<Upload size={18} />}
-                  sx={{
-                    fontFamily: FONT,
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    borderRadius: 2,
-                    px: 4,
-                    py: 1.5,
-                    mb: 2,
-                    width: '100%',
-                    borderColor: PRIMARY,
-                    color: PRIMARY,
-                    borderStyle: 'dashed',
-                    '&:hover': { borderColor: '#005530', bgcolor: 'rgba(0,104,55,0.04)' },
-                  }}
-                >
-                  Select Image
-                  <input type="file" accept="image/*" hidden onChange={handleAdcFileChange} />
-                </Button>
-              )}
-
-              {adcError && (
-                <Alert severity="error" sx={{ fontFamily: FONT, fontSize: '0.8rem', mb: 1 }}>
-                  {adcError}
-                </Alert>
-              )}
-            </DialogContent>
-            <DialogActions sx={{ justifyContent: 'center', gap: 1.5, pb: 3, px: 3 }}>
-              <Button
-                onClick={() => setAdcStep('ask')}
-                sx={{ fontFamily: FONT, textTransform: 'none', color: '#666' }}
-              >
-                Back
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleAdcSubmit}
-                disabled={!adcBase64 || adcUploading}
-                startIcon={adcUploading ? <CircularProgress size={16} color="inherit" /> : undefined}
-                sx={{
-                  fontFamily: FONT,
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  px: 4,
-                  bgcolor: PRIMARY,
-                  '&:hover': { bgcolor: '#005530' },
-                }}
-              >
-                {adcUploading ? 'Uploading...' : 'Submit Card'}
-              </Button>
-            </DialogActions>
-          </>
-        )}
-
-        {adcStep === 'done' && (
-          <>
-            <DialogContent sx={{ textAlign: 'center', py: 4 }}>
-              <CheckCircle size={48} color={PRIMARY} style={{ marginBottom: 12 }} />
-              <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '1.1rem', mb: 1 }}>
-                Card Submitted!
-              </Typography>
-              <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: '#666' }}>
-                Your ADC membership card is now under review. You'll be notified once it's verified.
-              </Typography>
-            </DialogContent>
-            <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
-              <Button
-                variant="contained"
-                onClick={() => { setAdcModalOpen(false); window.location.reload(); }}
-                sx={{
-                  fontFamily: FONT,
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  px: 4,
-                  bgcolor: PRIMARY,
-                  '&:hover': { bgcolor: '#005530' },
-                }}
-              >
-                Done
-              </Button>
-            </DialogActions>
-          </>
-        )}
       </Dialog>
     </Box>
   );

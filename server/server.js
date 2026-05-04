@@ -176,7 +176,7 @@ app.use('/api/conversations', conversationRoutes); // Real-time chat conversatio
 app.use('/users', blockRoutes); // User blocking (under /users/:id/block)
 app.use('/api/rooms', roomRoutes); // Community rooms (location-based group chat)
 app.use('/api/settings', appSettingsRoutes); // App settings (mobilization pack, etc.)
-app.use('/api/adc', adcRoutes); // ADC membership registration
+// app.use('/api/adc', adcRoutes); // ADC membership registration (disabled)
 app.use('/api/reactions', reactionRoutes); // Reactions (like, love, smile, meh)
 app.use('/api/nigeria-locations', nigeriaLocationsRoutes); // Public Nigeria location hierarchy
 app.use('/api/coordinator', coordinatorRoutes); // Coordinator assignment (search, assign, remove, subordinates)

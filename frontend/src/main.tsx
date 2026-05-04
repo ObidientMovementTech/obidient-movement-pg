@@ -94,7 +94,6 @@ const BlogEditorPage = lazy(() => import("./pages/pbx/blog/BlogEditorPage.tsx"))
 const PbxUsersPage = lazy(() => import("./pages/pbx/UsersPage.tsx"));
 const PbxCommunicationsPage = lazy(() => import("./pages/pbx/CommunicationsPage.tsx"));
 const PbxSettingsPage = lazy(() => import("./pages/pbx/SettingsPage.tsx"));
-const PbxAdcPage = lazy(() => import("./pages/pbx/AdcPage.tsx"));
 const PbxMobileFeedsPage = lazy(() => import("./pages/pbx/PbxMobileFeedsPage.tsx"));
 
 // Loading component
@@ -400,7 +399,6 @@ const router = createBrowserRouter([
       { path: "blog/edit/:id", element: <Suspense fallback={<PageLoader />}><BlogEditorPage /></Suspense> },
       { path: "users", element: <Suspense fallback={<PageLoader />}><PbxUsersPage /></Suspense> },
       { path: "communications", element: <Suspense fallback={<PageLoader />}><PbxCommunicationsPage /></Suspense> },
-      { path: "adc", element: <Suspense fallback={<PageLoader />}><PbxAdcPage /></Suspense> },
       { path: "mobile-feeds", element: <Suspense fallback={<PageLoader />}><PbxMobileFeedsPage /></Suspense> },
       { path: "settings", element: <Suspense fallback={<PageLoader />}><PbxSettingsPage /></Suspense> },
     ],
