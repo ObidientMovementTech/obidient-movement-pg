@@ -470,9 +470,6 @@ if (import.meta.hot) {
   root.render(renderApp());
 }
 
-// Register service worker for PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-  });
-}
+// Register service worker for PWA with auto-update
+import { registerSW } from 'virtual:pwa-register';
+registerSW({ immediate: true });
