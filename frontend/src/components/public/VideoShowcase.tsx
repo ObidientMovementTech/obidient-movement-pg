@@ -1,4 +1,35 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const FALLBACK_VIDEO_ID = 'k75SwmK_w80';
+
+/** Extract a YouTube video ID from various URL formats */
+function extractVideoId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'youtu.be') return u.pathname.slice(1).split('/')[0] || null;
+    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v');
+  } catch {
+    // If it's already just a video ID (no protocol), return as-is
+    if (/^[\w-]{11}$/.test(url.trim())) return url.trim();
+  }
+  return null;
+}
+
 const VideoShowcase = () => {
+  const [videoId, setVideoId] = useState(FALLBACK_VIDEO_ID);
+
+  useEffect(() => {
+    axios
+      .get(`${API_BASE}/api/settings/landing_video_url`)
+      .then((r) => {
+        const id = extractVideoId(r.data.value || '');
+        if (id) setVideoId(id);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="py-12 lg:py-16 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -23,7 +54,7 @@ const VideoShowcase = () => {
             <div className="rounded-[14px] overflow-hidden bg-gray-950">
               <div className="aspect-video">
                 <iframe
-                  src="https://www.youtube.com/embed/Ik8HctLbfXM"
+                  src={`https://www.youtube.com/embed/${videoId}`}
                   title="The Obidient Movement"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen

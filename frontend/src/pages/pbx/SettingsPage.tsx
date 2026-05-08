@@ -10,7 +10,7 @@ import {
   InputAdornment,
   Divider,
 } from '@mui/material';
-import { Link2, Save, ExternalLink, Users, Vote, Heart, MessageSquare } from 'lucide-react';
+import { Link2, Save, ExternalLink, Users, Vote, Heart, MessageSquare, Video } from 'lucide-react';
 import axios from 'axios';
 
 const FONT = '"Poppins", sans-serif';
@@ -55,6 +55,13 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Landing video state
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoSaved, setVideoSaved] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [videoSaving, setVideoSaving] = useState(false);
+  const [videoError, setVideoError] = useState('');
+
   // CTA state
   const [ctaValues, setCtaValues] = useState<Record<string, string>>({
     cta_volunteer_url: '',
@@ -74,6 +81,13 @@ export default function SettingsPage() {
       .then((r) => setMobilizationUrl(r.data.value || ''))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Fetch landing video URL
+    axios
+      .get(`${API}/api/settings/landing_video_url`, { withCredentials: true })
+      .then((r) => setVideoUrl(r.data.value || ''))
+      .catch(() => {})
+      .finally(() => setVideoLoading(false));
 
     // Fetch all CTA URLs in parallel
     Promise.all(
@@ -107,6 +121,25 @@ export default function SettingsPage() {
       setError(err.response?.data?.message || 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleVideoSave = async () => {
+    setVideoSaving(true);
+    setVideoError('');
+    setVideoSaved(false);
+    try {
+      await axios.put(
+        `${API}/api/settings/landing_video_url`,
+        { value: videoUrl.trim() },
+        { withCredentials: true }
+      );
+      setVideoSaved(true);
+      setTimeout(() => setVideoSaved(false), 3000);
+    } catch (err: any) {
+      setVideoError(err.response?.data?.message || 'Failed to save');
+    } finally {
+      setVideoSaving(false);
     }
   };
 
@@ -231,6 +264,106 @@ export default function SettingsPage() {
               }}
             >
               {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </>
+        )}
+      </Card>
+
+      {/* ─── Landing Page Video ─── */}
+      <Card
+        elevation={0}
+        sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 3,
+          p: 3,
+          mt: 3,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <Video size={18} color="#dc2626" />
+          <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '1rem' }}>
+            Landing Page Video
+          </Typography>
+        </Box>
+        <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: '#666', mb: 2.5 }}>
+          Set the YouTube video shown on the public landing page. Accepts any YouTube URL format
+          (e.g. youtu.be/xxx, youtube.com/watch?v=xxx).
+        </Typography>
+
+        {videoLoading ? (
+          <CircularProgress size={24} sx={{ color: PRIMARY }} />
+        ) : (
+          <>
+            <TextField
+              fullWidth
+              placeholder="https://youtu.be/k75SwmK_w80"
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Video size={16} color="#999" />
+                  </InputAdornment>
+                ),
+                sx: { fontFamily: FONT, fontSize: '0.9rem', borderRadius: 2 },
+              }}
+              sx={{ mb: 2 }}
+            />
+
+            {videoUrl.trim() && (
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  component="a"
+                  href={videoUrl.trim()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    fontFamily: FONT,
+                    fontSize: '0.8rem',
+                    color: PRIMARY,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    textDecoration: 'none',
+                    '&:hover': { textDecoration: 'underline' },
+                  }}
+                >
+                  <ExternalLink size={12} />
+                  Preview on YouTube
+                </Typography>
+              </Box>
+            )}
+
+            {videoError && (
+              <Alert severity="error" sx={{ mb: 2, fontFamily: FONT }}>
+                {videoError}
+              </Alert>
+            )}
+            {videoSaved && (
+              <Alert severity="success" sx={{ mb: 2, fontFamily: FONT }}>
+                Landing video URL saved! Changes appear on the public site immediately.
+              </Alert>
+            )}
+
+            <Button
+              variant="contained"
+              onClick={handleVideoSave}
+              disabled={videoSaving}
+              startIcon={
+                videoSaving ? <CircularProgress size={16} color="inherit" /> : <Save size={16} />
+              }
+              sx={{
+                fontFamily: FONT,
+                fontWeight: 600,
+                borderRadius: 2,
+                textTransform: 'none',
+                bgcolor: PRIMARY,
+                '&:hover': { bgcolor: '#005530' },
+              }}
+            >
+              {videoSaving ? 'Saving...' : 'Save'}
             </Button>
           </>
         )}
