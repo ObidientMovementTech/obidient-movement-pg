@@ -27,6 +27,7 @@ import {
   MessageSquare,
   UserPlus,
   ArrowUpRight,
+  Smartphone,
 } from 'lucide-react';
 import axios from 'axios';
 import { useUser } from '../../context/UserContext';
@@ -38,6 +39,7 @@ import { getNotifications } from '../../services/notificationService';
 import type { ChatContact } from '../../services/conversationService';
 import { useMyLeaders } from './overview/hooks/useMyLeaders';
 import LeaderInfoModal from './components/LeaderInfoModal';
+import { PETER_OBI } from '../../data/leaderProfiles';
 
 const FONT = '"Poppins", sans-serif';
 const PRIMARY = '#006837';
@@ -116,6 +118,7 @@ export default function DashboardHome() {
     { label: 'My Voting Bloc', icon: Users, path: '/dashboard/voting-bloc', color: PRIMARY },
     { label: 'Leaderboard', icon: Trophy, path: '/dashboard/leaderboard', color: '#D97706' },
     { label: 'Membership Card', icon: CreditCard, path: '/dashboard/card', color: '#7C3AED' },
+    { label: 'Mobile App', icon: Smartphone, path: '/dashboard/download-app', color: '#059669' },
     ...(profile?.role === 'admin' || isCoordinator
       ? [{ label: 'State Dashboard', icon: MapPin, path: '/dashboard/state', color: '#2563EB' }]
       : []),
@@ -1245,11 +1248,7 @@ export default function DashboardHome() {
                   color: '#374151',
                 }}
               >
-                Peter Gregory Obi is a Nigerian businessman and politician who
-                served as the Governor of Anambra State from 2006 to 2014. He
-                was the Vice Presidential candidate of the PDP in 2019 and the
-                Presidential candidate of the Labour Party in the 2023 general
-                elections. He is the Founder of the Obidient Movement.
+                {PETER_OBI.shortBio}
               </Typography>
             </Box>
           </Box>

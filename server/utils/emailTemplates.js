@@ -500,7 +500,13 @@ export function createVoteDefenderKeyAssignedEmailTemplate(userName, uniqueKey, 
   `.trim();
 }
 
-export function createAdminBroadcastEmailTemplate(title, message, senderName) {
+export function createAdminBroadcastEmailTemplate(title, message, senderName, imageUrl) {
+  const imageBlock = imageUrl ? `
+        <div style="margin: 20px 0; text-align: center;">
+          <img src="${imageUrl}" alt="${title}" width="600" style="max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 0 auto;" />
+        </div>
+  ` : '';
+
   return `
 <!DOCTYPE html>
 <html>
@@ -522,7 +528,7 @@ export function createAdminBroadcastEmailTemplate(title, message, senderName) {
         <h2 style="color: #0B6739; margin-top: 0; text-align: center; font-size: 24px; line-height: 1.3;">
           ${title}
         </h2>
-        
+        ${imageBlock}
         <div style="background-color: #f8f9fa; border-left: 4px solid #0B6739; padding: 20px; margin: 25px 0; border-radius: 6px;">
           <div style="color: #333333; line-height: 1.6; font-size: 16px;">
             ${message.split('\n').map(paragraph => 
@@ -557,6 +563,84 @@ export function createAdminBroadcastEmailTemplate(title, message, senderName) {
           This is an automated message from Obidient Movement. Please do not reply to this email.
         </p>
         <p style="color: #0B6739; font-weight: bold; text-align: center;">— The Obidient Movement Team</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+export function createInvolvementInterestEmailTemplate(interest) {
+  const roleLabels = {
+    volunteer: 'Volunteer',
+    vote_protection_officer: 'Vote Protection Officer',
+    donor: 'Donor',
+  };
+
+  const locationHtml = interest.is_diaspora
+    ? `<strong>Country:</strong> ${interest.country || 'Not specified'}`
+    : [interest.state, interest.lga, interest.ward].filter(Boolean).join(' → ') || 'Not specified';
+
+  const detailsHtml = [];
+  if (interest.skills?.length) {
+    detailsHtml.push(`<p style="margin: 4px 0;"><strong>Skills:</strong> ${interest.skills.join(', ')}</p>`);
+  }
+  if (interest.experience_level) {
+    detailsHtml.push(`<p style="margin: 4px 0;"><strong>Experience:</strong> ${interest.experience_level}</p>`);
+  }
+  if (interest.contribution_type) {
+    detailsHtml.push(`<p style="margin: 4px 0;"><strong>Contribution:</strong> ${interest.contribution_type}</p>`);
+  }
+  if (interest.message) {
+    detailsHtml.push(`<p style="margin: 4px 0;"><strong>Message:</strong> ${interest.message}</p>`);
+  }
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Get Involved Interest</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background-color: #0B6739; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+        <h2 style="color: #ffffff; margin: 0; font-size: 18px;">New Get Involved Interest</h2>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 30px;">
+        <p style="color: #555555; line-height: 1.5; margin-top: 0;">
+          A new person has expressed interest in getting involved with the movement.
+        </p>
+
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 6px; margin: 20px 0;">
+          <tr>
+            <td style="padding: 20px;">
+              <p style="margin: 4px 0;"><strong>Name:</strong> ${interest.full_name}</p>
+              <p style="margin: 4px 0;"><strong>Email:</strong> ${interest.email}</p>
+              <p style="margin: 4px 0;"><strong>Phone:</strong> ${interest.phone}</p>
+              <p style="margin: 4px 0;"><strong>Role:</strong> <span style="background-color: #0B6739; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 13px;">${roleLabels[interest.role] || interest.role}</span></p>
+              <p style="margin: 4px 0;"><strong>Location:</strong> ${locationHtml}</p>
+              ${interest.is_diaspora ? '<p style="margin: 4px 0;"><strong>Diaspora:</strong> Yes</p>' : ''}
+              ${detailsHtml.join('')}
+            </td>
+          </tr>
+        </table>
+
+        <p style="color: #555555; line-height: 1.5;">
+          Please review and follow up within 48 hours. You can manage all interests from the
+          <strong>Interests</strong> section in the Admin Panel.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #eeeeee; margin: 25px 0;">
+        <p style="color: #999999; font-size: 12px;">
+          This is an automated message from Obidient Movement. Please do not reply to this email.
+        </p>
+        <p style="color: #555555;">— The Obidient Movement Team</p>
       </td>
     </tr>
   </table>

@@ -1,5 +1,6 @@
 import { query, pool } from '../config/db.js';
 import { sendPushNotification } from '../services/pushNotificationService.js';
+import { bustLeadersCache } from '../routes/publicLeaders.routes.js';
 
 // ── Designation hierarchy (higher index = higher rank) ────────────
 const DESIGNATION_RANK = {
@@ -268,6 +269,7 @@ export const assignDesignation = async (req, res) => {
       console.error('Failed to send assignment push:', pushErr.message);
     }
 
+    bustLeadersCache();
     res.json({
       success: true,
       message: `Successfully assigned ${updatedUser.name} as ${designation}`,
@@ -482,6 +484,7 @@ export const removeDesignation = async (req, res) => {
       console.error('Failed to send removal push:', pushErr.message);
     }
 
+    bustLeadersCache();
     res.json({
       success: true,
       message: `Removed "${target.designation}" designation from ${target.name}`,

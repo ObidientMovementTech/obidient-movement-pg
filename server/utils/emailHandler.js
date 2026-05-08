@@ -8,7 +8,8 @@ import {
   createVotingBlocInvitationEmailTemplate,
   createVotingBlocRemovalEmailTemplate,
   createVoteDefenderKeyAssignedEmailTemplate,
-  createAdminBroadcastEmailTemplate
+  createAdminBroadcastEmailTemplate,
+  createInvolvementInterestEmailTemplate
 } from './emailTemplates.js';
 
 // Send Confirmation Email
@@ -419,6 +420,46 @@ For updates and more information, visit your dashboard at: https://member.obidie
   } catch (error) {
     console.error(`[EMAIL] Error sending admin broadcast email:`, error.message);
     throw error;
+  }
+};
+
+// Send Involvement Interest notification to all admins
+export const sendInvolvementInterestEmail = async (interest) => {
+  const roleLabels = {
+    volunteer: 'Volunteer',
+    vote_protection_officer: 'Vote Protection Officer',
+    donor: 'Donor',
+  };
+  const subject = `New Get Involved Interest — ${roleLabels[interest.role] || interest.role} — ${interest.full_name}`;
+  const html = createInvolvementInterestEmailTemplate(interest);
+  const plainText = `New Get Involved Interest\n\nName: ${interest.full_name}\nEmail: ${interest.email}\nPhone: ${interest.phone}\nRole: ${roleLabels[interest.role] || interest.role}\nLocation: ${interest.is_diaspora ? interest.country : [interest.state, interest.lga, interest.ward].filter(Boolean).join(' > ')}\n\n— Obidient Movement Team`;
+
+  try {
+    const { query: dbQuery } = await import('../config/db.js');
+    const adminResult = await dbQuery(`SELECT email, name FROM users WHERE role = 'admin'`);
+    const admins = adminResult.rows;
+
+    if (admins.length === 0) {
+      console.log('[EMAIL] No admin users found to notify about involvement interest');
+      return;
+    }
+
+    const emailPromises = admins.map(admin =>
+      emailTransporter.sendMail({
+        from: `"${sender.name}" <${sender.email}>`,
+        to: admin.email,
+        subject,
+        html,
+        text: plainText,
+      }).catch(error => {
+        console.error(`[EMAIL] Failed to send involvement interest email to ${admin.email}:`, error.message);
+      })
+    );
+
+    await Promise.allSettled(emailPromises);
+    console.log(`[EMAIL] Involvement interest notification sent to ${admins.length} admin(s)`);
+  } catch (error) {
+    console.error('[EMAIL] Error sending involvement interest email:', error.message);
   }
 };
 

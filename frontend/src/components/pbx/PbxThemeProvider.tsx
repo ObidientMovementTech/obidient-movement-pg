@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 const pbxTheme = createTheme({
   palette: {
     primary: {
-      main: '#0B6739',
+      main: '#169043',
       light: '#e8f5e9',
       dark: '#084a29',
       contrastText: '#ffffff',

@@ -6,6 +6,7 @@ export interface AdminBroadcast {
   _id: string;
   title: string;
   message: string;
+  imageUrl?: string | null;
   sentBy: {
     _id: string;
     username: string;
@@ -78,10 +79,10 @@ export const getAdminBroadcastById = async (id: string): Promise<AdminBroadcast>
   return res.data;
 };
 
-export const sendAdminBroadcast = async (title: string, message: string): Promise<AdminBroadcast> => {
+export const sendAdminBroadcast = async (title: string, message: string, imageUrl?: string | null): Promise<AdminBroadcast> => {
   const res = await axios.post(
     `${BASE_URL}/admin-broadcasts/send`,
-    { title, message },
+    { title, message, imageUrl: imageUrl || null },
     {
       withCredentials: true,
     }
@@ -89,15 +90,29 @@ export const sendAdminBroadcast = async (title: string, message: string): Promis
   return res.data.broadcast;
 };
 
-export const updateAdminBroadcast = async (id: string, title: string, message: string): Promise<AdminBroadcast> => {
+export const updateAdminBroadcast = async (id: string, title: string, message: string, imageUrl?: string | null): Promise<AdminBroadcast> => {
   const res = await axios.put(
     `${BASE_URL}/admin-broadcasts/${id}`,
-    { title, message },
+    { title, message, imageUrl },
     {
       withCredentials: true,
     }
   );
   return res.data;
+};
+
+export const uploadBroadcastImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await axios.post(
+    `${BASE_URL}/admin-broadcasts/upload-image`,
+    formData,
+    {
+      withCredentials: true,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+  return res.data.imageUrl;
 };
 
 export const deleteAdminBroadcast = async (id: string): Promise<void> => {

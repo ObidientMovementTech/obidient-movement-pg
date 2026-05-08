@@ -87,7 +87,7 @@ export default {
           dark: "#5E5E5E",
         },
         accent: {
-          green: "#0B6739",
+          green: "#169043",
           red: "#D21C5B",
         },
         text: {

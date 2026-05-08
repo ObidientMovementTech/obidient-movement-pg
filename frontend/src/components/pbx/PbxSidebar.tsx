@@ -21,6 +21,7 @@ import {
   IdCard,
   Settings,
   Smartphone,
+  Download,
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import RBACGate from './RBACGate';
@@ -43,8 +44,9 @@ const navItems: NavItem[] = [
   { label: 'Membership', icon: <IdCard size={20} />, path: '/pbx/membership', minimumLevel: 'state' },
   { label: 'Mobilisation', icon: <Target size={20} />, path: '/pbx/mobilisation' },
   { label: 'Blog', icon: <FileText size={20} />, path: '/pbx/blog', minimumLevel: 'state' },
-  { label: 'Communications', icon: <Megaphone size={20} />, path: '/pbx/communications', minimumLevel: 'state' },
+  { label: 'Broadcast', icon: <Megaphone size={20} />, path: '/pbx/broadcast', allowedRoles: ['admin'] },
   { label: 'Mobile Feeds', icon: <Smartphone size={20} />, path: '/pbx/mobile-feeds', allowedRoles: ['admin'] },
+  { label: 'Mobile App', icon: <Download size={20} />, path: '/pbx/app-management', allowedRoles: ['admin'] },
   { label: 'Settings', icon: <Settings size={20} />, path: '/pbx/settings', allowedRoles: ['admin'] },
 ];
 

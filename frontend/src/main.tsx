@@ -27,6 +27,13 @@ const AboutPage = lazy(() => import("./pages/public/AboutPage.tsx"));
 const NewsPage = lazy(() => import("./pages/public/NewsPage.tsx"));
 const NewsPostPage = lazy(() => import("./pages/public/NewsPostPage.tsx"));
 const ContactPage = lazy(() => import("./pages/public/ContactPage.tsx"));
+const LeadersPage = lazy(() => import("./pages/public/LeadersPage.tsx"));
+const PeterObiPage = lazy(() => import("./pages/public/PeterObiPage.tsx"));
+const GetInvolvedPage = lazy(() => import("./pages/public/GetInvolvedPage.tsx"));
+const GalleryPage = lazy(() => import("./pages/public/GalleryPage.tsx"));
+const PrivacyPage = lazy(() => import("./pages/public/PrivacyPage.tsx"));
+const TermsPage = lazy(() => import("./pages/public/TermsPage.tsx"));
+const MobileAppPage = lazy(() => import("./pages/public/MobileAppPage.tsx"));
 
 // Auth Pages
 const AuthPage = lazy(() => import("./pages/auth/page.tsx"));
@@ -59,6 +66,7 @@ const AssignLeaderPage = lazy(() => import("./pages/dashboard/state/AssignLeader
 const AllNotificationsPage = lazy(() => import("./pages/dashboard/notifications/AllNotificationsPage.tsx"));
 const EligibilityChecker = lazy(() => import("./pages/dashboard/lead/eligibilityChecker/EligibilityChecker.tsx"));
 const ChatPage = lazy(() => import("./pages/dashboard/ChatPage.tsx"));
+const AppDownloadPage = lazy(() => import("./pages/dashboard/AppDownloadPage.tsx"));
 
 // Voting Bloc Pages
 const VotingBlocDetail = lazy(() => import("./pages/dashboard/votingBloc/VotingBlocDetail.tsx"));
@@ -92,9 +100,10 @@ const PbxMobilisationPage = lazy(() => import("./pages/pbx/MobilisationPage.tsx"
 const BlogListPage = lazy(() => import("./pages/pbx/blog/BlogListPage.tsx"));
 const BlogEditorPage = lazy(() => import("./pages/pbx/blog/BlogEditorPage.tsx"));
 const PbxUsersPage = lazy(() => import("./pages/pbx/UsersPage.tsx"));
-const PbxCommunicationsPage = lazy(() => import("./pages/pbx/CommunicationsPage.tsx"));
+const PbxBroadcastPage = lazy(() => import("./pages/pbx/BroadcastPage.tsx"));
 const PbxSettingsPage = lazy(() => import("./pages/pbx/SettingsPage.tsx"));
 const PbxMobileFeedsPage = lazy(() => import("./pages/pbx/PbxMobileFeedsPage.tsx"));
+const PbxAppManagementPage = lazy(() => import("./pages/pbx/AppManagementPage.tsx"));
 
 // Loading component
 const PageLoader = () => (
@@ -141,6 +150,13 @@ const router = createBrowserRouter([
       { path: "news", element: <NewsPage /> },
       { path: "news/:slug", element: <NewsPostPage /> },
       { path: "contact", element: <ContactPage /> },
+      { path: "leaders", element: <LeadersPage /> },
+      { path: "leaders/peter-obi", element: <PeterObiPage /> },
+      { path: "get-involved", element: <GetInvolvedPage /> },
+      { path: "gallery", element: <GalleryPage /> },
+      { path: "privacy", element: <PrivacyPage /> },
+      { path: "terms", element: <TermsPage /> },
+      { path: "mobile-app", element: <MobileAppPage /> },
     ],
   },
   {
@@ -235,6 +251,7 @@ const router = createBrowserRouter([
       { path: "new-voting-bloc", element: <Suspense fallback={<PageLoader />}><NewVotingBlocPage /></Suspense> },
       { path: "edit-voting-bloc/:id", element: <Suspense fallback={<PageLoader />}><EditVotingBlocPage /></Suspense> },
       { path: "chat", element: <Suspense fallback={<PageLoader />}><ChatPage /></Suspense> },
+      { path: "download-app", element: <Suspense fallback={<PageLoader />}><AppDownloadPage /></Suspense> },
     ],
   },
 
@@ -398,8 +415,9 @@ const router = createBrowserRouter([
       { path: "blog/new", element: <Suspense fallback={<PageLoader />}><BlogEditorPage /></Suspense> },
       { path: "blog/edit/:id", element: <Suspense fallback={<PageLoader />}><BlogEditorPage /></Suspense> },
       { path: "users", element: <Suspense fallback={<PageLoader />}><PbxUsersPage /></Suspense> },
-      { path: "communications", element: <Suspense fallback={<PageLoader />}><PbxCommunicationsPage /></Suspense> },
+      { path: "broadcast", element: <Suspense fallback={<PageLoader />}><PbxBroadcastPage /></Suspense> },
       { path: "mobile-feeds", element: <Suspense fallback={<PageLoader />}><PbxMobileFeedsPage /></Suspense> },
+      { path: "app-management", element: <Suspense fallback={<PageLoader />}><PbxAppManagementPage /></Suspense> },
       { path: "settings", element: <Suspense fallback={<PageLoader />}><PbxSettingsPage /></Suspense> },
     ],
   },

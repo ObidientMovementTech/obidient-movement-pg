@@ -64,7 +64,7 @@ import {
 } from '../../services/roomService';
 
 const FONT = '"Poppins", sans-serif';
-const PRIMARY = '#0B6739';
+const PRIMARY = '#169043';
 const ACCENT = '#8cc63f';
 
 type WidgetView = 'conversations' | 'chat' | 'contacts' | 'rooms' | 'roomChat';
@@ -665,7 +665,7 @@ export default function ChatWidget() {
           position: 'fixed',
           bottom: { xs: 80, md: 24 },
           right: 24,
-          zIndex: 1300,
+          zIndex: '10 !important',
           width: 56,
           height: 56,
           bgcolor: PRIMARY,
@@ -685,7 +685,7 @@ export default function ChatWidget() {
             position: 'fixed',
             bottom: { xs: 148, md: 92 },
             right: 24,
-            zIndex: 1300,
+            zIndex: '10 !important',
             width: { xs: 'calc(100% - 48px)', sm: 380 },
             height: 520,
             borderRadius: 3,

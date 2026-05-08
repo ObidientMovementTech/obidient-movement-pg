@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import {
   sendAdminBroadcast,
   getAdminBroadcasts,
@@ -9,14 +10,22 @@ import {
   streamBroadcastProgress,
   getBroadcastEmailLogs,
   getBroadcastEmailStats,
-  retryBroadcastEmails
+  retryBroadcastEmails,
+  uploadBroadcastImage
 } from '../controllers/adminBroadcast.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
+// Multer memory storage for image uploads (max 1MB)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1 * 1024 * 1024 },
+});
+
 // Admin broadcast routes
 router.post('/send', protect, sendAdminBroadcast);
+router.post('/upload-image', protect, upload.single('image'), uploadBroadcastImage);
 router.get('/', protect, getAdminBroadcasts);
 router.get('/:id', protect, getAdminBroadcastById);
 router.put('/:id', protect, updateAdminBroadcast);

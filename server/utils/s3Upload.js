@@ -104,7 +104,7 @@ export const deleteFromS3 = async (fileUrl) => {
  * @param {number} expiresIn - TTL in seconds (default 300 = 5 min)
  * @returns {Promise<string>} - Signed URL
  */
-export const getSignedFileUrl = async (fileUrl, expiresIn = 300) => {
+export const getSignedFileUrl = async (fileUrl, expiresIn = 300, options = {}) => {
   let key;
   if (fileUrl.startsWith('http')) {
     const url = new URL(fileUrl);
@@ -113,10 +113,16 @@ export const getSignedFileUrl = async (fileUrl, expiresIn = 300) => {
     key = fileUrl;
   }
 
-  const command = new GetObjectCommand({
+  const commandParams = {
     Bucket: process.env.AWS_STORAGE_BUCKET_NAME,
     Key: key,
-  });
+  };
+
+  if (options.downloadFilename) {
+    commandParams.ResponseContentDisposition = `attachment; filename="${options.downloadFilename}"`;
+  }
+
+  const command = new GetObjectCommand(commandParams);
 
   return getSignedUrl(s3Client, command, { expiresIn });
 };

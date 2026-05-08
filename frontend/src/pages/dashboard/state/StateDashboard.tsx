@@ -506,7 +506,7 @@ const StateDashboard: React.FC = () => {
                   <circle cx="18" cy="18" r="14" fill="none" stroke="#f3f4f6" strokeWidth="3" />
                   <circle
                     cx="18" cy="18" r="14" fill="none"
-                    stroke="#0B6739" strokeWidth="3"
+                    stroke="#169043" strokeWidth="3"
                     strokeDasharray={`${
                       nationalStats.obidientRegisteredVoters > 0
                         ? ((nationalStats.obidientVotersWithPVC || 0) / nationalStats.obidientRegisteredVoters) * 88

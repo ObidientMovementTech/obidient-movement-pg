@@ -64,7 +64,7 @@ export default function MobilisationPage() {
         ) : (
           <>
             <Grid size={{ xs: 6, md: 3 }}>
-              <MiniCard icon={<Target size={22} />} label="Your Level" value={stats?.level || '—'} color="#0B6739" />
+              <MiniCard icon={<Target size={22} />} label="Your Level" value={stats?.level || '—'} color="#169043" />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
               <MiniCard icon={<Users size={22} />} label="Location" value={stats?.assignedLocation || '—'} color="#1565c0" />

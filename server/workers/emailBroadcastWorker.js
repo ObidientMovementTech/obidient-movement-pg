@@ -88,7 +88,7 @@ const countEligibleUsers = async (excludeUserId) => {
 const emailBroadcastWorker = new Worker(
   QUEUE_NAME,
   async (job) => {
-    const { broadcastId, adminId, adminName, title, message, isRetry } = job.data;
+    const { broadcastId, adminId, adminName, title, message, imageUrl, isRetry } = job.data;
     const startTime = Date.now();
 
     logger.info('Email broadcast job started', { broadcastId, adminName, isRetry: !!isRetry });
@@ -224,7 +224,7 @@ const emailBroadcastWorker = new Worker(
       });
 
       const subject = `Important Message: ${title} - Obidient Movement`;
-      const html = createAdminBroadcastEmailTemplate(title, message, adminName);
+      const html = createAdminBroadcastEmailTemplate(title, message, adminName, imageUrl || null);
       const plainText = `IMPORTANT MESSAGE FROM OBIDIENT MOVEMENT\n\n${title}\n\n${message}\n\nThis message was sent by ${adminName || 'Obidient Movement Administration'} to all members of the Obidient Movement platform.\n\nFor updates and more information, visit your dashboard at: https://member.obidients.com/dashboard\n\n— The Obidient Movement Team`;
 
       // Create a dedicated transporter for this job with tuned settings

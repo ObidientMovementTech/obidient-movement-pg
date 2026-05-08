@@ -51,7 +51,7 @@ export default function PbxDashboard() {
           label: 'Total Members',
           value: formatNumber(d.totalMembers ?? d.memberCount ?? 0),
           icon: <Users size={22} />,
-          color: '#0B6739',
+          color: '#169043',
           bgColor: '#e8f5e9',
         });
         cards.push({

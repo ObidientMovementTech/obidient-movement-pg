@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import BroadcastEmailLog from "../models/broadcastEmailLog.model.js";
 import { transformUser, transformBroadcast } from '../utils/mongoCompat.js';
 import emailBroadcastQueue from '../queues/emailBroadcastQueue.js';
+import { uploadBufferToS3 } from '../utils/s3Upload.js';
 import Redis from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379/0', {
@@ -17,7 +18,7 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379/0', {
  * notifications + email delivery. Returns immediately.
  */
 export const sendAdminBroadcast = async (req, res) => {
-  const { title, message } = req.body;
+  const { title, message, imageUrl } = req.body;
   const sentBy = req.userId;
 
   if (!title || !message) {
@@ -31,7 +32,7 @@ export const sendAdminBroadcast = async (req, res) => {
     }
 
     // Create the broadcast record (status = pending)
-    const newBroadcast = await AdminBroadcast.create({ title, message, sentBy });
+    const newBroadcast = await AdminBroadcast.create({ title, message, sentBy, imageUrl: imageUrl || null });
 
     const adminName = admin.name || admin.userName || 'Obidient Movement Administration';
 
@@ -42,6 +43,7 @@ export const sendAdminBroadcast = async (req, res) => {
       adminName,
       title,
       message,
+      imageUrl: imageUrl || null,
       isRetry: false
     }, {
       jobId: `broadcast-${newBroadcast.id}`
@@ -236,6 +238,7 @@ export const retryBroadcastEmails = async (req, res) => {
       adminName,
       title: broadcast.title,
       message: broadcast.message,
+      imageUrl: broadcast.imageUrl || null,
       isRetry: true
     }, {
       jobId: `broadcast-retry-${id}-${Date.now()}`
@@ -351,9 +354,9 @@ export const getAdminBroadcastById = async (req, res) => {
  * Update an admin broadcast
  */
 export const updateAdminBroadcast = async (req, res) => {
-  const { title, message } = req.body;
+  const { title, message, imageUrl } = req.body;
 
-  if (!title && !message) {
+  if (!title && !message && imageUrl === undefined) {
     return res.status(400).json({ message: "Nothing to update" });
   }
 
@@ -374,6 +377,7 @@ export const updateAdminBroadcast = async (req, res) => {
     const updateData = {};
     if (title) updateData.title = title;
     if (message) updateData.message = message;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
 
     const updatedBroadcast = await AdminBroadcast.findByIdAndUpdate(
       req.params.id,
@@ -504,5 +508,43 @@ export const deleteAdminBroadcast = async (req, res) => {
   } catch (error) {
     console.error("Error deleting admin broadcast:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/**
+ * Upload a broadcast image to S3.
+ * Accepts multipart/form-data with field name "image".
+ * Returns the public S3 URL.
+ */
+export const uploadBroadcastImage = async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (!admin || admin.role !== 'admin') {
+      return res.status(403).json({ message: "Unauthorized - admin privileges required" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: "Invalid file type. Only JPEG, PNG, and WebP are allowed." });
+    }
+
+    // Max 1MB
+    if (req.file.size > 1 * 1024 * 1024) {
+      return res.status(400).json({ message: "File too large. Maximum size is 1MB." });
+    }
+
+    const imageUrl = await uploadBufferToS3(req.file.buffer, req.file.originalname, {
+      folder: 'broadcast-images',
+      contentType: req.file.mimetype,
+    });
+
+    res.status(200).json({ success: true, imageUrl });
+  } catch (error) {
+    console.error("Error uploading broadcast image:", error);
+    res.status(500).json({ message: "Image upload failed" });
   }
 };

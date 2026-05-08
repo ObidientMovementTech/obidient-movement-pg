@@ -409,7 +409,7 @@ export default function PbxMobileFeedsPage() {
                     step={0.1}
                     value={zoom}
                     onChange={(e) => setZoom(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: '#0B6739' }}
+                    style={{ width: '100%', accentColor: '#169043' }}
                   />
                   <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
                     <Button

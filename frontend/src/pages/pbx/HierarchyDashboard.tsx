@@ -166,12 +166,12 @@ export default function HierarchyDashboard() {
           <Grid container spacing={3} sx={{ mb: 4 }}>
             {data?.totalMembers !== undefined && (
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatMini icon={<Users size={20} />} label="Members" value={data.totalMembers} color="#0B6739" />
+                <StatMini icon={<Users size={20} />} label="Members" value={data.totalMembers} color="#169043" />
               </Grid>
             )}
             {data?.memberCount !== undefined && (
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatMini icon={<Users size={20} />} label="Members" value={data.memberCount} color="#0B6739" />
+                <StatMini icon={<Users size={20} />} label="Members" value={data.memberCount} color="#169043" />
               </Grid>
             )}
             {(data?.coordinatorCount ?? data?.totalCoordinators) !== undefined && (
@@ -200,7 +200,7 @@ export default function HierarchyDashboard() {
           {data?.coordinator && (
             <Card sx={{ mb: 4 }}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Shield size={28} color="#0B6739" />
+                <Shield size={28} color="#169043" />
                 <Box>
                   <Typography variant="subtitle1">{data.coordinator.name || 'Coordinator'}</Typography>
                   <Typography variant="body2">

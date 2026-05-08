@@ -1,5 +1,15 @@
 import { Link } from 'react-router';
+import { useState, useEffect, useCallback } from 'react';
 import SEOHead from '../../components/public/SEOHead';
+import GradientCTA from '../../components/ui/GradientCTA';
+import MarqueeTicker from '../../components/public/MarqueeTicker';
+import MissionSection from '../../components/public/MissionSection';
+import FuturisticSectors from '../../components/public/FuturisticSectors';
+import LeadershipSpotlight from '../../components/public/LeadershipSpotlight';
+import VideoShowcase from '../../components/public/VideoShowcase';
+import ValuesPillars from '../../components/public/ValuesPillars';
+import MobileAppSection from '../../components/public/MobileAppSection';
+import LatestNews from '../../components/public/LatestNews';
 import heroImg from '../../assets/images/po1.webp';
 import meetingImg from '../../assets/images/po3.jpg';
 import voteAppImg from '../../assets/images/po4.jpg';
@@ -72,6 +82,28 @@ const missionFeatures = [
 ];
 
 const HomePage = () => {
+  const heroSlides = [heroImg, leaderImg, meetingImg, voteAppImg, rallyImg];
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [prevSlide, setPrevSlide] = useState<number | null>(null);
+
+  const advanceSlide = useCallback(() => {
+    setPrevSlide(activeSlide);
+    setActiveSlide((prev) => (prev + 1) % heroSlides.length);
+  }, [activeSlide, heroSlides.length]);
+
+  useEffect(() => {
+    const interval = setInterval(advanceSlide, 6000);
+    return () => clearInterval(interval);
+  }, [advanceSlide]);
+
+  // Clear prevSlide after transition completes
+  useEffect(() => {
+    if (prevSlide !== null) {
+      const timeout = setTimeout(() => setPrevSlide(null), 1200);
+      return () => clearTimeout(timeout);
+    }
+  }, [prevSlide]);
+
   return (
     <>
       <SEOHead
@@ -80,99 +112,193 @@ const HomePage = () => {
         jsonLd={organizationJsonLd}
       />
 
-      {/* ── Hero Section ────────────────────────────────────────── */}
-      <section className="min-h-[85vh] flex items-center">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 w-full">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left Content */}
-            <div className="order-2 lg:order-1">
-              <span className="text-sm uppercase tracking-wider font-medium text-accent-green">
-                The People's Movement
-              </span>
-              <h1 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tight text-text-light dark:text-text-dark leading-[1.1]">
-                Register, verify, and become an{' '}
-                <span className="text-accent-green">Obidient member</span>
-              </h1>
-              <p className="mt-6 text-base lg:text-lg text-text-muted leading-relaxed max-w-lg">
-                Join millions of Nigerians committed to democratic progress. Verify your identity, connect with your local chapter, and be part of the change.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link
-                  to="/auth/sign-up"
-                  className="inline-flex items-center gap-2 bg-accent-green text-white px-7 py-3.5 rounded-lg font-medium hover:bg-accent-green/90 transition-colors text-sm"
-                >
-                  Register Now
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                  </svg>
-                </Link>
-                <Link
-                  to="/auth/login"
-                  className="inline-flex items-center gap-2 border border-gray-300 dark:border-gray-600 text-text-light dark:text-text-dark px-7 py-3.5 rounded-lg font-medium hover:border-accent-green hover:text-accent-green transition-colors text-sm"
-                >
-                  Member Portal
-                </Link>
-              </div>
-            </div>
+      {/* ── Cinematic Hero Section ──────────────────────────────── */}
+      <section className="relative min-h-[calc(100vh-4rem)] flex items-center overflow-hidden">
+        {/* Background Slideshow */}
+        <div className="absolute inset-0">
+          {heroSlides.map((slide, index) => (
+            <img
+              key={index}
+              src={slide}
+              alt=""
+              aria-hidden="true"
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1200ms] ease-in-out ${
+                index === activeSlide
+                  ? 'opacity-100 animate-kenburns'
+                  : index === prevSlide
+                  ? 'opacity-0'
+                  : 'opacity-0'
+              }`}
+              style={{ animationDelay: index === activeSlide ? '0ms' : undefined }}
+            />
+          ))}
+        </div>
 
-            {/* Right Imagery */}
-            <div className="order-1 lg:order-2">
-              <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
-                <img
-                  src={heroImg}
-                  alt="Obidient Movement digital platform connecting Nigerian citizens"
-                  className="w-full h-full object-cover"
-                />
-              </div>
+        {/* Dark Cinematic Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40" />
+
+        {/* Subtle grid pattern overlay for corporate texture */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+
+        {/* Accent top border line */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#D42B27] to-transparent" />
+
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 w-full">
+          <div className="max-w-3xl">
+            <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] font-semibold text-[#D42B27] mb-8">
+              <span className="w-8 h-px bg-[#D42B27]" />
+              The People's Movement
+            </span>
+            <h1 className="text-5xl sm:text-6xl lg:text-8xl font-medium tracking-tight text-white leading-[1.02]">
+              A New Nigeria
+              <br />
+              <span className="text-white/90">is POssible</span>
+            </h1>
+            <p className="mt-8 text-lg lg:text-xl text-gray-300 leading-relaxed max-w-xl">
+              Join millions of Nigerians committed to democratic progress. Register, verify your identity, and be part of the movement reshaping our nation.
+            </p>
+            <div className="mt-12 flex flex-wrap gap-4">
+              <GradientCTA to="/auth/sign-up">
+                Join the Movement
+                <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </GradientCTA>
+              <Link
+                to="/auth/login"
+                className="inline-flex items-center gap-2 border border-white/20 text-white px-8 py-4 rounded-lg font-semibold hover:border-white/50 hover:bg-white/5 transition-all text-sm backdrop-blur-sm hover:-translate-y-0.5"
+              >
+                Member Portal
+              </Link>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ── Mission Section ──────────────────────────────────────── */}
-      <section className="py-20 lg:py-24 bg-gray-50/50 dark:bg-secondary-light/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left Image Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="aspect-square rounded-xl overflow-hidden">
-                <img src={meetingImg} alt="Community meeting with Obidient Movement members" className="w-full h-full object-cover" />
+        {/* Bottom Stats Bar */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 border-t border-white/10 bg-black/30 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
+            <div className="hidden sm:flex items-center gap-8 lg:gap-12">
+              <div className="text-center">
+                <span className="block text-2xl font-bold text-white">36</span>
+                <span className="text-xs uppercase tracking-wider text-gray-400">States</span>
               </div>
-              <div className="aspect-square rounded-xl overflow-hidden mt-8">
-                <img src={voteAppImg} alt="Secure digital voting platform" className="w-full h-full object-cover" />
+              <div className="w-px h-8 bg-white/10" />
+              <div className="text-center">
+                <span className="block text-2xl font-bold text-white">774</span>
+                <span className="text-xs uppercase tracking-wider text-gray-400">LGAs Covered</span>
               </div>
-              <div className="aspect-square rounded-xl overflow-hidden -mt-8">
-                <img src={rallyImg} alt="Obidient Movement rally for a better Nigeria" className="w-full h-full object-cover" />
-              </div>
-              <div className="aspect-square rounded-xl overflow-hidden">
-                <img src={leaderImg} alt="Movement leadership" className="w-full h-full object-cover" />
+              <div className="w-px h-8 bg-white/10" />
+              <div className="text-center">
+                <span className="block text-2xl font-bold text-white">25k+</span>
+                <span className="text-xs uppercase tracking-wider text-gray-400">Members</span>
               </div>
             </div>
 
-            {/* Right Content */}
-            <div>
-              <span className="text-sm uppercase tracking-wider font-medium text-accent-green">
-                Our Mission
-              </span>
-              <h2 className="mt-3 text-3xl lg:text-4xl font-medium text-text-light dark:text-text-dark tracking-tight">
-                Empowering every Nigerian for democratic participation
-              </h2>
-              <p className="mt-4 text-base text-text-muted leading-relaxed">
-                The Obidient Movement is building the largest verified civic membership platform in Nigeria. We mobilize, organize, and empower citizens through technology and collective action.
-              </p>
+            {/* Slide Indicators */}
+            <div className="flex gap-2 mx-auto sm:mx-0">
+              {heroSlides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setPrevSlide(activeSlide);
+                    setActiveSlide(index);
+                  }}
+                  className={`h-1.5 rounded-full transition-all duration-500 ${
+                    index === activeSlide ? 'w-8 bg-[#D42B27]' : 'w-3 bg-white/30 hover:bg-white/50'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
 
-              <div className="mt-8 space-y-6">
-                {missionFeatures.map((feat) => (
-                  <div key={feat.title} className="flex gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-accent-green/10 text-accent-green flex items-center justify-center">
-                      {feat.icon}
+        {/* Scroll Hint */}
+        <div className="absolute bottom-20 right-8 text-white/40 animate-bounce hidden lg:block">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+          </svg>
+        </div>
+      </section>
+
+      {/* ── Marquee Ticker ────────────────────────────────────── */}
+      <MarqueeTicker />
+
+      {/* ── Mission Section ──────────────────────────────────────── */}
+      <MissionSection missionFeatures={missionFeatures} />
+
+      {/* ── Futuristic Sectors — "A New Nigeria Is Possible" ─────── */}
+      <FuturisticSectors />
+
+      {/* ── Leadership Spotlight ──────────────────────────────────── */}
+      <LeadershipSpotlight />
+
+      {/* ── Video Showcase ───────────────────────────────────────── */}
+      <VideoShowcase />
+
+      {/* ── Mobile App Section ───────────────────────────────────── */}
+      <MobileAppSection />
+
+      {/* ── Values / Pillars ─────────────────────────────────────── */}
+      <ValuesPillars />
+
+      {/* ── How It Works — Vertical Timeline ────────────────────── */}
+      <section className="py-24 lg:py-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Logo + Movement Name centered above */}
+          <div className="flex flex-col items-center mb-16">
+            <img src="/obi-icon.svg" alt="Obidient Movement" className="w-28 h-28 lg:w-36 lg:h-36" />
+            <h3 className="mt-5 text-2xl sm:text-3xl lg:text-4xl font-medium text-text-light dark:text-text-dark tracking-tight">
+              The Obidient Movement
+            </h3>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+            {/* Left — Heading */}
+            <div className="lg:sticky lg:top-32">
+              <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] font-semibold text-accent-green">
+                <span className="w-8 h-px bg-accent-green" />
+                How It Works
+              </span>
+              <h2 className="mt-4 text-3xl lg:text-5xl font-medium text-text-light dark:text-text-dark tracking-tight leading-[1.1]">
+                Three steps to join the movement
+              </h2>
+              <p className="mt-5 text-base text-text-muted leading-relaxed">
+                Getting started takes less than 5 minutes. Follow these simple steps to become a verified Obidient member.
+              </p>
+              <div className="mt-8">
+                <GradientCTA to="/auth/sign-up">
+                  Start Registration
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </GradientCTA>
+              </div>
+            </div>
+
+            {/* Right — Timeline */}
+            <div className="relative">
+              {/* Vertical line */}
+              <div className="absolute left-5 top-2 bottom-2 w-px bg-gray-200 dark:bg-gray-700" />
+
+              <div className="space-y-12">
+                {steps.map((step) => (
+                  <div key={step.num} className="relative pl-14 group">
+                    {/* Timeline node */}
+                    <div className="absolute left-0 top-1 w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark flex items-center justify-center group-hover:border-accent-green transition-colors">
+                      <span className="text-sm font-semibold text-accent-green">
+                        {step.num}
+                      </span>
                     </div>
-                    <div>
-                      <h3 className="text-base font-medium text-text-light dark:text-text-dark">
-                        {feat.title}
+
+                    <div className="bg-white dark:bg-secondary-light border border-gray-100 dark:border-gray-700 rounded-xl p-6 lg:p-8 group-hover:border-accent-green/30 transition-all duration-300">
+                      <h3 className="text-xl font-medium text-text-light dark:text-text-dark">
+                        {step.title}
                       </h3>
-                      <p className="mt-1 text-sm text-text-muted leading-relaxed">
-                        {feat.desc}
+                      <p className="mt-2 text-sm text-text-muted leading-relaxed">
+                        {step.desc}
                       </p>
                     </div>
                   </div>
@@ -183,103 +309,79 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ── How It Works Section ─────────────────────────────────── */}
-      <section className="py-20 lg:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-sm uppercase tracking-wider font-medium text-accent-green">
-              How It Works
-            </span>
-            <h2 className="mt-3 text-3xl lg:text-4xl font-medium text-text-light dark:text-text-dark tracking-tight">
-              Three simple steps to join
-            </h2>
-            <p className="mt-4 text-base text-text-muted leading-relaxed">
-              Getting started takes less than 5 minutes. Follow these simple steps to become a verified Obidient member.
-            </p>
-          </div>
+      {/* ── Latest News ──────────────────────────────────────────── */}
+      <LatestNews />
 
-          <div className="grid md:grid-cols-3 gap-6 lg:gap-8 relative">
-            {/* Connector line (desktop only) */}
-            <div className="hidden md:block absolute top-20 left-[20%] right-[20%] h-px bg-gray-200 dark:bg-gray-700" />
-
-            {steps.map((step) => (
-              <div
-                key={step.num}
-                className="relative bg-white dark:bg-secondary-light border border-gray-100 dark:border-gray-700 rounded-xl p-8 hover:border-accent-green/30 transition-colors group"
-              >
-                <span className="text-4xl font-medium text-accent-green/20 group-hover:text-accent-green/40 transition-colors">
-                  {step.num}
-                </span>
-                <h3 className="mt-4 text-xl font-medium text-text-light dark:text-text-dark">
-                  {step.title}
-                </h3>
-                <p className="mt-2 text-sm text-text-muted leading-relaxed">
-                  {step.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Quote Section ────────────────────────────────────────── */}
-      <section className="py-20 lg:py-24 bg-gray-900 text-white relative overflow-hidden">
-        <img src={leaderImg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" aria-hidden="true" />
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/80 to-gray-900/95" />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <svg className="w-10 h-10 mx-auto mb-6 text-accent-green/40" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151C7.563 6.068 6 8.789 6 11h4v10H0z" />
-          </svg>
-          <blockquote className="text-2xl sm:text-3xl lg:text-4xl font-medium leading-snug tracking-tight">
+      {/* ── Quote Section — Full-bleed ────────────────────────────── */}
+      <section className="relative py-32 lg:py-40 overflow-hidden">
+        <img src={leaderImg} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden="true" />
+        <div className="absolute inset-0 bg-gray-950/85" />
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-950/50 via-transparent to-gray-950/50" />
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="w-12 h-px bg-[#D42B27] mx-auto mb-10" />
+          <blockquote className="text-3xl sm:text-4xl lg:text-6xl font-medium text-white leading-[1.15] tracking-tight italic">
             "The power of the people is greater than the people in power."
           </blockquote>
-          <p className="mt-6 text-gray-400 text-sm">
-            — The Obidient Movement
-          </p>
+          <div className="mt-10 flex items-center justify-center gap-3">
+            <div className="w-8 h-px bg-white/30" />
+            <p className="text-gray-400 text-sm uppercase tracking-[0.2em]">
+              The Obidient Movement
+            </p>
+            <div className="w-8 h-px bg-white/30" />
+          </div>
         </div>
       </section>
 
-      {/* ── Final CTA Section ────────────────────────────────────── */}
-      <section className="py-20 lg:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative bg-gradient-to-br from-accent-green to-accent-green/80 rounded-3xl px-8 py-16 lg:px-16 lg:py-20 overflow-hidden">
-            {/* Decorative blurred circles */}
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-            <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-white/10 rounded-full blur-3xl" />
+      {/* ── Final CTA Section — "Get Involved" ─────────────────── */}
+      <section className="py-24 lg:py-32 bg-gray-950 relative overflow-hidden">
+        {/* Subtle background elements */}
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent-green/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#D42B27]/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, #169043, #D42B27, transparent)' }} />
 
-            <div className="relative z-10 text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl lg:text-4xl font-medium text-white tracking-tight">
-                Ready to join the movement?
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* Left — Copy + CTA */}
+            <div>
+              <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] font-semibold text-accent-green">
+                <span className="w-8 h-px bg-accent-green" />
+                Get Involved
+              </span>
+              <h2 className="mt-5 text-3xl lg:text-5xl font-medium text-white tracking-tight leading-[1.1]">
+                The future won't build itself.{' '}
+                <span className="text-white/70">Nigeria needs you.</span>
               </h2>
-              <p className="mt-4 text-white/80 text-base leading-relaxed">
-                Be part of a growing community of verified Nigerians committed to democratic progress and national transformation.
+              <p className="mt-6 text-gray-400 text-base lg:text-lg leading-relaxed max-w-lg">
+                The Obidient Movement is committed to building a stronger, more accountable Nigeria through verified civic participation — with a growing community of members organized across every state.
               </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-4">
-                <Link
-                  to="/auth/sign-up"
-                  className="inline-flex items-center gap-2 bg-white text-accent-green px-7 py-3.5 rounded-lg font-medium hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Register Now
-                </Link>
-                <Link
-                  to="/auth/login"
-                  className="inline-flex items-center gap-2 border border-white/40 text-white px-7 py-3.5 rounded-lg font-medium hover:bg-white/10 transition-colors text-sm"
-                >
-                  Member Portal
-                </Link>
+              <div className="mt-8">
+                <GradientCTA to="/auth/sign-up">
+                  Learn How
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </GradientCTA>
               </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="relative z-10 mt-14 grid grid-cols-3 gap-6 max-w-md mx-auto">
+            {/* Right — Stats Grid */}
+            <div className="grid grid-cols-2 gap-4">
               {[
-                { val: '5 min', label: 'Registration' },
-                { val: '100%', label: 'Secure' },
-                { val: 'Free', label: 'Registration' },
+                { val: '36', label: 'States Organized' },
+                { val: '774', label: 'LGAs Covered' },
+                { val: '25k+', label: 'Verified Members' },
+                { val: '8k+', label: 'Polling Units Mapped' },
               ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <div className="text-2xl font-medium text-white">{stat.val}</div>
-                  <div className="text-xs text-white/60 mt-1">{stat.label}</div>
+                <div
+                  key={stat.label}
+                  className="bg-white/5 border border-white/10 rounded-xl p-6 lg:p-8 hover:border-accent-green/30 transition-colors"
+                >
+                  <div className="text-3xl lg:text-4xl font-medium text-white">
+                    {stat.val}
+                  </div>
+                  <div className="mt-2 text-xs uppercase tracking-wider text-gray-400">
+                    {stat.label}
+                  </div>
                 </div>
               ))}
             </div>

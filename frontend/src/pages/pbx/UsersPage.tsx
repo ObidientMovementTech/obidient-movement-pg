@@ -541,7 +541,7 @@ export default function UsersPage() {
   const statCards = stats ? [
     { label: 'Total Users', value: stats.totalUsers, color: '#3b82f6' },
     { label: 'Admins', value: stats.totalAdmins, color: '#8b5cf6' },
-    { label: 'Verified', value: stats.verifiedUsers, color: '#0B6739' },
+    { label: 'Verified', value: stats.verifiedUsers, color: '#169043' },
     { label: 'Unverified', value: stats.unverifiedUsers, color: '#f59e0b',
       sub: unverifiedStats?.recentSignups ? `+${unverifiedStats.recentSignups} this week` : undefined },
     { label: 'New This Month', value: stats.newUsersMonth, color: '#06b6d4' },

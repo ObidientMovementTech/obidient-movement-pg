@@ -44,6 +44,9 @@ import adcRoutes from './routes/adc.route.js';
 import reactionRoutes from './routes/reaction.route.js';
 import nigeriaLocationsRoutes from './routes/nigeriaLocations.routes.js';
 import coordinatorRoutes from './routes/coordinator.routes.js';
+import publicLeadersRoutes from './routes/publicLeaders.routes.js';
+import appDownloadRoutes from './routes/appDownload.route.js';
+import involvementRoutes from './routes/involvement.route.js';
 import { initSocket } from './config/socket.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
@@ -180,6 +183,9 @@ app.use('/api/settings', appSettingsRoutes); // App settings (mobilization pack,
 app.use('/api/reactions', reactionRoutes); // Reactions (like, love, smile, meh)
 app.use('/api/nigeria-locations', nigeriaLocationsRoutes); // Public Nigeria location hierarchy
 app.use('/api/coordinator', coordinatorRoutes); // Coordinator assignment (search, assign, remove, subordinates)
+app.use('/api/public', publicLeadersRoutes); // Public leaders page (no auth)
+app.use('/api/app-download', appDownloadRoutes); // Mobile app download system
+app.use('/api/involvement', involvementRoutes); // Get Involved interest form + admin
 
 // Placeholder route
 app.get('/', (req, res) => {

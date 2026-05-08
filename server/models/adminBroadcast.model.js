@@ -7,13 +7,13 @@ class AdminBroadcast {
 
   // Create a new admin broadcast
   static async create(broadcastData) {
-    const { title, message, sentBy } = broadcastData;
+    const { title, message, sentBy, imageUrl } = broadcastData;
 
     const result = await query(
-      `INSERT INTO "adminBroadcasts" (title, message, "sentBy") 
-       VALUES ($1, $2, $3) 
+      `INSERT INTO "adminBroadcasts" (title, message, "sentBy", "imageUrl") 
+       VALUES ($1, $2, $3, $4) 
        RETURNING *`,
-      [title, message, sentBy]
+      [title, message, sentBy, imageUrl || null]
     );
 
     return new AdminBroadcast(result.rows[0]);
@@ -105,7 +105,7 @@ class AdminBroadcast {
     const values = [];
     let paramCount = 1;
 
-    const updatableFields = ['title', 'message', 'status', 'totalRecipients', 'emailsSent', 'emailsFailed', 'notificationsCreated', 'startedAt', 'completedAt'];
+    const updatableFields = ['title', 'message', 'imageUrl', 'status', 'totalRecipients', 'emailsSent', 'emailsFailed', 'notificationsCreated', 'startedAt', 'completedAt'];
 
     updatableFields.forEach(field => {
       if (updateData[field] !== undefined) {
@@ -190,7 +190,7 @@ class AdminBroadcast {
     const values = [];
     let paramCount = 1;
 
-    const updatableFields = ['title', 'message', 'status', 'totalRecipients', 'emailsSent', 'emailsFailed', 'notificationsCreated', 'startedAt', 'completedAt'];
+    const updatableFields = ['title', 'message', 'imageUrl', 'status', 'totalRecipients', 'emailsSent', 'emailsFailed', 'notificationsCreated', 'startedAt', 'completedAt'];
 
     updatableFields.forEach(field => {
       if (this[field] !== undefined) {

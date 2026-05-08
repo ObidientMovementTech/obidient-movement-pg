@@ -1001,7 +1001,45 @@ export const adminUserManagementController = {
           [userId]
         );
 
-        // 13. Finally delete the main user record
+        // 13. Delete call logs
+        await client.query(
+          'DELETE FROM call_logs WHERE volunteer_id = $1',
+          [userId]
+        );
+
+        // 14. Nullify inec_voters references
+        await client.query(
+          'UPDATE inec_voters SET last_updated_by = NULL WHERE last_updated_by = $1',
+          [userId]
+        );
+        await client.query(
+          'UPDATE inec_voters SET imported_by = NULL WHERE imported_by = $1',
+          [userId]
+        );
+
+        // 15. Nullify call_center_assignments.assigned_by
+        await client.query(
+          'UPDATE call_center_assignments SET assigned_by = NULL WHERE assigned_by = $1',
+          [userId]
+        );
+
+        // 16. Delete/nullify leadership_messages references
+        await client.query(
+          'DELETE FROM leadership_messages WHERE sender_id = $1',
+          [userId]
+        );
+        await client.query(
+          'UPDATE leadership_messages SET assigned_to = NULL WHERE assigned_to = $1',
+          [userId]
+        );
+
+        // 17. Delete push tokens
+        await client.query(
+          'DELETE FROM push_tokens WHERE user_id = $1',
+          [userId]
+        );
+
+        // 18. Finally delete the main user record
         await client.query(
           'DELETE FROM users WHERE id = $1',
           [userId]
