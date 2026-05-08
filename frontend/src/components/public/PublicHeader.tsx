@@ -55,101 +55,103 @@ const PublicHeader = () => {
   }, [mobileOpen]);
 
   return (
-    <header
-      className={`sticky top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.05)] border-b border-gray-200/60 dark:border-white/[0.06]'
-          : 'bg-white dark:bg-gray-950 border-b border-transparent'
-      }`}
-    >
-      <nav className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 lg:px-10">
-        <div className="flex items-center justify-between h-16 lg:h-[72px]">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <TopLogo />
-          </div>
+    <>
+      <header
+        className={`sticky top-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? 'bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.05)] border-b border-gray-200/60 dark:border-white/[0.06]'
+            : 'bg-white dark:bg-gray-950 border-b border-transparent'
+        }`}
+      >
+        <nav className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 lg:px-10">
+          <div className="flex items-center justify-between h-16 lg:h-[72px]">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <TopLogo />
+            </div>
 
-          {/* Desktop Navigation — centered */}
-          <div className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.to === '/'}
-                className={({ isActive }) =>
-                  `relative px-4 py-2 rounded-lg text-[13px] font-medium tracking-wide transition-all duration-150 ${
-                    isActive
-                      ? 'text-text-light dark:text-white bg-gray-100 dark:bg-white/[0.06]'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.04]'
-                  }`
-                }
-              >
-                {link.label}
-              </NavLink>
-            ))}
-          </div>
-
-          {/* Desktop Right Side */}
-          <div className="hidden lg:flex items-center gap-3">
-            <a
-              href={X_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-text-light dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
-              aria-label="Follow us on X"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-            </a>
-            {isLoggedIn ? (
-              <Link
-                to="/dashboard"
-                className="text-[13px] font-medium text-white bg-gray-900 dark:bg-white dark:text-gray-900 px-5 py-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/auth/login"
-                  className="text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-all"
+            {/* Desktop Navigation — centered */}
+            <div className="hidden lg:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  end={link.to === '/'}
+                  className={({ isActive }) =>
+                    `relative px-4 py-2 rounded-lg text-[13px] font-medium tracking-wide transition-all duration-150 ${
+                      isActive
+                        ? 'text-text-light dark:text-white bg-gray-100 dark:bg-white/[0.06]'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.04]'
+                    }`
+                  }
                 >
-                  Login
+                  {link.label}
+                </NavLink>
+              ))}
+            </div>
+
+            {/* Desktop Right Side */}
+            <div className="hidden lg:flex items-center gap-3">
+              <a
+                href={X_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-text-light dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
+                aria-label="Follow us on X"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              </a>
+              {isLoggedIn ? (
+                <Link
+                  to="/dashboard"
+                  className="text-[13px] font-medium text-white bg-gray-900 dark:bg-white dark:text-gray-900 px-5 py-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                >
+                  Dashboard
                 </Link>
-                <GradientCTA to="/mobile-app" className="!px-5 !py-2 !text-[13px] !rounded-lg !shadow-none">
-                  Download App
-                </GradientCTA>
-              </>
-            )}
-          </div>
-
-          {/* Mobile Hamburger */}
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden p-2 -mr-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              {mobileOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
+                <>
+                  <Link
+                    to="/auth/login"
+                    className="text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-all"
+                  >
+                    Login
+                  </Link>
+                  <GradientCTA to="/mobile-app" className="!px-5 !py-2 !text-[13px] !rounded-lg !shadow-none">
+                    Download App
+                  </GradientCTA>
+                </>
               )}
-            </svg>
-          </button>
-        </div>
-      </nav>
+            </div>
 
-      {/* Mobile Overlay */}
+            {/* Mobile Hamburger */}
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="lg:hidden p-2 -mr-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                {mobileOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
+                )}
+              </svg>
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      {/* Mobile Overlay — OUTSIDE header to escape stacking context */}
       <div
-        className={`fixed inset-0 z-[90] bg-black/30 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+        className={`fixed inset-0 z-[9998] bg-black/30 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
           mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setMobileOpen(false)}
       />
 
-      {/* Mobile Panel — Rich Navigation */}
+      {/* Mobile Panel — OUTSIDE header to escape stacking context */}
       <div
-        className={`fixed top-0 right-0 z-[100] h-full w-[320px] max-w-[85vw] bg-white dark:bg-gray-950 border-l border-gray-200 dark:border-white/[0.06] shadow-2xl transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden overflow-y-auto ${
+        className={`fixed top-0 right-0 z-[9999] h-full w-[320px] max-w-[85vw] bg-white dark:bg-gray-950 border-l border-gray-200 dark:border-white/[0.06] shadow-2xl transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden overflow-y-auto ${
           mobileOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -265,7 +267,7 @@ const PublicHeader = () => {
           </div>
         </div>
       </div>
-    </header>
+    </>
   );
 };
 

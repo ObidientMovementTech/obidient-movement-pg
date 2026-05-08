@@ -7,9 +7,9 @@ const TopLogo = () => {
       <OptimizedImage
         src="/obidientLogoGreen.svg"
         alt="Obidient Movement Logo"
-        className="w-48 block dark:hidden"
-        width={192}
-        height={64}
+        className="w-40 block dark:hidden"
+        width={160}
+        height={53}
         loading="eager"
       />
 
@@ -17,9 +17,9 @@ const TopLogo = () => {
       <OptimizedImage
         src="/obidientLogo.svg"
         alt="Obidient Movement Logo"
-        className="w-48 hidden dark:block"
-        width={192}
-        height={64}
+        className="w-40 hidden dark:block"
+        width={160}
+        height={53}
         loading="eager"
       />
     </a>
