@@ -181,13 +181,14 @@ export const getNationalData = async (req, res) => {
       });
     }
 
-    // Get all states data
+    // Get all states data with reconciled PVC math
     const votersData = await getObidientVotersByState();
 
     const statesData = votersData.map(stateData => {
       const totalObidient = stateData.totalObidientUsers || 0;
       const votersWithPVC = stateData.votersWithPVC || 0;
-      const votersWithoutPVC = stateData.votersWithoutPVC || 0;
+      // Reconcile: without = total - with (guarantees donut adds up)
+      const votersWithoutPVC = totalObidient - votersWithPVC;
 
       return {
         id: stateData.state.toLowerCase().replace(/\s+/g, '-'),
@@ -216,6 +217,15 @@ export const getNationalData = async (req, res) => {
       pvcWithStatus: 0,
       pvcWithoutStatus: 0
     });
+
+    // Count users with no votingState at all (invisible across all states)
+    const noStateResult = await query(`
+      SELECT COUNT(*) AS n FROM users
+      WHERE "votingState" IS NULL OR "votingState" = ''
+    `);
+    const unassignedCount = parseInt(noStateResult.rows[0]?.n) || 0;
+    nationalStats.unassignedCount = unassignedCount;
+    nationalStats.unassignedLabel = 'No State Set';
 
     res.json({
       success: true,
@@ -296,8 +306,7 @@ export const getStateData = async (req, res) => {
       SELECT 
         "votingLGA" as lga,
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
-        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc
       FROM users
       WHERE "votingState" = $1 AND "votingLGA" IS NOT NULL AND "votingLGA" != ''
       GROUP BY "votingLGA"
@@ -305,7 +314,31 @@ export const getStateData = async (req, res) => {
     `;
     const lgaResult = await query(lgaQuery, [stateName]);
 
-    if (lgaResult.rows.length === 0) {
+    // Direct headline total for this state (matches national path exactly)
+    const headlineQuery = `
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') AS with_pvc,
+        COUNT(*) FILTER (WHERE "votingLGA" IS NULL OR "votingLGA" = '') AS unassigned_lga
+      FROM users
+      WHERE "votingState" = $1
+    `;
+    const headlineResult = await query(headlineQuery, [stateName]);
+    const headline = headlineResult.rows[0] || { total: '0', with_pvc: '0', unassigned_lga: '0' };
+    const headlineTotal = parseInt(headline.total) || 0;
+    const headlineWithPVC = parseInt(headline.with_pvc) || 0;
+    const unassignedLGA = parseInt(headline.unassigned_lga) || 0;
+
+    // Check for cross-state LGAs (LGA doesn't belong to this state in nigeria_locations)
+    const validLgasResult = await query(
+      `SELECT l.name FROM nigeria_locations l
+       JOIN nigeria_locations s ON l.parent_id = s.id AND s.level='state' AND s.name = $1
+       WHERE l.level='lga'`,
+      [stateName]
+    );
+    const validLgaNames = new Set(validLgasResult.rows.map(r => r.name));
+
+    if (lgaResult.rows.length === 0 && unassignedLGA === 0) {
       console.log(`⚠️ No voter data yet for state: ${stateName} — returning empty dashboard`);
       return res.json({
         success: true,
@@ -324,7 +357,8 @@ export const getStateData = async (req, res) => {
     const lgasData = lgaResult.rows.map(row => {
       const total = parseInt(row.total) || 0;
       const withPvc = parseInt(row.with_pvc) || 0;
-      const withoutPvc = parseInt(row.without_pvc) || 0;
+      const withoutPvc = total - withPvc; // Reconciled
+      const isInvalidLocation = !validLgaNames.has(row.lga);
       return {
         id: `${stateId}-${toSlug(row.lga)}`,
         name: row.lga,
@@ -336,25 +370,45 @@ export const getStateData = async (req, res) => {
         obidientVotersWithPVC: withPvc,
         obidientVotersWithoutPVC: withoutPvc,
         pvcWithStatus: withPvc,
-        pvcWithoutStatus: withoutPvc
+        pvcWithoutStatus: withoutPvc,
+        ...(isInvalidLocation && { isInvalidLocation: true })
       };
     });
 
+    // Append synthetic "Unassigned LGA" row if any exist
+    if (unassignedLGA > 0) {
+      const unassignedPvcResult = await query(
+        `SELECT COUNT(*) FILTER (WHERE "isVoter" = 'Yes') AS with_pvc
+         FROM users WHERE "votingState" = $1 AND ("votingLGA" IS NULL OR "votingLGA" = '')`,
+        [stateName]
+      );
+      const unassignedWithPvc = parseInt(unassignedPvcResult.rows[0]?.with_pvc) || 0;
+      lgasData.push({
+        id: `${stateId}-unassigned`,
+        name: 'Unassigned LGA',
+        code: '—',
+        level: 'lga',
+        stateId,
+        stateName,
+        obidientRegisteredVoters: unassignedLGA,
+        obidientVotersWithPVC: unassignedWithPvc,
+        obidientVotersWithoutPVC: unassignedLGA - unassignedWithPvc,
+        pvcWithStatus: unassignedWithPvc,
+        pvcWithoutStatus: unassignedLGA - unassignedWithPvc,
+        isUnassigned: true
+      });
+    }
 
-    // Calculate state totals
-    const stateStats = lgasData.reduce((acc, lga) => ({
-      obidientRegisteredVoters: acc.obidientRegisteredVoters + lga.obidientRegisteredVoters,
-      obidientVotersWithPVC: acc.obidientVotersWithPVC + lga.obidientVotersWithPVC,
-      obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + lga.obidientVotersWithoutPVC,
-      pvcWithStatus: acc.pvcWithStatus + lga.pvcWithStatus,
-      pvcWithoutStatus: acc.pvcWithoutStatus + lga.pvcWithoutStatus
-    }), {
-      obidientRegisteredVoters: 0,
-      obidientVotersWithPVC: 0,
-      obidientVotersWithoutPVC: 0,
-      pvcWithStatus: 0,
-      pvcWithoutStatus: 0
-    });
+    // State stats use the direct headline (reconciled, never drifts from national)
+    const stateStats = {
+      obidientRegisteredVoters: headlineTotal,
+      obidientVotersWithPVC: headlineWithPVC,
+      obidientVotersWithoutPVC: headlineTotal - headlineWithPVC,
+      pvcWithStatus: headlineWithPVC,
+      pvcWithoutStatus: headlineTotal - headlineWithPVC,
+      unassignedCount: unassignedLGA,
+      unassignedLabel: 'No LGA Set'
+    };
 
     res.json({
       success: true,
@@ -471,8 +525,7 @@ export const getLGAData = async (req, res) => {
       SELECT
         "votingWard" as ward,
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
-        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc
       FROM users
       WHERE "votingState" = $1 AND "votingLGA" = $2
         AND "votingWard" IS NOT NULL AND "votingWard" != ''
@@ -481,7 +534,22 @@ export const getLGAData = async (req, res) => {
     `;
     const wardResult = await query(wardQuery, [stateName, lgaName]);
 
-    if (wardResult.rows.length === 0) {
+    // Direct headline total for this LGA (matches state-level count for this LGA exactly)
+    const headlineQuery = `
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') AS with_pvc,
+        COUNT(*) FILTER (WHERE "votingWard" IS NULL OR "votingWard" = '') AS unassigned_ward
+      FROM users
+      WHERE "votingState" = $1 AND "votingLGA" = $2
+    `;
+    const headlineResult = await query(headlineQuery, [stateName, lgaName]);
+    const headline = headlineResult.rows[0] || { total: '0', with_pvc: '0', unassigned_ward: '0' };
+    const headlineTotal = parseInt(headline.total) || 0;
+    const headlineWithPVC = parseInt(headline.with_pvc) || 0;
+    const unassignedWard = parseInt(headline.unassigned_ward) || 0;
+
+    if (wardResult.rows.length === 0 && unassignedWard === 0) {
       console.log(`⚠️ No voter data yet for LGA: ${lgaName} in state: ${stateName} — returning empty dashboard`);
       return res.json({
         success: true,
@@ -501,7 +569,7 @@ export const getLGAData = async (req, res) => {
     const wardsData = wardResult.rows.map(row => {
       const total = parseInt(row.total) || 0;
       const withPvc = parseInt(row.with_pvc) || 0;
-      const withoutPvc = parseInt(row.without_pvc) || 0;
+      const withoutPvc = total - withPvc; // Reconciled
       return {
         id: `${lgaId}-${toSlug(row.ward)}`,
         name: row.ward,
@@ -519,20 +587,42 @@ export const getLGAData = async (req, res) => {
       };
     });
 
-    // Calculate LGA totals
-    const lgaStats = wardsData.reduce((acc, ward) => ({
-      obidientRegisteredVoters: acc.obidientRegisteredVoters + ward.obidientRegisteredVoters,
-      obidientVotersWithPVC: acc.obidientVotersWithPVC + ward.obidientVotersWithPVC,
-      obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + ward.obidientVotersWithoutPVC,
-      pvcWithStatus: acc.pvcWithStatus + ward.pvcWithStatus,
-      pvcWithoutStatus: acc.pvcWithoutStatus + ward.pvcWithoutStatus
-    }), {
-      obidientRegisteredVoters: 0,
-      obidientVotersWithPVC: 0,
-      obidientVotersWithoutPVC: 0,
-      pvcWithStatus: 0,
-      pvcWithoutStatus: 0
-    });
+    // Append synthetic "Unassigned Ward" row if any exist
+    if (unassignedWard > 0) {
+      const unassignedPvcResult = await query(
+        `SELECT COUNT(*) FILTER (WHERE "isVoter" = 'Yes') AS with_pvc
+         FROM users WHERE "votingState" = $1 AND "votingLGA" = $2 AND ("votingWard" IS NULL OR "votingWard" = '')`,
+        [stateName, lgaName]
+      );
+      const unassignedWithPvc = parseInt(unassignedPvcResult.rows[0]?.with_pvc) || 0;
+      wardsData.push({
+        id: `${lgaId}-unassigned`,
+        name: 'Unassigned Ward',
+        code: '—',
+        level: 'ward',
+        lgaId,
+        lgaName,
+        stateId,
+        stateName,
+        obidientRegisteredVoters: unassignedWard,
+        obidientVotersWithPVC: unassignedWithPvc,
+        obidientVotersWithoutPVC: unassignedWard - unassignedWithPvc,
+        pvcWithStatus: unassignedWithPvc,
+        pvcWithoutStatus: unassignedWard - unassignedWithPvc,
+        isUnassigned: true
+      });
+    }
+
+    // LGA stats use the direct headline (reconciled)
+    const lgaStats = {
+      obidientRegisteredVoters: headlineTotal,
+      obidientVotersWithPVC: headlineWithPVC,
+      obidientVotersWithoutPVC: headlineTotal - headlineWithPVC,
+      pvcWithStatus: headlineWithPVC,
+      pvcWithoutStatus: headlineTotal - headlineWithPVC,
+      unassignedCount: unassignedWard,
+      unassignedLabel: 'No Ward Set'
+    };
 
     res.json({
       success: true,
@@ -661,8 +751,7 @@ export const getWardData = async (req, res) => {
       SELECT
         "votingPU" as pu,
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
-        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc
       FROM users
       WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" = $3
         AND "votingPU" IS NOT NULL AND "votingPU" != ''
@@ -673,7 +762,22 @@ export const getWardData = async (req, res) => {
 
     const lgaId = `${stateId}-${lgaSlug}`;
 
-    if (puResult.rows.length === 0) {
+    // Direct headline total for this ward
+    const headlineQuery = `
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') AS with_pvc,
+        COUNT(*) FILTER (WHERE "votingPU" IS NULL OR "votingPU" = '') AS unassigned_pu
+      FROM users
+      WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" = $3
+    `;
+    const headlineResult = await query(headlineQuery, [stateName, lgaName, wardName]);
+    const headline = headlineResult.rows[0] || { total: '0', with_pvc: '0', unassigned_pu: '0' };
+    const headlineTotal = parseInt(headline.total) || 0;
+    const headlineWithPVC = parseInt(headline.with_pvc) || 0;
+    const unassignedPU = parseInt(headline.unassigned_pu) || 0;
+
+    if (puResult.rows.length === 0 && unassignedPU === 0) {
       return res.json({
         success: true,
         data: {
@@ -693,7 +797,7 @@ export const getWardData = async (req, res) => {
     const pollingUnitsData = puResult.rows.map(row => {
       const total = parseInt(row.total) || 0;
       const withPvc = parseInt(row.with_pvc) || 0;
-      const withoutPvc = parseInt(row.without_pvc) || 0;
+      const withoutPvc = total - withPvc; // Reconciled
       return {
         id: `${wardId}-${toSlug(row.pu)}`,
         name: row.pu,
@@ -713,13 +817,45 @@ export const getWardData = async (req, res) => {
       };
     });
 
-    const wardStats = pollingUnitsData.reduce((acc, pu) => ({
-      obidientRegisteredVoters: acc.obidientRegisteredVoters + pu.obidientRegisteredVoters,
-      obidientVotersWithPVC: acc.obidientVotersWithPVC + pu.obidientVotersWithPVC,
-      obidientVotersWithoutPVC: acc.obidientVotersWithoutPVC + pu.obidientVotersWithoutPVC,
-      pvcWithStatus: acc.pvcWithStatus + pu.pvcWithStatus,
-      pvcWithoutStatus: acc.pvcWithoutStatus + pu.pvcWithoutStatus
-    }), { ...EMPTY_STATS });
+    // Append synthetic "Unassigned PU" row if any exist
+    if (unassignedPU > 0) {
+      const unassignedPvcResult = await query(
+        `SELECT COUNT(*) FILTER (WHERE "isVoter" = 'Yes') AS with_pvc
+         FROM users WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" = $3
+           AND ("votingPU" IS NULL OR "votingPU" = '')`,
+        [stateName, lgaName, wardName]
+      );
+      const unassignedWithPvc = parseInt(unassignedPvcResult.rows[0]?.with_pvc) || 0;
+      pollingUnitsData.push({
+        id: `${wardId}-unassigned`,
+        name: 'Unassigned Polling Unit',
+        code: '—',
+        level: 'pu',
+        wardId,
+        wardName,
+        lgaId,
+        lgaName,
+        stateId,
+        stateName,
+        obidientRegisteredVoters: unassignedPU,
+        obidientVotersWithPVC: unassignedWithPvc,
+        obidientVotersWithoutPVC: unassignedPU - unassignedWithPvc,
+        pvcWithStatus: unassignedWithPvc,
+        pvcWithoutStatus: unassignedPU - unassignedWithPvc,
+        isUnassigned: true
+      });
+    }
+
+    // Ward stats use the direct headline (reconciled)
+    const wardStats = {
+      obidientRegisteredVoters: headlineTotal,
+      obidientVotersWithPVC: headlineWithPVC,
+      obidientVotersWithoutPVC: headlineTotal - headlineWithPVC,
+      pvcWithStatus: headlineWithPVC,
+      pvcWithoutStatus: headlineTotal - headlineWithPVC,
+      unassignedCount: unassignedPU,
+      unassignedLabel: 'No Polling Unit Set'
+    };
 
     res.json({
       success: true,
@@ -825,17 +961,16 @@ export const getPollingUnitData = async (req, res) => {
     const puQuery = `
       SELECT
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc,
-        COUNT(*) FILTER (WHERE "isVoter" = 'No' OR "isVoter" IS NULL) as without_pvc
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') as with_pvc
       FROM users
       WHERE "votingState" = $1 AND "votingLGA" = $2 AND "votingWard" = $3 AND "votingPU" = $4
     `;
     const puResult = await query(puQuery, [stateName, lgaName, wardName, puName]);
-    const row = puResult.rows[0] || { total: 0, with_pvc: 0, without_pvc: 0 };
+    const row = puResult.rows[0] || { total: 0, with_pvc: 0 };
 
     const total = parseInt(row.total) || 0;
     const withPvc = parseInt(row.with_pvc) || 0;
-    const withoutPvc = parseInt(row.without_pvc) || 0;
+    const withoutPvc = total - withPvc; // Reconciled
     const lgaId = `${stateId}-${lgaSlug}`;
     const wardId = `${lgaId}-${wardSlug}`;
 

@@ -1,4 +1,5 @@
 import { query, getClient } from '../config/db.js';
+import { normalizeEmail } from '../utils/normalizeEmail.js';
 
 class User {
   constructor(userData) {
@@ -9,7 +10,7 @@ class User {
   static async create(userData) {
     const {
       name,
-      email,
+      email: rawEmail,
       phone,
       passwordHash,
       profileImage = null,
@@ -34,6 +35,9 @@ class User {
       bankAccountNumber = null,
       bankAccountName = null
     } = userData;
+
+    // Canonicalize email so accounts are stored case-insensitively.
+    const email = normalizeEmail(rawEmail);
 
     const client = await getClient();
     try {
@@ -85,8 +89,9 @@ class User {
     let values = [];
 
     if (criteria.email) {
-      whereClause = 'WHERE email = $1';
-      values = [criteria.email];
+      // Case-insensitive lookup to match how emails are stored (normalized).
+      whereClause = 'WHERE LOWER(email) = $1';
+      values = [normalizeEmail(criteria.email)];
     } else if (criteria.phone) {
       whereClause = 'WHERE phone = $1';
       values = [criteria.phone];
@@ -222,7 +227,7 @@ class User {
       directFields.forEach(field => {
         if (updateData[field] !== undefined) {
           fieldsToUpdate.push(`"${field}" = $${paramCount}`);
-          values.push(updateData[field]);
+          values.push(field === 'email' ? normalizeEmail(updateData[field]) : updateData[field]);
           paramCount++;
         }
       });
@@ -270,7 +275,12 @@ class User {
     updatableFields.forEach(field => {
       if (this[field] !== undefined) {
         updateFields.push(`"${field}" = $${paramCount}`);
-        values.push(this[field]);
+        // Keep email/pendingEmail canonicalized (case-insensitive storage).
+        if ((field === 'email' || field === 'pendingEmail') && this[field] !== null) {
+          values.push(normalizeEmail(this[field]));
+        } else {
+          values.push(this[field]);
+        }
         paramCount++;
       }
     });
@@ -299,7 +309,7 @@ class User {
       await client.query('BEGIN');
 
       // Get user ID first
-      const userResult = await client.query('SELECT id FROM users WHERE email = $1', [email]);
+      const userResult = await client.query('SELECT id FROM users WHERE LOWER(email) = $1', [normalizeEmail(email)]);
       if (userResult.rows.length === 0) {
         await client.query('ROLLBACK');
         return null;
@@ -315,7 +325,7 @@ class User {
       await client.query('DELETE FROM "userNotificationSettings" WHERE "userId" = $1', [userId]);
 
       // Delete main user record
-      const result = await client.query('DELETE FROM users WHERE email = $1 RETURNING *', [email]);
+      const result = await client.query('DELETE FROM users WHERE LOWER(email) = $1 RETURNING *', [normalizeEmail(email)]);
 
       await client.query('COMMIT');
       return result.rows.length > 0 ? new User(result.rows[0]) : null;

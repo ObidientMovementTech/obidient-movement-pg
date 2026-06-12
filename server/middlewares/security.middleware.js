@@ -177,26 +177,30 @@ export const helmetConfig = helmet({
 
 // Input sanitization middleware
 export const sanitizeInput = (req, res, next) => {
-  // Enhanced sanitization function for PostgreSQL security
+  // Sanitization function.
+  //
+  // IMPORTANT: SQL injection is prevented exclusively by parameterized queries
+  // ($1, $2 placeholders) throughout the data layer — never by stripping
+  // characters from user input. The previous keyword/comment/quote blocklist
+  // here provided no real protection (queries are parameterized) while it
+  // silently corrupted legitimate values: e.g. "delete.me@gmail.com" became
+  // ".me@gmail.com", "create.account@firm.org" became ".account@firm.org",
+  // and chat messages like "let's drop the call" lost words. That broke
+  // signup and OTP delivery for valid emails containing a dotted SQL keyword
+  // or "--". We therefore only strip HTML/XSS payloads and null bytes here.
   const sanitizeString = (str) => {
     if (typeof str !== 'string') return str;
 
-    // XSS protection - but preserve valid characters for names and addresses
-    let sanitized = xss(str, {
+    // Remove null bytes (can break Postgres text and cause parsing issues)
+    let sanitized = str.replace(/\0/g, '');
+
+    // XSS protection — strip any HTML so stored values are safe to render later.
+    // This does NOT alter normal email/name punctuation (dots, +, -, _, ').
+    sanitized = xss(sanitized, {
       whiteList: {}, // No HTML allowed
       stripIgnoreTag: true,
       stripIgnoreTagBody: ['script']
     });
-
-    // SQL injection protection - only remove truly dangerous patterns
-    // Don't remove single quotes as they're common in names (O'Brien, etc.)
-    sanitized = sanitized.replace(/[";\\]/g, ''); // Remove dangerous quotes and backslashes
-    sanitized = sanitized.replace(/--/g, ''); // Remove SQL comments
-    sanitized = sanitized.replace(/\/\*/g, ''); // Remove SQL block comments
-    sanitized = sanitized.replace(/\*\//g, ''); // Remove SQL block comments
-
-    // Remove potential SQL injection patterns but preserve normal punctuation
-    sanitized = sanitized.replace(/\b(union|select|insert|delete|drop|create|alter|truncate|exec|execute)\b/gi, '');
 
     return sanitized;
   };

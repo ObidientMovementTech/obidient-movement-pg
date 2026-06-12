@@ -1521,7 +1521,7 @@ export const adminUserManagementController = {
         });
       }
 
-      const { designation, assignedState, assignedLGA, assignedWard } = req.body;
+      const { designation, assignedState, assignedLGA, assignedWard, assignedCountry } = req.body;
 
       // Validate designation
       const validDesignations = [
@@ -1529,6 +1529,7 @@ export const adminUserManagementController = {
         'State Coordinator',
         'LGA Coordinator',
         'Ward Coordinator',
+        'Diaspora Coordinator',
         'Polling Unit Agent',
         'Vote Defender',
         'Community Member'
@@ -1563,6 +1564,13 @@ export const adminUserManagementController = {
         });
       }
 
+      if (designation === 'Diaspora Coordinator' && !assignedCountry) {
+        return res.status(400).json({
+          success: false,
+          message: 'Diaspora Coordinator requires an assigned country'
+        });
+      }
+
       // Check if user exists
       const userResult = await query('SELECT id, name FROM users WHERE id = $1', [userId]);
       if (userResult.rows.length === 0) {
@@ -1573,21 +1581,30 @@ export const adminUserManagementController = {
       }
 
       // Update user designation and assignment
+      const isDiaspora = designation === 'Diaspora Coordinator';
       const updateResult = await query(
         `UPDATE users 
          SET designation = $1, 
              "assignedState" = $2, 
              "assignedLGA" = $3, 
              "assignedWard" = $4,
+             "assignedCountry" = $5,
              "updatedAt" = NOW()
-         WHERE id = $5
-         RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard"`,
-        [designation, assignedState, assignedLGA, assignedWard, userId]
+         WHERE id = $6
+         RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry"`,
+        [
+          designation,
+          isDiaspora ? null : assignedState,
+          isDiaspora ? null : assignedLGA,
+          isDiaspora ? null : assignedWard,
+          isDiaspora ? assignedCountry : null,
+          userId
+        ]
       );
 
       const updatedUser = updateResult.rows[0];
 
-      auditLog({ actorId: req.user.id, action: 'user.designation_change', targetType: 'user', targetId: userId, details: { designation, assignedState, assignedLGA, assignedWard }, req });
+      auditLog({ actorId: req.user.id, action: 'user.designation_change', targetType: 'user', targetId: userId, details: { designation, assignedState, assignedLGA, assignedWard, assignedCountry }, req });
 
       res.json({
         success: true,

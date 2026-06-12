@@ -11,12 +11,13 @@ const DESIGNATION_RANK = {
   'Ward Coordinator': 2,
   'LGA Coordinator': 3,
   'State Coordinator': 4,
+  'Diaspora Coordinator': 4,
   'National Coordinator': 5,
 };
 
 // What each coordinator level can assign
 const CAN_ASSIGN = {
-  'National Coordinator': ['State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent'],
+  'National Coordinator': ['State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Diaspora Coordinator'],
   'State Coordinator': ['LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent'],
   'LGA Coordinator': ['Ward Coordinator', 'Polling Unit Agent'],
   'Ward Coordinator': ['Polling Unit Agent'],
@@ -27,13 +28,14 @@ const COORDINATOR_DESIGNATIONS = [
   'State Coordinator',
   'LGA Coordinator',
   'Ward Coordinator',
+  'Diaspora Coordinator',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────
 
 async function getCallerInfo(userId) {
   const result = await query(
-    `SELECT id, designation, "assignedState", "assignedLGA", "assignedWard", role
+    `SELECT id, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry", role
      FROM users WHERE id = $1`,
     [userId],
   );
@@ -52,8 +54,11 @@ function isCoordinatorOrAdmin(user) {
  * LGA Coord  → state + LGA must match.
  * Ward Coord → state + LGA + ward must match.
  */
-function hasJurisdiction(caller, state, lga, ward) {
+function hasJurisdiction(caller, state, lga, ward, { isDiasporaAssignment } = {}) {
   if (caller.role === 'admin' || caller.designation === 'National Coordinator') return true;
+
+  // Diaspora assignments can only be made by admin/National (handled above)
+  if (isDiasporaAssignment) return false;
 
   const normalize = (s) => (s || '').toLowerCase().trim();
 
@@ -103,7 +108,7 @@ export const searchUsers = async (req, res) => {
 
     const result = await query(
       `SELECT id, name, email, phone, "profileImage",
-              designation, "assignedState", "assignedLGA", "assignedWard"
+              designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry"
        FROM users
        WHERE (name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1)
          AND id != $2
@@ -136,7 +141,7 @@ export const assignDesignation = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only coordinators can assign designations' });
     }
 
-    const { userId, designation, assignedState, assignedLGA, assignedWard, override } = req.body;
+    const { userId, designation, assignedState, assignedLGA, assignedWard, assignedCountry, override } = req.body;
 
     // Validate UUID
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -150,7 +155,7 @@ export const assignDesignation = async (req, res) => {
 
     // Validate designation
     const assignable = caller.role === 'admin'
-      ? [...Object.keys(CAN_ASSIGN), 'Polling Unit Agent', 'Vote Defender', 'Community Member']
+      ? [...Object.keys(CAN_ASSIGN), 'Polling Unit Agent', 'Vote Defender', 'Community Member', 'Diaspora Coordinator']
       : CAN_ASSIGN[caller.designation];
 
     if (!assignable || !assignable.includes(designation)) {
@@ -173,9 +178,13 @@ export const assignDesignation = async (req, res) => {
     if (designation === 'Polling Unit Agent' && (!assignedState || !assignedLGA || !assignedWard)) {
       return res.status(400).json({ success: false, message: 'Polling Unit Agent requires assignedState, assignedLGA, and assignedWard' });
     }
+    if (designation === 'Diaspora Coordinator' && !assignedCountry) {
+      return res.status(400).json({ success: false, message: 'Diaspora Coordinator requires assignedCountry' });
+    }
 
     // Jurisdiction check — caller must have authority over the target location
-    if (!hasJurisdiction(caller, assignedState, assignedLGA, assignedWard)) {
+    const isDiasporaAssignment = designation === 'Diaspora Coordinator';
+    if (!hasJurisdiction(caller, assignedState, assignedLGA, assignedWard, { isDiasporaAssignment })) {
       return res.status(403).json({
         success: false,
         message: 'You can only assign coordinators within your jurisdiction',
@@ -184,7 +193,7 @@ export const assignDesignation = async (req, res) => {
 
     // Check target user exists and their current designation
     const targetResult = await query(
-      `SELECT id, name, designation, "assignedState", "assignedLGA", "assignedWard"
+      `SELECT id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry"
        FROM users WHERE id = $1`,
       [userId],
     );
@@ -231,10 +240,18 @@ export const assignDesignation = async (req, res) => {
            "assignedState" = $2,
            "assignedLGA" = $3,
            "assignedWard" = $4,
+           "assignedCountry" = $5,
            "updatedAt" = NOW()
-       WHERE id = $5
-       RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard"`,
-      [designation, assignedState || null, assignedLGA || null, assignedWard || null, userId],
+       WHERE id = $6
+       RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry"`,
+      [
+        designation,
+        isDiasporaAssignment ? null : (assignedState || null),
+        isDiasporaAssignment ? null : (assignedLGA || null),
+        isDiasporaAssignment ? null : (assignedWard || null),
+        isDiasporaAssignment ? assignedCountry : null,
+        userId,
+      ],
     );
 
     const updatedUser = updateResult.rows[0];
@@ -242,13 +259,21 @@ export const assignDesignation = async (req, res) => {
     // Audit log
     await query(
       `INSERT INTO coordinator_assignment_log
-         (assigned_by, assigned_to, action, designation, assigned_state, assigned_lga, assigned_ward)
-       VALUES ($1, $2, 'assign', $3, $4, $5, $6)`,
-      [callerId, userId, designation, assignedState || null, assignedLGA || null, assignedWard || null],
+         (assigned_by, assigned_to, action, designation, assigned_state, assigned_lga, assigned_ward, assigned_country)
+       VALUES ($1, $2, 'assign', $3, $4, $5, $6, $7)`,
+      [
+        callerId, userId, designation,
+        isDiasporaAssignment ? null : (assignedState || null),
+        isDiasporaAssignment ? null : (assignedLGA || null),
+        isDiasporaAssignment ? null : (assignedWard || null),
+        isDiasporaAssignment ? assignedCountry : null,
+      ],
     );
 
     // Create notification for the assigned user
-    const notifMessage = `You have been assigned as ${designation}${assignedState ? ` for ${assignedState}` : ''}${assignedLGA ? ` - ${assignedLGA}` : ''}${assignedWard ? ` - ${assignedWard}` : ''}.`;
+    const notifMessage = isDiasporaAssignment
+      ? `You have been assigned as Diaspora Coordinator for ${assignedCountry}.`
+      : `You have been assigned as ${designation}${assignedState ? ` for ${assignedState}` : ''}${assignedLGA ? ` - ${assignedLGA}` : ''}${assignedWard ? ` - ${assignedWard}` : ''}.`;
     try {
       await query(
         `INSERT INTO notifications (id, "userId", type, title, message, "createdAt")
@@ -362,7 +387,7 @@ export const getSubordinates = async (req, res) => {
     const dataParams = [...params, limit, offset];
     const result = await query(
       `SELECT id, name, email, phone, "profileImage",
-              designation, "assignedState", "assignedLGA", "assignedWard"
+              designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry"
        FROM users
        WHERE ${where}
        ORDER BY designation, name
@@ -413,7 +438,7 @@ export const removeDesignation = async (req, res) => {
 
     // Check target
     const targetResult = await query(
-      `SELECT id, name, designation, "assignedState", "assignedLGA", "assignedWard"
+      `SELECT id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry"
        FROM users WHERE id = $1`,
       [userId],
     );
@@ -435,7 +460,8 @@ export const removeDesignation = async (req, res) => {
     }
 
     // Jurisdiction check
-    if (!hasJurisdiction(caller, target.assignedState, target.assignedLGA, target.assignedWard)) {
+    const isDiasporaTarget = target.designation === 'Diaspora Coordinator';
+    if (!isDiasporaTarget && !hasJurisdiction(caller, target.assignedState, target.assignedLGA, target.assignedWard)) {
       return res.status(403).json({
         success: false,
         message: 'You can only remove coordinators within your jurisdiction',
@@ -449,6 +475,7 @@ export const removeDesignation = async (req, res) => {
            "assignedState" = NULL,
            "assignedLGA" = NULL,
            "assignedWard" = NULL,
+           "assignedCountry" = NULL,
            "updatedAt" = NOW()
        WHERE id = $1
        RETURNING id, name, designation`,
@@ -458,9 +485,9 @@ export const removeDesignation = async (req, res) => {
     // Audit log
     await query(
       `INSERT INTO coordinator_assignment_log
-         (assigned_by, assigned_to, action, designation, assigned_state, assigned_lga, assigned_ward)
-       VALUES ($1, $2, 'remove', $3, $4, $5, $6)`,
-      [callerId, userId, target.designation, target.assignedState, target.assignedLGA, target.assignedWard],
+         (assigned_by, assigned_to, action, designation, assigned_state, assigned_lga, assigned_ward, assigned_country)
+       VALUES ($1, $2, 'remove', $3, $4, $5, $6, $7)`,
+      [callerId, userId, target.designation, target.assignedState, target.assignedLGA, target.assignedWard, target.assignedCountry],
     );
 
     // Notify user

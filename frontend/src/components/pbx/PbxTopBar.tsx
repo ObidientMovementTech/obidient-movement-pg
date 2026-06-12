@@ -24,6 +24,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/pbx/mobilisation': 'Mobilisation',
   '/pbx/blog': 'Blog',
   '/pbx/blog/new': 'New Post',
+  '/pbx/newsletter': 'Newsletter',
+  '/pbx/newsletter/new': 'New Newsletter',
   '/pbx/users': 'Users',
   '/pbx/communications': 'Communications',
 };
@@ -64,6 +66,9 @@ export default function PbxTopBar({ onMenuToggle }: PbxTopBarProps) {
 
     // Check for blog edit
     if (location.pathname.startsWith('/pbx/blog/edit/')) return 'Edit Post';
+
+    // Check for newsletter edit
+    if (location.pathname.startsWith('/pbx/newsletter/edit/')) return 'Edit Newsletter';
 
     // Fallback: last path segment
     const last = location.pathname.split('/').filter(Boolean).pop() || 'Dashboard';

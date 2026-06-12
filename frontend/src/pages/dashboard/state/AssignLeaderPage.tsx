@@ -8,6 +8,7 @@ import coordinatorService, {
   AssignDesignationPayload,
 } from '../../../services/coordinatorService';
 import { mobiliseDashboardService } from '../../../services/mobiliseDashboardService';
+import { countryCodes } from '../../../utils/countryCodes';
 
 interface UserLevelData {
   userLevel: string;
@@ -36,6 +37,7 @@ const AssignLeaderPage: React.FC = () => {
   const [selectedState, setSelectedState] = useState<NigeriaLocation | null>(null);
   const [selectedLGA, setSelectedLGA] = useState<NigeriaLocation | null>(null);
   const [selectedWard, setSelectedWard] = useState<NigeriaLocation | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState('');
 
   // Location data
   const [states, setStates] = useState<NigeriaLocation[]>([]);
@@ -102,13 +104,14 @@ const AssignLeaderPage: React.FC = () => {
     const { designation: userDesignation } = userLevel;
     // Admins can assign all coordinator roles
     if (userLevel.role === 'admin') {
-      return ['National Coordinator', 'State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent'];
+      return ['National Coordinator', 'State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Diaspora Coordinator'];
     }
     return CAN_ASSIGN[userDesignation] || [];
   }, [userLevel]);
 
   // Determine which location fields are needed
-  const needsState = designation !== '' && designation !== 'Community Member';
+  const needsCountry = designation === 'Diaspora Coordinator';
+  const needsState = designation !== '' && designation !== 'Community Member' && designation !== 'Diaspora Coordinator';
   const needsLGA =
     designation === 'LGA Coordinator' ||
     designation === 'Ward Coordinator' ||
@@ -204,6 +207,7 @@ const AssignLeaderPage: React.FC = () => {
   // Can submit?
   const canSubmit = (() => {
     if (!designation || !selectedUser) return false;
+    if (needsCountry && !selectedCountry) return false;
     if (needsState && !selectedState) return false;
     if (needsLGA && !selectedLGA) return false;
     if (needsWard && !selectedWard) return false;
@@ -216,6 +220,7 @@ const AssignLeaderPage: React.FC = () => {
     setSelectedState(null);
     setSelectedLGA(null);
     setSelectedWard(null);
+    setSelectedCountry('');
     setAssignError(null);
     setAssignSuccess(null);
   };
@@ -225,6 +230,7 @@ const AssignLeaderPage: React.FC = () => {
     setSelectedState(null);
     setSelectedLGA(null);
     setSelectedWard(null);
+    setSelectedCountry('');
     setAssignError(null);
 
     // Re-apply locked locations
@@ -254,6 +260,7 @@ const AssignLeaderPage: React.FC = () => {
         assignedState: selectedState?.name,
         assignedLGA: selectedLGA?.name,
         assignedWard: selectedWard?.name,
+        assignedCountry: needsCountry ? selectedCountry : undefined,
         override: !!hasExistingDesignation,
       };
 
@@ -441,6 +448,30 @@ const AssignLeaderPage: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {/* Country picker (Diaspora Coordinator) */}
+              {needsCountry && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Country
+                  </label>
+                  <select
+                    value={selectedCountry}
+                    onChange={(e) => setSelectedCountry(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-accent-green focus:border-transparent outline-none"
+                  >
+                    <option value="">Select country…</option>
+                    {countryCodes
+                      .filter((c) => c.name !== 'Nigeria')
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((c) => (
+                        <option key={c.code + c.name} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
 
               {/* State picker */}
               {needsState && (

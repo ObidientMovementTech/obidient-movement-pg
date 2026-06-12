@@ -26,6 +26,8 @@ const HomePage = lazy(() => import("./pages/public/HomePage.tsx"));
 const AboutPage = lazy(() => import("./pages/public/AboutPage.tsx"));
 const NewsPage = lazy(() => import("./pages/public/NewsPage.tsx"));
 const NewsPostPage = lazy(() => import("./pages/public/NewsPostPage.tsx"));
+const NewsletterPage = lazy(() => import("./pages/public/NewsletterPage.tsx"));
+const NewsletterUnsubscribePage = lazy(() => import("./pages/public/NewsletterUnsubscribePage.tsx"));
 const ContactPage = lazy(() => import("./pages/public/ContactPage.tsx"));
 const LeadersPage = lazy(() => import("./pages/public/LeadersPage.tsx"));
 const PeterObiPage = lazy(() => import("./pages/public/PeterObiPage.tsx"));
@@ -99,12 +101,15 @@ const PbxCommunitiesPage = lazy(() => import("./pages/pbx/CommunitiesPage.tsx"))
 const PbxMobilisationPage = lazy(() => import("./pages/pbx/MobilisationPage.tsx"));
 const BlogListPage = lazy(() => import("./pages/pbx/blog/BlogListPage.tsx"));
 const BlogEditorPage = lazy(() => import("./pages/pbx/blog/BlogEditorPage.tsx"));
+const NewsletterListPage = lazy(() => import("./pages/pbx/newsletter/NewsletterListPage.tsx"));
+const NewsletterEditorPage = lazy(() => import("./pages/pbx/newsletter/NewsletterEditorPage.tsx"));
 const PbxUsersPage = lazy(() => import("./pages/pbx/UsersPage.tsx"));
 const PbxBroadcastPage = lazy(() => import("./pages/pbx/BroadcastPage.tsx"));
 const PbxSettingsPage = lazy(() => import("./pages/pbx/SettingsPage.tsx"));
 const PbxMobileFeedsPage = lazy(() => import("./pages/pbx/PbxMobileFeedsPage.tsx"));
 const PbxAppManagementPage = lazy(() => import("./pages/pbx/AppManagementPage.tsx"));
 const PbxInterestsPage = lazy(() => import("./pages/pbx/InterestsPage.tsx"));
+const PbxBankAccountsPage = lazy(() => import("./pages/pbx/BankAccountsPage.tsx"));
 
 // Loading component
 const PageLoader = () => (
@@ -150,6 +155,9 @@ const router = createBrowserRouter([
       { path: "about", element: <AboutPage /> },
       { path: "news", element: <NewsPage /> },
       { path: "news/:slug", element: <NewsPostPage /> },
+      { path: "newsletter", element: <NewsletterPage /> },
+      { path: "newsletter/unsubscribe", element: <NewsletterUnsubscribePage /> },
+      { path: "newsletter/:slug", element: <NewsletterPage /> },
       { path: "contact", element: <ContactPage /> },
       { path: "leaders", element: <LeadersPage /> },
       { path: "leaders/peter-obi", element: <PeterObiPage /> },
@@ -415,9 +423,13 @@ const router = createBrowserRouter([
       { path: "blog", element: <Suspense fallback={<PageLoader />}><BlogListPage /></Suspense> },
       { path: "blog/new", element: <Suspense fallback={<PageLoader />}><BlogEditorPage /></Suspense> },
       { path: "blog/edit/:id", element: <Suspense fallback={<PageLoader />}><BlogEditorPage /></Suspense> },
+      { path: "newsletter", element: <Suspense fallback={<PageLoader />}><NewsletterListPage /></Suspense> },
+      { path: "newsletter/new", element: <Suspense fallback={<PageLoader />}><NewsletterEditorPage /></Suspense> },
+      { path: "newsletter/edit/:id", element: <Suspense fallback={<PageLoader />}><NewsletterEditorPage /></Suspense> },
       { path: "users", element: <Suspense fallback={<PageLoader />}><PbxUsersPage /></Suspense> },
       { path: "broadcast", element: <Suspense fallback={<PageLoader />}><PbxBroadcastPage /></Suspense> },
       { path: "interests", element: <Suspense fallback={<PageLoader />}><PbxInterestsPage /></Suspense> },
+      { path: "bank-accounts", element: <Suspense fallback={<PageLoader />}><PbxBankAccountsPage /></Suspense> },
       { path: "mobile-feeds", element: <Suspense fallback={<PageLoader />}><PbxMobileFeedsPage /></Suspense> },
       { path: "app-management", element: <Suspense fallback={<PageLoader />}><PbxAppManagementPage /></Suspense> },
       { path: "settings", element: <Suspense fallback={<PageLoader />}><PbxSettingsPage /></Suspense> },

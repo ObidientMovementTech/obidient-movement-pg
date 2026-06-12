@@ -27,6 +27,7 @@ import {
   Menu as MenuIcon,
   X,
   ChevronRight,
+  Globe,
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { logoutUser } from '../../services/authService';
@@ -228,6 +229,9 @@ export default function DashboardLayout() {
         </MenuItem>
         <MenuItem component={Link} to="/dashboard/card" onClick={() => setAnchorEl(null)} sx={{ fontFamily: FONT, fontSize: '0.82rem', py: 1, color: '#525252' }}>
           <CreditCard size={15} style={{ marginRight: 10, opacity: 0.5 }} /> Membership Card
+        </MenuItem>
+        <MenuItem component={Link} to="/" onClick={() => setAnchorEl(null)} sx={{ fontFamily: FONT, fontSize: '0.82rem', py: 1, color: '#525252' }}>
+          <Globe size={15} style={{ marginRight: 10, opacity: 0.5 }} /> Back to Main Site
         </MenuItem>
         {(profile.role === 'admin' || isCoordinator) && (
           <MenuItem component="a" href="/pbx/dashboard" target="_blank" rel="noopener noreferrer" onClick={() => setAnchorEl(null)} sx={{ fontFamily: FONT, fontSize: '0.82rem', py: 1, color: '#525252' }}>
@@ -543,10 +547,46 @@ export default function DashboardLayout() {
           </>
         )}
 
-        {/* Spacer + logout */}
+        {/* Spacer + back to site + logout */}
         <Box sx={{ mt: 'auto' }}>
           <Divider sx={{ borderColor: '#f5f5f5' }} />
-          <Box sx={{ px: 1, py: 1.5 }}>
+          <Box sx={{ px: 1, pt: 1.5 }}>
+            <Box
+              component={Link}
+              to="/"
+              onClick={() => setDrawerOpen(false)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                textDecoration: 'none',
+                px: 2,
+                py: 1.25,
+                borderRadius: 2.5,
+                transition: 'all 0.15s',
+                '&:hover': { bgcolor: '#fafafa' },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 2,
+                  bgcolor: '#f5f5f5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#737373',
+                }}
+              >
+                <Globe size={16} strokeWidth={1.8} />
+              </Box>
+              <Typography sx={{ fontFamily: FONT, fontSize: '0.84rem', fontWeight: 400, color: '#525252', flex: 1 }}>
+                Back to Main Site
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ px: 1, pb: 1.5 }}>
             <Box
               onClick={() => { setDrawerOpen(false); handleLogout(); }}
               sx={{

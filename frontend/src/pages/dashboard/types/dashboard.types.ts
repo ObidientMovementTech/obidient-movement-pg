@@ -10,6 +10,8 @@ export interface MobilizationStats {
   obidientVotersWithoutPVC?: number;
   pvcWithStatus: number;
   pvcWithoutStatus: number;
+  unassignedCount?: number;  // Users missing the next location level
+  unassignedLabel?: string;  // e.g. 'No LGA Set', 'No Ward Set'
 }
 
 // API response interface for voter data
@@ -26,6 +28,8 @@ export interface StateData extends MobilizationStats {
   id: string;
   name: string;
   lgas: LGAData[];
+  isUnassigned?: boolean;      // Synthetic row for users missing this location level
+  isInvalidLocation?: boolean; // LGA doesn't belong to this state
 }
 
 export interface LGAData extends MobilizationStats {
@@ -33,6 +37,8 @@ export interface LGAData extends MobilizationStats {
   name: string;
   stateId: string;
   wards: WardData[];
+  isUnassigned?: boolean;
+  isInvalidLocation?: boolean;
 }
 
 export interface WardData extends MobilizationStats {
@@ -40,6 +46,7 @@ export interface WardData extends MobilizationStats {
   name: string;
   lgaId: string;
   pollingUnits: PUData[];
+  isUnassigned?: boolean;
 }
 
 export interface PUData extends MobilizationStats {
@@ -47,6 +54,7 @@ export interface PUData extends MobilizationStats {
   name: string;
   wardId: string;
   code: string;
+  isUnassigned?: boolean;
 }
 
 // Navigation and view types

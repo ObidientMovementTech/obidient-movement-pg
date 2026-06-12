@@ -10,6 +10,7 @@ import { NIGERIAN_BANKS } from '../../constants/nigerianBanks';
 import FormSelect from '../select/FormSelect';
 import { genderOptions, ageRangeOptions } from '../../utils/lookups';
 import { adminUserManagementService } from '../../services/adminUserManagementService';
+import { countryCodes } from '../../utils/countryCodes';
 
 // Designation constants
 const DESIGNATIONS = {
@@ -17,6 +18,7 @@ const DESIGNATIONS = {
   STATE_COORDINATOR: 'State Coordinator',
   LGA_COORDINATOR: 'LGA Coordinator',
   WARD_COORDINATOR: 'Ward Coordinator',
+  DIASPORA_COORDINATOR: 'Diaspora Coordinator',
   POLLING_UNIT_AGENT: 'Polling Unit Agent',
   VOTE_DEFENDER: 'Vote Defender',
   COMMUNITY_MEMBER: 'Community Member'
@@ -234,11 +236,13 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     // Only update designation if one is selected
     if (formData.designation) {
       try {
+        const isDiaspora = formData.designation === DESIGNATIONS.DIASPORA_COORDINATOR;
         await adminUserManagementService.updateUserDesignation(userId, {
           designation: formData.designation,
-          assignedState: assignLocations.selectedState?.name || null,
-          assignedLGA: assignLocations.selectedLGA?.name || null,
-          assignedWard: assignLocations.selectedWard?.name || null
+          assignedState: isDiaspora ? null : (assignLocations.selectedState?.name || null),
+          assignedLGA: isDiaspora ? null : (assignLocations.selectedLGA?.name || null),
+          assignedWard: isDiaspora ? null : (assignLocations.selectedWard?.name || null),
+          assignedCountry: isDiaspora ? (formData as any).assignedCountry || null : null
         });
       } catch (error: any) {
         console.error('Designation update failed:', error);
@@ -623,6 +627,34 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                   {formData.designation === DESIGNATIONS.STATE_COORDINATOR && "This coordinator will have access to all LGAs and wards in the assigned state."}
                   {formData.designation === DESIGNATIONS.LGA_COORDINATOR && "This coordinator will have access to all wards in the assigned LGA."}
                   {formData.designation === DESIGNATIONS.WARD_COORDINATOR && "This coordinator will have access only to the assigned ward."}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Diaspora Coordinator — Country Assignment */}
+            {formData.designation === DESIGNATIONS.DIASPORA_COORDINATOR && (
+              <Box sx={{ p: 2, bgcolor: '#eff6ff', borderRadius: 2, border: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.8rem', color: '#1e40af' }}>
+                  Assigned Country
+                </Typography>
+                <FormControl size="small" fullWidth>
+                  <InputLabel sx={{ fontFamily: FONT }}>Country</InputLabel>
+                  <Select
+                    value={(formData as any).assignedCountry || ''}
+                    label="Country"
+                    onChange={(e) => setFormData(prev => ({ ...prev, assignedCountry: e.target.value }))}
+                    sx={{ fontFamily: FONT }}
+                  >
+                    {countryCodes
+                      .filter((c) => c.name !== 'Nigeria')
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((c) => (
+                        <MenuItem key={c.code + c.name} value={c.name}>{c.name}</MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#1d4ed8' }}>
+                  This coordinator will manage diaspora members in the assigned country.
                 </Typography>
               </Box>
             )}

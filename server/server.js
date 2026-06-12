@@ -35,6 +35,7 @@ import onboardingRoutes from './routes/onboarding.routes.js';
 import liveResultsRoutes from './routes/liveResults.route.js';
 import resultsDashboardRoutes from './routes/resultsDashboard.route.js';
 import blogRoutes from './routes/blog.route.js';
+import newsletterRoutes from './routes/newsletter.route.js';
 import chatRoutes from './routes/chat.route.js';
 import conversationRoutes from './routes/conversation.route.js';
 import roomRoutes from './routes/room.route.js';
@@ -47,6 +48,7 @@ import coordinatorRoutes from './routes/coordinator.routes.js';
 import publicLeadersRoutes from './routes/publicLeaders.routes.js';
 import appDownloadRoutes from './routes/appDownload.route.js';
 import involvementRoutes from './routes/involvement.route.js';
+import bankAccountRoutes from './routes/bankAccount.route.js';
 import { initSocket } from './config/socket.js';
 import { verifyEmailConnection } from './config/email.js';
 import {
@@ -174,6 +176,7 @@ app.use('/api/results-dashboard', resultsDashboardRoutes); // Results Dashboard 
 app.use('/api/situation-room', situationRoomRoutes); // Admin Situation Room - Comprehensive monitoring
 app.use('/auth/onboarding', onboardingRoutes); // Onboarding system with Google OAuth
 app.use('/api/blog', blogRoutes); // Blog system (public + admin)
+app.use('/api/newsletter', newsletterRoutes); // Newsletter system (public + admin)
 app.use('/api/chat', chatRoutes); // Chat coordinator chain + rate limiting
 app.use('/api/conversations', conversationRoutes); // Real-time chat conversations
 app.use('/users', blockRoutes); // User blocking (under /users/:id/block)
@@ -186,6 +189,7 @@ app.use('/api/coordinator', coordinatorRoutes); // Coordinator assignment (searc
 app.use('/api/public', publicLeadersRoutes); // Public leaders page (no auth)
 app.use('/api/app-download', appDownloadRoutes); // Mobile app download system
 app.use('/api/involvement', involvementRoutes); // Get Involved interest form + admin
+app.use('/api/bank-accounts', bankAccountRoutes); // Bank accounts (public + admin CRUD)
 
 // Placeholder route
 app.get('/', (req, res) => {

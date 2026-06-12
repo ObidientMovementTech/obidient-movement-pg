@@ -22,6 +22,7 @@ export const updateS3CorsPolicy = async () => {
           AllowedMethods: ["GET", "HEAD", "POST"],
           AllowedOrigins: [
             "https://member.obidients.com", // Production domain
+            "https://www.obidients.com", // Production domain
             "http://localhost:5173", // Local development
             "http://localhost:3000", // Alternative local port
             "http://localhost:4173", // Vite preview

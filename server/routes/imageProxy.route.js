@@ -3,6 +3,8 @@ import fetch from 'node-fetch';
 
 const router = express.Router();
 
+const ALLOWED_S3_HOST = `${process.env.AWS_STORAGE_BUCKET_NAME}.s3.${process.env.AWS_S3_REGION_NAME}.amazonaws.com`;
+
 // Proxy endpoint to serve S3 images with proper CORS headers
 router.get('/proxy-image', async (req, res) => {
   try {
@@ -13,7 +15,7 @@ router.get('/proxy-image', async (req, res) => {
     }
 
     // Validate that it's an S3 URL from your bucket
-    if (!url.includes('generic-uat.s3.eu-central-1.amazonaws.com')) {
+    if (!url.includes(ALLOWED_S3_HOST)) {
       return res.status(400).json({ error: 'Invalid URL' });
     }
 

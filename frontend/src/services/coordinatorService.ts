@@ -12,6 +12,7 @@ export interface SearchedUser {
   assignedState?: string;
   assignedLGA?: string;
   assignedWard?: string;
+  assignedCountry?: string;
 }
 
 export interface NigeriaLocation {
@@ -37,12 +38,13 @@ export interface AssignDesignationPayload {
   assignedState?: string;
   assignedLGA?: string;
   assignedWard?: string;
+  assignedCountry?: string;
   override?: boolean;
 }
 
 // What each coordinator level can assign (mirrors backend CAN_ASSIGN)
 export const CAN_ASSIGN: Record<string, string[]> = {
-  'National Coordinator': ['State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent'],
+  'National Coordinator': ['State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Diaspora Coordinator'],
   'State Coordinator': ['LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent'],
   'LGA Coordinator': ['Ward Coordinator', 'Polling Unit Agent'],
   'Ward Coordinator': ['Polling Unit Agent'],
@@ -53,6 +55,7 @@ export const COORDINATOR_DESIGNATIONS = [
   'State Coordinator',
   'LGA Coordinator',
   'Ward Coordinator',
+  'Diaspora Coordinator',
 ];
 
 export const coordinatorService = {

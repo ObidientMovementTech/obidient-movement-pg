@@ -649,3 +649,99 @@ export function createInvolvementInterestEmailTemplate(interest) {
   `.trim();
 }
 
+/**
+ * Newsletter email template
+ * @param {Object} options
+ * @param {string} options.title - Newsletter title
+ * @param {string} options.content - Rich HTML content
+ * @param {string} options.previewText - Email preheader text
+ * @param {string} options.featuredImageUrl - Hero image URL
+ * @param {string} options.webUrl - "View in browser" link
+ * @param {string} options.unsubscribeUrl - Unsubscribe link
+ * @param {string} options.recipientName - Recipient's name
+ */
+export function createNewsletterEmailTemplate({ title, content, previewText, featuredImageUrl, webUrl, unsubscribeUrl, recipientName }) {
+  const heroImage = featuredImageUrl
+    ? `<tr><td style="padding: 0;"><img src="${featuredImageUrl}" alt="${title}" style="width: 100%; max-width: 600px; height: auto; display: block; border-radius: 8px 8px 0 0;" /></td></tr>`
+    : '';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  ${previewText ? `<!--[if !mso]><!--><span style="display:none;font-size:1px;color:#f4f4f4;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${previewText}</span><!--<![endif]-->` : ''}
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+    <!-- Header -->
+    <tr>
+      <td style="padding: 24px 30px 16px; border-bottom: 2px solid #0B6739;">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td>
+              <h1 style="margin: 0; font-size: 14px; color: #0B6739; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Obidient Movement Newsletter</h1>
+            </td>
+            <td align="right">
+              <a href="${webUrl}" style="font-size: 12px; color: #666; text-decoration: underline;">View in browser</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Featured Image -->
+    ${heroImage}
+
+    <!-- Title -->
+    <tr>
+      <td style="padding: 30px 30px 10px;">
+        <h2 style="margin: 0; font-size: 24px; color: #1a1a1a; line-height: 1.3; font-weight: 700;">${title}</h2>
+      </td>
+    </tr>
+
+    <!-- Greeting -->
+    <tr>
+      <td style="padding: 0 30px 20px;">
+        <p style="margin: 0; color: #555; font-size: 15px; line-height: 1.5;">Hi ${recipientName || 'there'},</p>
+      </td>
+    </tr>
+
+    <!-- Content -->
+    <tr>
+      <td style="padding: 0 30px 30px; font-size: 15px; line-height: 1.7; color: #333;">
+        ${content}
+      </td>
+    </tr>
+
+    <!-- CTA: Read on web -->
+    <tr>
+      <td style="padding: 0 30px 30px;">
+        <table border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td align="center" bgcolor="#0B6739" style="border-radius: 6px;">
+              <a href="${webUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 15px; color: #ffffff; text-decoration: none; font-weight: 600;">Read Full Newsletter →</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="padding: 20px 30px; background-color: #f9f9f9; border-radius: 0 0 8px 8px; border-top: 1px solid #eee;">
+        <p style="margin: 0 0 8px; color: #999; font-size: 12px;">You received this because you're a member of Obidient Movement.</p>
+        <p style="margin: 0; color: #999; font-size: 12px;">
+          <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">Unsubscribe from newsletters</a>
+        </p>
+        <p style="margin: 10px 0 0; color: #aaa; font-size: 11px;">© ${new Date().getFullYear()} Obidient Movement. All rights reserved.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+

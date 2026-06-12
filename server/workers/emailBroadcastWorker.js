@@ -3,10 +3,11 @@ import { Worker } from 'bullmq';
 import { createRedisClient, getBullMqPrefix } from '../config/redis.js';
 import { logger } from '../middlewares/security.middleware.js';
 import { createEmailTransporter, sender } from '../config/email.js';
-import { createAdminBroadcastEmailTemplate } from '../utils/emailTemplates.js';
+import { createAdminBroadcastEmailTemplate, createNewsletterEmailTemplate } from '../utils/emailTemplates.js';
 import { query } from '../config/db.js';
 import BroadcastEmailLog from '../models/broadcastEmailLog.model.js';
 import Notification from '../models/notification.model.js';
+import Newsletter from '../models/newsletter.model.js';
 import { sendBroadcastPush } from '../services/pushNotificationService.js';
 import Redis from 'ioredis';
 
@@ -84,10 +85,159 @@ const countEligibleUsers = async (excludeUserId) => {
   return parseInt(result.rows[0].total);
 };
 
+// Newsletter progress key helper
+const newsletterProgressKey = (newsletterId) => `newsletter:progress:${newsletterId}`;
+
+// Update newsletter progress in Redis
+const updateNewsletterProgress = async (newsletterId, data) => {
+  const key = newsletterProgressKey(newsletterId);
+  await redisPublisher.hmset(key, {
+    ...data,
+    updatedAt: new Date().toISOString()
+  });
+  await redisPublisher.expire(key, 86400);
+};
+
+// Newsletter send processor
+const processNewsletterJob = async (job) => {
+  const { newsletterId, adminId, adminName, title, subject, content, previewText, featuredImageUrl, slug } = job.data;
+  const startTime = Date.now();
+
+  logger.info('Newsletter send job started', { newsletterId, adminName });
+
+  try {
+    // Guard: check newsletter status
+    const newsletter = await Newsletter.findById(newsletterId);
+    if (!newsletter) {
+      logger.info('Newsletter was deleted, skipping job', { newsletterId });
+      return;
+    }
+    if (newsletter.status !== 'sending') {
+      logger.info('Newsletter status is not "sending", skipping', { newsletterId, status: newsletter.status });
+      return;
+    }
+
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const webUrl = `${clientUrl}/newsletter/${slug}`;
+
+    // Get total recipients
+    const totalRecipients = await Newsletter.getRecipientCount();
+    logger.info(`Newsletter: ${totalRecipients} eligible recipients`, { newsletterId });
+
+    await updateNewsletterProgress(newsletterId, {
+      status: 'sending',
+      total: totalRecipients,
+      sent: 0,
+      failed: 0,
+      phase: 'Starting email delivery...'
+    });
+
+    // Create transporter
+    const transporter = createEmailTransporter();
+    let sent = 0;
+    let failed = 0;
+    let offset = 0;
+
+    while (true) {
+      const recipients = await Newsletter.getRecipients({ limit: BATCH_SIZE, offset });
+      if (recipients.length === 0) break;
+
+      for (const recipient of recipients) {
+        try {
+          const unsubscribeUrl = `${clientUrl}/newsletter/unsubscribe?token=${recipient.unsubscribe_token}`;
+
+          const html = createNewsletterEmailTemplate({
+            title,
+            content,
+            previewText: previewText || '',
+            featuredImageUrl: featuredImageUrl || null,
+            webUrl,
+            unsubscribeUrl,
+            recipientName: recipient.name || 'there',
+          });
+
+          if (DRY_RUN) {
+            logger.info(`[DRY RUN] Newsletter would send to ${recipient.email}`, { newsletterId });
+            await new Promise(r => setTimeout(r, 20));
+          } else {
+            await transporter.sendMail({
+              from: `"${sender.name}" <${sender.email}>`,
+              to: recipient.email,
+              subject: subject || title,
+              html,
+              headers: {
+                'List-Unsubscribe': `<${unsubscribeUrl}>`,
+                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+              },
+            });
+          }
+          sent++;
+        } catch (emailError) {
+          failed++;
+          logger.error(`Newsletter email failed: ${recipient.email}`, { newsletterId, error: emailError.message });
+        }
+
+        // Update progress every 10 emails
+        if ((sent + failed) % 10 === 0) {
+          await updateNewsletterProgress(newsletterId, {
+            status: 'sending',
+            total: totalRecipients,
+            sent,
+            failed,
+            phase: `Sending emails... ${sent + failed}/${totalRecipients}`
+          });
+        }
+
+        // Update DB every 100 emails
+        if ((sent + failed) % 100 === 0) {
+          await Newsletter.update(newsletterId, { emailsSent: sent, emailsFailed: failed });
+        }
+      }
+
+      offset += recipients.length;
+    }
+
+    // Close transporter
+    transporter.close();
+
+    // Finalize
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    await Newsletter.markSent(newsletterId, sent, failed);
+
+    await updateNewsletterProgress(newsletterId, {
+      status: 'completed',
+      total: totalRecipients,
+      sent,
+      failed,
+      phase: `Completed in ${elapsed}s — ${sent} sent, ${failed} failed`,
+      completedAt: new Date().toISOString()
+    });
+
+    logger.info('Newsletter send completed', { newsletterId, sent, failed, total: totalRecipients, elapsedSeconds: elapsed });
+
+  } catch (error) {
+    logger.error('Newsletter send job crashed', { newsletterId, error: error.message, stack: error.stack });
+
+    // Mark newsletter as failed (revert to draft so admin can retry)
+    await Newsletter.update(newsletterId, { status: 'draft' }).catch(() => {});
+    await updateNewsletterProgress(newsletterId, {
+      status: 'failed',
+      phase: `Error: ${error.message}`
+    }).catch(() => {});
+
+    throw error;
+  }
+};
+
 // Main worker processor
 const emailBroadcastWorker = new Worker(
   QUEUE_NAME,
   async (job) => {
+    // Route newsletter jobs to dedicated processor
+    if (job.data.type === 'newsletter') {
+      return processNewsletterJob(job);
+    }
+
     const { broadcastId, adminId, adminName, title, message, imageUrl, isRetry } = job.data;
     const startTime = Date.now();
 

@@ -542,6 +542,18 @@ const StateDashboard: React.FC = () => {
           </div>
         )}
 
+        {/* Unassigned info banner */}
+        {nationalStats && (nationalStats as any).unassignedCount > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2.5 mb-4 bg-amber-50 border border-amber-100 rounded-xl">
+            <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs text-amber-800">
+              <strong>{(nationalStats as any).unassignedCount}</strong> Obidient{(nationalStats as any).unassignedCount > 1 ? 's' : ''} haven't set their {(nationalStats as any).unassignedLabel?.replace('No ', '').replace(' Set', '') || 'location'}
+            </span>
+          </div>
+        )}
+
         {/* Charts — Obidients vs PVC comparison */}
         {currentData.length > 0 && (
           <DashboardCharts
@@ -579,32 +591,46 @@ const StateDashboard: React.FC = () => {
               const total = item.obidientRegisteredVoters || 0;
               const withPvc = item.obidientVotersWithPVC || 0;
               const pvcRate = total > 0 ? withPvc / total : 0;
+              const isUnassigned = item.isUnassigned;
+              const isInvalid = item.isInvalidLocation;
+              const isClickable = canDrillDown && !isUnassigned;
 
               return (
                 <button
                   key={item.id || index}
-                  onClick={canDrillDown ? () => handleItemClick(item) : undefined}
-                  disabled={!canDrillDown}
-                  className={`w-full bg-white rounded-xl border border-gray-100 px-4 py-3.5 text-left transition-colors ${
-                    canDrillDown ? 'hover:border-gray-200 cursor-pointer' : 'cursor-default'
+                  onClick={isClickable ? () => handleItemClick(item) : undefined}
+                  disabled={!isClickable}
+                  className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${
+                    isUnassigned
+                      ? 'bg-gray-50 border-dashed border-gray-200 cursor-default'
+                      : isInvalid
+                        ? 'bg-amber-50/50 border-amber-200 cursor-default'
+                        : isClickable
+                          ? 'bg-white border-gray-100 hover:border-gray-200 cursor-pointer'
+                          : 'bg-white border-gray-100 cursor-default'
                   }`}
                 >
                   {/* Top: name + percentage */}
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-semibold text-gray-900 truncate flex-1">
+                    <span className={`text-sm font-semibold truncate flex-1 ${isUnassigned ? 'text-gray-500 italic' : 'text-gray-900'}`}>
                       {item.name}
                     </span>
+                    {isInvalid && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium flex-shrink-0">
+                        ⚠ check location
+                      </span>
+                    )}
                     <span className="text-[13px] font-bold text-gray-900 tracking-tight">
                       {(pvcRate * 100).toFixed(0)}%
                     </span>
-                    {canDrillDown && (
+                    {isClickable && (
                       <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                     )}
                   </div>
                   {/* Progress bar */}
                   <div className="h-[3px] bg-gray-100 rounded-full overflow-hidden mb-2.5">
                     <div
-                      className="h-full bg-accent-green rounded-full"
+                      className={`h-full rounded-full ${isUnassigned ? 'bg-gray-300' : 'bg-accent-green'}`}
                       style={{ width: `${Math.min(pvcRate * 100, 100)}%` }}
                     />
                   </div>

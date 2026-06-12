@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import axios from 'axios';
 import SEOHead from '../../components/public/SEOHead';
@@ -199,6 +199,37 @@ const GetInvolvedPage = () => {
   const [honeypot, setHoneypot] = useState('');
   const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [formError, setFormError] = useState('');
+
+  /* Bank accounts for donation section */
+  interface PublicBankAccount {
+    id: number;
+    account_name: string;
+    account_number: string;
+    bank_name: string;
+    bank_code: string | null;
+    currency: string;
+    account_type: 'local' | 'international';
+    swift_code: string | null;
+    routing_number: string | null;
+    country: string;
+    description: string | null;
+    display_order: number;
+  }
+  const [bankAccounts, setBankAccounts] = useState<PublicBankAccount[]>([]);
+  const [copiedAccountId, setCopiedAccountId] = useState<number | null>(null);
+
+  useEffect(() => {
+    axios
+      .get(`${API}/api/bank-accounts/public`)
+      .then((res) => setBankAccounts(res.data.accounts || []))
+      .catch(() => {});
+  }, []);
+
+  const copyAccountNumber = (account: PublicBankAccount) => {
+    navigator.clipboard.writeText(account.account_number);
+    setCopiedAccountId(account.id);
+    setTimeout(() => setCopiedAccountId(null), 2000);
+  };
 
   const locations = useNigeriaLocations({ levels: 3 });
 
@@ -710,6 +741,80 @@ const GetInvolvedPage = () => {
                 Your information is private and never shared. By submitting, you agree to our{' '}
                 <Link to="/privacy" className="text-accent-green hover:underline">Privacy Policy</Link>.
               </p>
+
+              {/* Bank accounts inline when donor is selected */}
+              {formRole === 'donor' && bankAccounts.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-4">
+                    <svg className="w-5 h-5 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
+                    </svg>
+                    <h4 className="text-sm font-semibold text-text-light dark:text-text-dark">
+                      Send donations directly
+                    </h4>
+                  </div>
+                  <div className="space-y-3">
+                    {bankAccounts.map((account) => (
+                      <div
+                        key={account.id}
+                        className="bg-gray-50 dark:bg-background-dark border border-gray-100 dark:border-gray-700 rounded-xl p-4"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-text-light dark:text-text-dark">
+                              {account.bank_name}
+                            </span>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase ${
+                              account.account_type === 'local'
+                                ? 'bg-accent-green/10 text-accent-green'
+                                : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
+                              {account.currency}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between bg-white dark:bg-secondary-light rounded-lg px-3 py-2">
+                          <div>
+                            <p className="text-sm font-semibold text-text-light dark:text-text-dark">
+                              {account.account_name}
+                            </p>
+                            <p className="text-base font-mono font-bold text-text-light dark:text-text-dark mt-0.5">
+                              {account.account_number}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyAccountNumber(account)}
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-accent-green/10 text-accent-green text-xs font-medium hover:bg-accent-green hover:text-white transition-colors"
+                          >
+                            {copiedAccountId === account.id ? (
+                              <>
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                </svg>
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        {account.account_type === 'international' && (account.swift_code || account.routing_number) && (
+                          <div className="flex gap-3 mt-2 text-xs text-text-muted">
+                            {account.swift_code && <span>SWIFT: <span className="font-mono font-medium">{account.swift_code}</span></span>}
+                            {account.routing_number && <span>Routing: <span className="font-mono font-medium">{account.routing_number}</span></span>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </form>
           )}
         </div>
@@ -761,6 +866,128 @@ const GetInvolvedPage = () => {
               </div>
             ))}
           </div>
+
+          {/* Bank Account Details */}
+          {bankAccounts.length > 0 && (
+            <div className="mt-16">
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-medium text-white tracking-tight">
+                  Donation Account Details
+                </h3>
+                <p className="mt-2 text-sm text-white/60">
+                  Send your contributions directly to the official movement accounts below.
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+                {bankAccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="bg-white dark:bg-secondary-light border border-gray-100 dark:border-gray-700 rounded-2xl p-6 hover:shadow-lg transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
+                          account.account_type === 'local'
+                            ? 'bg-accent-green/10 text-accent-green'
+                            : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                        }`}>
+                          {account.account_type === 'local' ? 'Local' : 'International'}
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-[10px] font-semibold text-text-muted">
+                          {account.currency}
+                        </span>
+                      </div>
+                    </div>
+
+                    <h4 className="text-base font-medium text-text-light dark:text-text-dark">
+                      {account.bank_name}
+                    </h4>
+                    {account.description && (
+                      <p className="text-xs text-text-muted mt-0.5">{account.description}</p>
+                    )}
+
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between bg-gray-50 dark:bg-background-dark rounded-lg px-3 py-2">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-text-muted font-medium">Account Number</p>
+                          <p className="text-sm font-mono font-semibold text-text-light dark:text-text-dark">
+                            {account.account_number}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyAccountNumber(account)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent-green/10 text-accent-green text-xs font-medium hover:bg-accent-green hover:text-white transition-colors"
+                        >
+                          {copiedAccountId === account.id ? (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-gray-50 dark:bg-background-dark rounded-lg px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-text-muted font-medium">Account Name</p>
+                          <p className="text-xs font-medium text-text-light dark:text-text-dark mt-0.5">
+                            {account.account_name}
+                          </p>
+                        </div>
+                        {account.bank_code && (
+                          <div className="bg-gray-50 dark:bg-background-dark rounded-lg px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wide text-text-muted font-medium">Bank Code</p>
+                            <p className="text-xs font-medium text-text-light dark:text-text-dark mt-0.5">
+                              {account.bank_code}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {account.account_type === 'international' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {account.swift_code && (
+                            <div className="bg-gray-50 dark:bg-background-dark rounded-lg px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-wide text-text-muted font-medium">SWIFT / BIC</p>
+                              <p className="text-xs font-mono font-medium text-text-light dark:text-text-dark mt-0.5">
+                                {account.swift_code}
+                              </p>
+                            </div>
+                          )}
+                          {account.routing_number && (
+                            <div className="bg-gray-50 dark:bg-background-dark rounded-lg px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-wide text-text-muted font-medium">Routing No.</p>
+                              <p className="text-xs font-mono font-medium text-text-light dark:text-text-dark mt-0.5">
+                                {account.routing_number}
+                              </p>
+                            </div>
+                          )}
+                          {account.country && account.country !== 'Nigeria' && (
+                            <div className="bg-gray-50 dark:bg-background-dark rounded-lg px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-wide text-text-muted font-medium">Country</p>
+                              <p className="text-xs font-medium text-text-light dark:text-text-dark mt-0.5">
+                                {account.country}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
