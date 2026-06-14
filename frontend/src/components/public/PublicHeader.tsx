@@ -1,10 +1,25 @@
-import { useState, useEffect } from 'react';
-import { NavLink, Link } from 'react-router';
+import { useState, useEffect, useRef } from 'react';
+import { NavLink, Link, useLocation } from 'react-router';
 import TopLogo from '../TopLogo';
 import GradientCTA from '../ui/GradientCTA';
 import { useUser } from '../../context/UserContext';
 
-const navLinks = [
+interface NavChild {
+  to: string;
+  label: string;
+  desc: string;
+  icon: JSX.Element;
+}
+
+interface NavItem {
+  to?: string;
+  label: string;
+  desc?: string;
+  icon: JSX.Element;
+  children?: NavChild[];
+}
+
+const navLinks: NavItem[] = [
   {
     to: '/', label: 'Home', desc: 'Back to homepage',
     icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>,
@@ -18,12 +33,18 @@ const navLinks = [
     icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>,
   },
   {
-    to: '/news', label: 'News & Updates', desc: 'Latest movement news',
+    label: 'News & Updates',
     icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5M6 7.5h3v3H6v-3z" /></svg>,
-  },
-  {
-    to: '/newsletter', label: 'Newsletter', desc: 'Our regular newsletter',
-    icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 9v.906a2.25 2.25 0 01-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 001.183 1.981l6.478 3.488m8.839 2.51l-4.66-2.51m0 0l-1.023-.55a2.25 2.25 0 00-2.134 0l-1.022.55m0 0l-4.661 2.51m16.5 1.615a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V8.844a2.25 2.25 0 011.183-1.981l7.209-3.888a2.25 2.25 0 012.134 0l7.209 3.888A2.25 2.25 0 0121.75 8.844v8.156z" /></svg>,
+    children: [
+      {
+        to: '/news', label: 'Latest News', desc: 'Latest movement news & updates',
+        icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5M6 7.5h3v3H6v-3z" /></svg>,
+      },
+      {
+        to: '/newsletter', label: 'Newsletter', desc: 'Our regular email newsletter',
+        icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 9v.906a2.25 2.25 0 01-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 001.183 1.981l6.478 3.488m8.839 2.51l-4.66-2.51m0 0l-1.023-.55a2.25 2.25 0 00-2.134 0l-1.022.55m0 0l-4.661 2.51m16.5 1.615a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V8.844a2.25 2.25 0 011.183-1.981l7.209-3.888a2.25 2.25 0 012.134 0l7.209 3.888A2.25 2.25 0 0121.75 8.844v8.156z" /></svg>,
+      },
+    ],
   },
   {
     to: '/mobile-app', label: 'Mobile App', desc: 'Download for iOS & Android',
@@ -43,9 +64,13 @@ const X_URL = 'https://x.com/obaborcharity';
 
 const PublicHeader = () => {
   const { profile } = useUser();
+  const location = useLocation();
   const isLoggedIn = !!profile;
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [mobileExpanded, setMobileExpanded] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -57,6 +82,26 @@ const PublicHeader = () => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Close dropdown on route change
+  useEffect(() => {
+    setOpenDropdown(null);
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  const isGroupActive = (item: NavItem) =>
+    item.children?.some(c => location.pathname === c.to || location.pathname.startsWith(c.to + '/')) ?? false;
 
   return (
     <>
@@ -75,23 +120,88 @@ const PublicHeader = () => {
             </div>
 
             {/* Desktop Navigation — centered */}
-            <div className="hidden lg:flex items-center gap-1">
-              {navLinks.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  end={link.to === '/'}
-                  className={({ isActive }) =>
-                    `relative px-4 py-2 rounded-lg text-[13px] font-medium tracking-wide transition-all duration-150 ${
-                      isActive
-                        ? 'text-text-light dark:text-white bg-gray-100 dark:bg-white/[0.06]'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.04]'
-                    }`
-                  }
-                >
-                  {link.label}
-                </NavLink>
-              ))}
+            <div className="hidden lg:flex items-center gap-1" ref={dropdownRef}>
+              {navLinks.map((link) => {
+                if (link.children) {
+                  const active = isGroupActive(link);
+                  const isOpen = openDropdown === link.label;
+                  return (
+                    <div key={link.label} className="relative">
+                      <button
+                        onClick={() => setOpenDropdown(isOpen ? null : link.label)}
+                        className={`flex items-center gap-1 px-4 py-2 rounded-lg text-[13px] font-medium tracking-wide transition-all duration-150 ${
+                          active || isOpen
+                            ? 'text-text-light dark:text-white bg-gray-100 dark:bg-white/[0.06]'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        {link.label}
+                        <svg
+                          className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                        </svg>
+                      </button>
+
+                      {/* Dropdown panel */}
+                      {isOpen && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/[0.08] rounded-2xl shadow-xl shadow-black/[0.08] overflow-hidden z-50">
+                          <div className="p-1.5 flex flex-col gap-0.5">
+                            {link.children.map((child) => {
+                              const childActive = location.pathname === child.to || location.pathname.startsWith(child.to + '/');
+                              return (
+                                <NavLink
+                                  key={child.to}
+                                  to={child.to}
+                                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                                    childActive
+                                      ? 'bg-accent-green/8 dark:bg-accent-green/10'
+                                      : 'hover:bg-gray-50 dark:hover:bg-white/[0.04]'
+                                  }`}
+                                >
+                                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                    childActive
+                                      ? 'bg-accent-green/10 text-accent-green'
+                                      : 'bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-gray-400'
+                                  }`}>
+                                    {child.icon}
+                                  </span>
+                                  <div>
+                                    <p className={`text-[13px] font-medium ${childActive ? 'text-accent-green' : 'text-text-light dark:text-text-dark'}`}>
+                                      {child.label}
+                                    </p>
+                                    <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5 leading-tight">
+                                      {child.desc}
+                                    </p>
+                                  </div>
+                                </NavLink>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <NavLink
+                    key={link.to}
+                    to={link.to!}
+                    end={link.to === '/'}
+                    className={({ isActive }) =>
+                      `relative px-4 py-2 rounded-lg text-[13px] font-medium tracking-wide transition-all duration-150 ${
+                        isActive
+                          ? 'text-text-light dark:text-white bg-gray-100 dark:bg-white/[0.06]'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.04]'
+                      }`
+                    }
+                  >
+                    {link.label}
+                  </NavLink>
+                );
+              })}
             </div>
 
             {/* Desktop Right Side */}
@@ -189,32 +299,98 @@ const PublicHeader = () => {
 
         {/* Nav links — rich cards */}
         <div className="px-3 pb-4 flex flex-col gap-0.5">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/'}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
-                  isActive
-                    ? 'bg-accent-green/5 dark:bg-accent-green/10 border border-accent-green/20'
-                    : 'hover:bg-gray-50 dark:hover:bg-white/[0.03] border border-transparent'
-                }`
-              }
-            >
-              <span className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center text-gray-500 dark:text-gray-400 flex-shrink-0">
-                {link.icon}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-light dark:text-text-dark">{link.label}</p>
-                <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5">{link.desc}</p>
-              </div>
-              <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-            </NavLink>
-          ))}
+          {navLinks.map((link) => {
+            if (link.children) {
+              const active = isGroupActive(link);
+              const expanded = mobileExpanded === link.label;
+              return (
+                <div key={link.label}>
+                  {/* Accordion trigger */}
+                  <button
+                    onClick={() => setMobileExpanded(expanded ? null : link.label)}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
+                      active
+                        ? 'bg-accent-green/5 dark:bg-accent-green/10 border border-accent-green/20'
+                        : 'hover:bg-gray-50 dark:hover:bg-white/[0.03] border border-transparent'
+                    }`}
+                  >
+                    <span className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center text-gray-500 dark:text-gray-400 flex-shrink-0">
+                      {link.icon}
+                    </span>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-sm font-medium text-text-light dark:text-text-dark">{link.label}</p>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5">News, updates & newsletter</p>
+                    </div>
+                    <svg
+                      className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </button>
+
+                  {/* Children */}
+                  {expanded && (
+                    <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l-2 border-gray-100 dark:border-white/[0.06] pl-3">
+                      {link.children.map((child) => {
+                        const childActive = location.pathname === child.to || location.pathname.startsWith(child.to + '/');
+                        return (
+                          <NavLink
+                            key={child.to}
+                            to={child.to}
+                            onClick={() => setMobileOpen(false)}
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                              childActive
+                                ? 'bg-accent-green/5 dark:bg-accent-green/10 border border-accent-green/20'
+                                : 'hover:bg-gray-50 dark:hover:bg-white/[0.03] border border-transparent'
+                            }`}
+                          >
+                            <span className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center text-gray-500 dark:text-gray-400 flex-shrink-0">
+                              {child.icon}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-text-light dark:text-text-dark">{child.label}</p>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5">{child.desc}</p>
+                            </div>
+                            <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                            </svg>
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <NavLink
+                key={link.to}
+                to={link.to!}
+                end={link.to === '/'}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
+                    isActive
+                      ? 'bg-accent-green/5 dark:bg-accent-green/10 border border-accent-green/20'
+                      : 'hover:bg-gray-50 dark:hover:bg-white/[0.03] border border-transparent'
+                  }`
+                }
+              >
+                <span className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center text-gray-500 dark:text-gray-400 flex-shrink-0">
+                  {link.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-light dark:text-text-dark">{link.label}</p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5">{link.desc}</p>
+                </div>
+                <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </NavLink>
+            );
+          })}
         </div>
 
         {/* CTA Card */}
