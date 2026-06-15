@@ -47,20 +47,17 @@ interface KYCSubmission {
   kycRejectionReason?: string;
   votingState?: string;
   votingLGA?: string;
+  votingWard?: string;
+  userName?: string;
+  gender?: string;
+  ageRange?: string;
+  stateOfOrigin?: string;
+  citizenship?: string;
+  isVoter?: string;
+  willVote?: string;
+  designation?: string;
+  profileCompletionPercentage?: number;
   createdAt: string;
-  personalInfo?: {
-    firstName?: string;
-    lastName?: string;
-    userName?: string;
-    phoneNumber?: string;
-    gender?: string;
-    lga?: string;
-    ward?: string;
-    ageRange?: string;
-    stateOfOrigin?: string;
-    citizenship?: string;
-    isVoter?: string;
-  };
   validID?: {
     idType?: string;
     idNumber?: string;
@@ -241,6 +238,9 @@ export default function MembershipPage() {
 
       {/* Table */}
       <Card variant="outlined" sx={{ borderRadius: 2 }}>
+        <Box sx={{ px: 2.5, pt: 2, pb: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontFamily: FONT, fontWeight: 600, color: '#374151' }}>KYC Submissions</Typography>
+        </Box>
         <TableContainer component={Paper} variant="outlined" sx={{ border: 'none' }}>
           <Table size="small">
             <TableHead>
@@ -341,41 +341,50 @@ export default function MembershipPage() {
                 <Avatar src={drawerUser.profileImage} imgProps={{ referrerPolicy: 'no-referrer' }} sx={{ width: 56, height: 56, bgcolor: PRIMARY, fontSize: '1.25rem' }}>
                   {drawerUser.name?.[0]}
                 </Avatar>
-                <Box>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, fontFamily: FONT }}>{drawerUser.name}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontFamily: FONT }}>{drawerUser.email}</Typography>
                   {drawerUser.phone && (
                     <Typography variant="caption" color="text.secondary" sx={{ fontFamily: FONT }}>{drawerUser.phone}</Typography>
                   )}
                 </Box>
+                {/* Profile completion */}
+                <Box sx={{ textAlign: 'center', minWidth: 48 }}>
+                  <Typography variant="h6" sx={{ fontFamily: FONT, fontWeight: 700, color: (drawerUser.profileCompletionPercentage || 0) >= 80 ? '#16a34a' : (drawerUser.profileCompletionPercentage || 0) >= 50 ? '#d97706' : '#dc2626', lineHeight: 1 }}>
+                    {drawerUser.profileCompletionPercentage || 0}%
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: FONT, fontSize: '0.6rem' }}>Profile</Typography>
+                </Box>
               </Box>
+
+              {drawerUser.designation && (
+                <Chip label={drawerUser.designation} size="small" sx={{ fontFamily: FONT, mb: 1, bgcolor: '#f0fdf4', color: '#166534', fontWeight: 500 }} />
+              )}
 
               <Divider sx={{ my: 2 }} />
 
-              {/* Personal Info */}
-              {drawerUser.personalInfo && (
-                <Box sx={{ mb: 2.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontFamily: FONT, fontWeight: 600, mb: 1.5, color: '#374151' }}>Personal Information</Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                    <InfoItem label="First Name" value={drawerUser.personalInfo.firstName} />
-                    <InfoItem label="Last Name" value={drawerUser.personalInfo.lastName} />
-                    <InfoItem label="Username" value={drawerUser.personalInfo.userName} />
-                    <InfoItem label="Gender" value={drawerUser.personalInfo.gender} />
-                    <InfoItem label="Age Range" value={drawerUser.personalInfo.ageRange} />
-                    <InfoItem label="State of Origin" value={drawerUser.personalInfo.stateOfOrigin} />
-                    <InfoItem label="Citizenship" value={drawerUser.personalInfo.citizenship} />
-                    <InfoItem label="Registered Voter" value={drawerUser.personalInfo.isVoter} />
-                  </Box>
+              {/* Profile Information */}
+              <Box sx={{ mb: 2.5 }}>
+                <Typography variant="subtitle2" sx={{ fontFamily: FONT, fontWeight: 600, mb: 1.5, color: '#374151' }}>Profile Information</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                  <InfoItem label="Username" value={drawerUser.userName} />
+                  <InfoItem label="Gender" value={drawerUser.gender} />
+                  <InfoItem label="Age Range" value={drawerUser.ageRange} />
+                  <InfoItem label="State of Origin" value={drawerUser.stateOfOrigin} />
+                  <InfoItem label="Citizenship" value={drawerUser.citizenship} />
+                  <InfoItem label="Registered Voter" value={drawerUser.isVoter} />
+                  <InfoItem label="Will Vote" value={drawerUser.willVote} />
                 </Box>
-              )}
+              </Box>
 
-              {/* Location */}
-              {(drawerUser.votingState || drawerUser.votingLGA) && (
+              {/* Voting Location */}
+              {(drawerUser.votingState || drawerUser.votingLGA || drawerUser.votingWard) && (
                 <Box sx={{ mb: 2.5 }}>
                   <Typography variant="subtitle2" sx={{ fontFamily: FONT, fontWeight: 600, mb: 1.5, color: '#374151' }}>Voting Location</Typography>
                   <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
                     <InfoItem label="State" value={drawerUser.votingState} />
                     <InfoItem label="LGA" value={drawerUser.votingLGA} />
+                    <InfoItem label="Ward" value={drawerUser.votingWard} />
                   </Box>
                 </Box>
               )}

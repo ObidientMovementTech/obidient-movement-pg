@@ -289,6 +289,7 @@ export const validateRegistration = [
     .trim(),
 
   body('email')
+    .optional({ values: 'falsy' })
     .isEmail()
     .withMessage('Please provide a valid email address')
     .normalizeEmail()
@@ -296,6 +297,7 @@ export const validateRegistration = [
     .withMessage('Email must not exceed 150 characters'),
 
   body('phone')
+    .optional({ values: 'falsy' })
     .isLength({ min: 8, max: 25 })
     .withMessage('Phone number must be between 8 and 25 characters')
     .matches(/^[\+]?[0-9\-\s().]+$/)
@@ -354,9 +356,14 @@ export const validateLogin = [
 // Password reset validation
 export const validatePasswordReset = [
   body('email')
+    .optional({ values: 'falsy' })
     .isEmail()
     .withMessage('Please provide a valid email address')
     .normalizeEmail(),
+  body('phone')
+    .optional({ values: 'falsy' })
+    .isLength({ min: 8, max: 25 })
+    .withMessage('Phone number must be between 8 and 25 characters'),
 ];
 
 // New password validation

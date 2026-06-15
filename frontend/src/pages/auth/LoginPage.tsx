@@ -179,7 +179,12 @@ export default function LoginPage() {
       else if (error.errorType === "EMAIL_NOT_VERIFIED") {
         errorMessage = "Please verify your email before logging in.";
         // Redirect to verification page with email
-        navigate("/auth/verify", { state: { email } });
+        navigate("/auth/verify", { state: { email, verificationMethod: 'email' } });
+        return;
+      } else if (error.errorType === "PHONE_NOT_VERIFIED") {
+        errorMessage = "Please verify your phone number before logging in.";
+        // Redirect to verification page with phone
+        navigate("/auth/verify", { state: { phone: error.phone, verificationMethod: 'phone' } });
         return;
       } else if (error.errorType === "INVALID_PASSWORD")
         errorMessage = "Incorrect password.";

@@ -8,7 +8,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import validatePassword from "../../utils/validatePassword.js";
-import { registerUser } from "../../services/authService.js";
+import { registerUser, getSignupConfig } from "../../services/authService.js";
 import { useUserContext } from "../../context/UserContext.js";
 import FormSelect from "../../components/select/FormSelect.js";
 import useNigeriaLocations from "../../hooks/useNigeriaLocations";
@@ -41,8 +41,17 @@ const GetStartedPage = () => {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [smsSignupEnabled, setSmsSignupEnabled] = useState(false);
+  const [signupMethod, setSignupMethod] = useState<"email" | "phone">("email");
 
   const locations = useNigeriaLocations({ levels: 2 });
+
+  // Fetch signup config to check if SMS signup is enabled
+  useEffect(() => {
+    getSignupConfig().then((config) => {
+      setSmsSignupEnabled(config.smsSignupEnabled);
+    });
+  }, []);
 
   // Redirect to dashboard if user is already authenticated
   useEffect(() => {
@@ -88,17 +97,33 @@ const GetStartedPage = () => {
     e.preventDefault();
     setIsLoading(true);
 
-
-    if (!validateEmail(email)) {
-      displayError("Invalid email address format.");
-      setIsLoading(false);
-      return;
+    // Validate based on signup method
+    if (signupMethod === "email" || !smsSignupEnabled) {
+      if (!validateEmail(email)) {
+        displayError("Invalid email address format.");
+        setIsLoading(false);
+        return;
+      }
     }
 
-    if (!validatePhone(phone)) {
-      displayError("Please enter a valid WhatsApp phone number (digits only, no emails).");
-      setIsLoading(false);
-      return;
+    if (signupMethod === "phone" && smsSignupEnabled) {
+      if (!phone) {
+        displayError("Phone number is required.");
+        setIsLoading(false);
+        return;
+      }
+      if (!validatePhone(phone)) {
+        displayError("Please enter a valid phone number (digits only).");
+        setIsLoading(false);
+        return;
+      }
+    } else if (!smsSignupEnabled) {
+      // Original flow: phone always required
+      if (!validatePhone(phone)) {
+        displayError("Please enter a valid WhatsApp phone number (digits only, no emails).");
+        setIsLoading(false);
+        return;
+      }
     }
 
     const { validPassword, message: pwdMessage, is_ok } = validatePassword(password, confirmPassword);
@@ -110,13 +135,13 @@ const GetStartedPage = () => {
 
     try {
       // Format phone number for storage (add leading zero for Nigerian numbers)
-      const formattedPhone = formatPhoneForStorage(phone, countryCode);
+      const formattedPhone = phone ? formatPhoneForStorage(phone, countryCode) : undefined;
 
       const result = await registerUser({
         name,
-        email,
+        email: email || undefined,
         phone: formattedPhone,
-        countryCode,
+        countryCode: phone ? countryCode : undefined,
         password: validPassword,
         votingState: !isDiaspora && locations.selectedState ? locations.selectedState.name : undefined,
         votingLGA: !isDiaspora && locations.selectedLGA ? locations.selectedLGA.name : undefined,
@@ -124,10 +149,16 @@ const GetStartedPage = () => {
         isDiaspora,
       });
 
-      setMessage(result.message || "Signup successful! Please check your email.");
+      setMessage(result.message || "Signup successful!");
       setToastType("success");
       setShowToast(true);
-      navigate("/auth/verify", { state: { email } });
+
+      // Navigate to verification page with appropriate context
+      if (result.verificationMethod === 'phone' || (signupMethod === 'phone' && smsSignupEnabled)) {
+        navigate("/auth/verify", { state: { phone: formattedPhone, verificationMethod: 'phone' } });
+      } else {
+        navigate("/auth/verify", { state: { email, verificationMethod: 'email' } });
+      }
     } catch (error: any) {
       console.log('Registration error:', error);
 
@@ -192,6 +223,35 @@ const GetStartedPage = () => {
       <p className="get-started-text text-gray-dark dark:text-gray-100 text-2xl">
         Let's get started
       </p>
+
+      {/* Signup method toggle - only show when SMS signup is enabled */}
+      {smsSignupEnabled && (
+        <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+          <button
+            type="button"
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              signupMethod === 'email'
+                ? 'bg-accent-green text-white'
+                : 'bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200'
+            }`}
+            onClick={() => setSignupMethod('email')}
+          >
+            Sign up with Email
+          </button>
+          <button
+            type="button"
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              signupMethod === 'phone'
+                ? 'bg-accent-green text-white'
+                : 'bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200'
+            }`}
+            onClick={() => setSignupMethod('phone')}
+          >
+            Sign up with Phone
+          </button>
+        </div>
+      )}
+
       <div>
         <label className="block text-dark dark:text-gray-100 mb-2 text-sm">Name</label>
         <input
@@ -204,53 +264,59 @@ const GetStartedPage = () => {
         />
       </div>
 
-      <div>
-        <label className="block text-dark dark:text-gray-100 mb-2 text-sm">
-          Email
-        </label>
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-      </div>
-
-      <div>
-        <label className="block text-dark dark:text-gray-100 mb-2 text-sm">WhatsApp Phone Number</label>
-        <div className="flex gap-2">
-          <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 px-3 py-2">
-            <ListBoxComp
-              defaultSelected={countryCode}
-              onChange={(country) => setCountryCode(country.code)}
-            />
-          </div>
+      {/* Email field - show when email signup or when SMS is disabled */}
+      {(signupMethod === 'email' || !smsSignupEnabled) && (
+        <div>
+          <label className="block text-dark dark:text-gray-100 mb-2 text-sm">
+            Email
+          </label>
           <input
-            type="tel"
-            placeholder="Phone Number"
-            className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-            value={phone}
-            onChange={(e) => {
-              // Remove spaces and non-numeric characters except + and -
-              const cleanValue = e.target.value.replace(/[^\d\-+]/g, '');
-              setPhone(cleanValue);
-            }}
-            onPaste={(e) => {
-              e.preventDefault();
-              // Handle paste events to clean the pasted content
-              const pastedText = e.clipboardData.getData('text');
-              const cleanValue = pastedText.replace(/[^\d\-+]/g, '');
-              setPhone(cleanValue);
-            }}
-            required
+            type="email"
+            placeholder="Email"
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required={signupMethod === 'email' || !smsSignupEnabled}
           />
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          Enter digits only (spaces are not allowed)
-        </p>
-      </div>
+      )}
+
+      {/* Phone field - show when phone signup or when SMS is disabled (WhatsApp field) */}
+      {(signupMethod === 'phone' || !smsSignupEnabled) && (
+        <div>
+          <label className="block text-dark dark:text-gray-100 mb-2 text-sm">
+            {signupMethod === 'phone' && smsSignupEnabled ? 'Phone Number' : 'WhatsApp Phone Number'}
+          </label>
+          <div className="flex gap-2">
+            <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 px-3 py-2">
+              <ListBoxComp
+                defaultSelected={countryCode}
+                onChange={(country) => setCountryCode(country.code)}
+              />
+            </div>
+            <input
+              type="tel"
+              placeholder="Phone Number"
+              className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-[#00123A10] dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+              value={phone}
+              onChange={(e) => {
+                const cleanValue = e.target.value.replace(/[^\d\-+]/g, '');
+                setPhone(cleanValue);
+              }}
+              onPaste={(e) => {
+                e.preventDefault();
+                const pastedText = e.clipboardData.getData('text');
+                const cleanValue = pastedText.replace(/[^\d\-+]/g, '');
+                setPhone(cleanValue);
+              }}
+              required={signupMethod === 'phone' || !smsSignupEnabled}
+            />
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Enter digits only (spaces are not allowed)
+          </p>
+        </div>
+      )}
 
       {/* Voting Location Section */}
       <div className="space-y-4">

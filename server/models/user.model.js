@@ -15,6 +15,7 @@ class User {
       passwordHash,
       profileImage = null,
       emailVerified = false,
+      phoneVerified = false,
       role = 'user',
       votingState = null,
       votingLGA = null,
@@ -47,14 +48,14 @@ class User {
       const userResult = await client.query(
         `INSERT INTO users (
           name, email, phone, "passwordHash", "profileImage", 
-          "emailVerified", role, "votingState", "votingLGA", "votingWard",
+          "emailVerified", "phoneVerified", role, "votingState", "votingLGA", "votingWard",
           designation, "assignedState", "assignedLGA", "assignedWard",
           gender, "ageRange", citizenship, "isVoter", "willVote",
           "userName", "countryCode", "stateOfOrigin",
           "bankName", "bankAccountNumber", "bankAccountName"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) 
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26) 
         RETURNING *`,
-        [name, email, phone, passwordHash, profileImage, emailVerified, role,
+        [name, email, phone, passwordHash, profileImage, emailVerified, phoneVerified, role,
           votingState, votingLGA, votingWard, designation, assignedState, assignedLGA, assignedWard,
           gender, ageRange, citizenship, isVoter, willVote, userName, countryCode, stateOfOrigin,
           bankName, bankAccountNumber, bankAccountName]
@@ -143,7 +144,7 @@ class User {
   static async findByIdSelect(id, excludeFields = []) {
     let selectFields = '*';
     if (excludeFields.includes('passwordHash')) {
-      selectFields = `id, name, email, phone, "profileImage", "emailVerified", role, 
+      selectFields = `id, name, email, phone, "profileImage", "emailVerified", "phoneVerified", role, 
                      "kycStatus", "twoFactorEnabled", "twoFactorQRCode", otp, "otpExpiry", 
                      "otpPurpose", "pendingEmail", "kycRejectionReason", "hasTakenCauseSurvey",
                      "countryOfResidence", "createdAt", "updatedAt", "votingState", "votingLGA",
@@ -223,7 +224,7 @@ class User {
       }
 
       // Handle direct user fields
-      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA', 'votingWard', 'votingPU', 'designation', 'assignedState', 'assignedLGA', 'assignedWard', 'bankName', 'bankAccountNumber', 'bankAccountName', 'otp', 'otpExpiry', 'otpPurpose', 'emailVerified'];
+      const directFields = ['name', 'email', 'phone', 'votingState', 'votingLGA', 'votingWard', 'votingPU', 'designation', 'assignedState', 'assignedLGA', 'assignedWard', 'bankName', 'bankAccountNumber', 'bankAccountName', 'otp', 'otpExpiry', 'otpPurpose', 'emailVerified', 'phoneVerified'];
       directFields.forEach(field => {
         if (updateData[field] !== undefined) {
           fieldsToUpdate.push(`"${field}" = $${paramCount}`);

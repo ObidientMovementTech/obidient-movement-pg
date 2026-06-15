@@ -37,11 +37,12 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ message: "User not found" });
     }
 
-    // Check if email is verified
-    if (!user.emailVerified) {
+    // Check if user is verified (email OR phone)
+    if (!user.emailVerified && !user.phoneVerified) {
       return res.status(403).json({
-        message: "Email verification required",
+        message: "Account verification required",
         emailVerified: false,
+        phoneVerified: false,
       });
     }
 

@@ -5,8 +5,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export const registerUser = async (data: {
   name: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
   password: string;
   countryCode?: string;
   votingState?: string;
@@ -150,6 +150,62 @@ export const verifyEmailCode = async (email: string, code: string) => {
       success: false,
       errorType: 'NETWORK_ERROR'
     };
+  }
+};
+
+export const verifyPhoneCode = async (phone: string, code: string) => {
+  try {
+    const response = await axios.post(`${API_BASE}/auth/verify-phone-code`,
+      { phone, code },
+      { withCredentials: true }
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw {
+        message: error.response.data.message || "Verification failed.",
+        errorType: error.response.data.errorType,
+        success: false,
+        ...error.response.data
+      };
+    }
+    throw {
+      message: "Verification failed. Please check your connection and try again.",
+      success: false,
+      errorType: 'NETWORK_ERROR'
+    };
+  }
+};
+
+export const resendPhoneOTP = async (phone: string) => {
+  try {
+    const response = await axios.post(`${API_BASE}/auth/resend-phone-otp`,
+      { phone },
+      { withCredentials: true }
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw {
+        message: error.response.data.message || "Failed to resend verification SMS.",
+        success: false,
+        ...error.response.data
+      };
+    }
+    throw {
+      message: "Failed to resend verification SMS. Please try again.",
+      success: false,
+      errorType: 'NETWORK_ERROR'
+    };
+  }
+};
+
+export const getSignupConfig = async () => {
+  try {
+    const response = await axios.get(`${API_BASE}/auth/signup-config`);
+    return response.data;
+  } catch (error) {
+    return { smsSignupEnabled: false };
   }
 };
 

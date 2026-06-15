@@ -12,6 +12,8 @@ import {
   resendConfirmationEmail,
   verify2FALogin,
   verifyEmailCode,
+  verifyPhoneCode,
+  resendPhoneOTP,
   refreshAccessToken,
 } from '../controllers/auth.controller.js';
 import { protect, authenticateUser } from "../middlewares/auth.middleware.js";
@@ -110,6 +112,23 @@ router.post('/verify-email-code',
   loginRateLimit,
   verifyEmailCode
 );
+
+router.post('/verify-phone-code',
+  loginRateLimit,
+  verifyPhoneCode
+);
+
+router.post('/resend-phone-otp',
+  emailResendRateLimit,
+  resendPhoneOTP
+);
+
+// Signup config endpoint (tells frontend if SMS signup is enabled)
+router.get('/signup-config', (req, res) => {
+  res.status(200).json({
+    smsSignupEnabled: process.env.SMS_SIGNUP_ENABLED === 'true',
+  });
+});
 
 router.post('/forgot-password',
   passwordResetRateLimit,
