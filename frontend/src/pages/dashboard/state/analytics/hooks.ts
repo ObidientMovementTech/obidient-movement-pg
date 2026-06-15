@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { mobiliseDashboardService } from '../../../../services/mobiliseDashboardService';
 import type { DemographicsData, PersonRow, PeopleFilters, PaginationData } from './types';
 
-export function useDemographics(level: string, locationId: string) {
+export function useDemographics(level: string, locationId: string, locationName?: string) {
   const [data, setData] = useState<DemographicsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -11,22 +11,23 @@ export function useDemographics(level: string, locationId: string) {
     if (!level || !locationId) return;
     let cancelled = false;
     setLoading(true);
-    mobiliseDashboardService.getDemographics(level, locationId)
+    mobiliseDashboardService.getDemographics(level, locationId, locationName)
       .then(res => { if (!cancelled) setData(res.data); })
       .catch(err => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [level, locationId]);
+  }, [level, locationId, locationName]);
 
   return { data, loading, error };
 }
 
-export function usePeople(level: string, locationId: string) {
+export function usePeople(level: string, locationId: string, locationName?: string) {
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [pagination, setPagination] = useState<PaginationData>({ page: 1, limit: 50, total: 0, totalPages: 0 });
   const [filters, setFilters] = useState<PeopleFilters>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nameRef = locationName;
 
   const fetchPeople = useCallback(async (page = 1, currentFilters?: PeopleFilters) => {
     if (!level || !locationId) return;
@@ -49,7 +50,7 @@ export function usePeople(level: string, locationId: string) {
       const effectiveLevel = (f as any)._scope || level;
       const effectiveLocationId = (f as any)._scope ? 'all' : locationId;
 
-      const res = await mobiliseDashboardService.getPeople(effectiveLevel, effectiveLocationId, params);
+      const res = await mobiliseDashboardService.getPeople(effectiveLevel, effectiveLocationId, params, nameRef);
       setPeople(res.data);
       setPagination(res.pagination);
     } catch (err: any) {
@@ -82,7 +83,7 @@ export function usePeople(level: string, locationId: string) {
     const effectiveLevel = (filters as any)._scope || level;
     const effectiveLocationId = (filters as any)._scope ? 'all' : locationId;
 
-    const blob = await mobiliseDashboardService.exportPeople(effectiveLevel, effectiveLocationId, params);
+    const blob = await mobiliseDashboardService.exportPeople(effectiveLevel, effectiveLocationId, params, nameRef);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

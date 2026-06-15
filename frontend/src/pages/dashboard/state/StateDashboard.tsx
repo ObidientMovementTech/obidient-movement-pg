@@ -523,10 +523,12 @@ const StateDashboard: React.FC = () => {
           const lastBreadcrumb = breadcrumbs[breadcrumbs.length - 1];
           const analyticsLevel = currentView === 'national' ? 'national' : currentView;
           const analyticsLocationId = lastBreadcrumb?.id || 'all';
+          const analyticsLocationName = lastBreadcrumb?.name || '';
           return (
             <AnalyticsPanel
               level={analyticsLevel}
               locationId={analyticsLocationId}
+              locationName={analyticsLocationName}
             />
           );
         })()}

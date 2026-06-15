@@ -9,11 +9,12 @@ import type { PeopleFilters } from './types';
 interface AnalyticsPanelProps {
   level: string;
   locationId: string;
+  locationName?: string;
 }
 
-const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ level, locationId }) => {
-  const { data: demographics, loading: demoLoading } = useDemographics(level, locationId);
-  const { people, pagination, filters, loading: peopleLoading, fetchPeople, setPage, applyFilters, exportCsv } = usePeople(level, locationId);
+const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ level, locationId, locationName }) => {
+  const { data: demographics, loading: demoLoading } = useDemographics(level, locationId, locationName);
+  const { people, pagination, filters, loading: peopleLoading, fetchPeople, setPage, applyFilters, exportCsv } = usePeople(level, locationId, locationName);
 
   // Load first page of people on mount
   useEffect(() => {

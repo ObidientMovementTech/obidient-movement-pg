@@ -72,9 +72,10 @@ export const mobiliseDashboardService = {
   /**
    * Get demographics/analytics for a location level
    */
-  getDemographics: async (level: string, locationId: string) => {
+  getDemographics: async (level: string, locationId: string, locationName?: string) => {
     const response = await axios.get(`${API_BASE}/mobilise-dashboard/${level}/${locationId}/demographics`, {
       withCredentials: true,
+      params: locationName ? { name: locationName } : undefined,
     });
     return response.data;
   },
@@ -82,10 +83,10 @@ export const mobiliseDashboardService = {
   /**
    * Get paginated people list for a location level
    */
-  getPeople: async (level: string, locationId: string, params: Record<string, string | number>) => {
+  getPeople: async (level: string, locationId: string, params: Record<string, string | number>, locationName?: string) => {
     const response = await axios.get(`${API_BASE}/mobilise-dashboard/${level}/${locationId}/people`, {
       withCredentials: true,
-      params,
+      params: locationName ? { ...params, name: locationName } : params,
     });
     return response.data;
   },
@@ -93,10 +94,10 @@ export const mobiliseDashboardService = {
   /**
    * Export filtered people as CSV
    */
-  exportPeople: async (level: string, locationId: string, params: Record<string, string>) => {
+  exportPeople: async (level: string, locationId: string, params: Record<string, string>, locationName?: string) => {
     const response = await axios.get(`${API_BASE}/mobilise-dashboard/${level}/${locationId}/people/export`, {
       withCredentials: true,
-      params,
+      params: locationName ? { ...params, name: locationName } : params,
       responseType: 'blob',
     });
     return response.data;

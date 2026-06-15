@@ -1031,17 +1031,20 @@ export const getPollingUnitData = async (req, res) => {
 
 /**
  * Build a WHERE clause + params for scoping queries to a location level.
- * Returns { clause, params, paramIndex }
+ * If canonicalName is provided (from frontend), use it directly.
+ * Otherwise fall back to fromSlug (unreliable for uppercase/spaced names).
  */
-function buildLocationScope(level, locationId) {
-  const locationName = fromSlug(locationId);
+function buildLocationScope(level, locationId, canonicalName) {
+  const locationName = canonicalName || fromSlug(locationId);
   switch (level) {
     case 'state':
-      return { clause: `"votingState" = $1`, params: [locationName], nextIdx: 2 };
+      return { clause: `"votingState" ILIKE $1`, params: [locationName], nextIdx: 2 };
     case 'lga':
-      return { clause: `"votingLGA" = $1`, params: [locationName], nextIdx: 2 };
+      return { clause: `"votingLGA" ILIKE $1`, params: [locationName], nextIdx: 2 };
     case 'ward':
-      return { clause: `"votingWard" = $1`, params: [locationName], nextIdx: 2 };
+      return { clause: `"votingWard" ILIKE $1`, params: [locationName], nextIdx: 2 };
+    case 'pu':
+      return { clause: `"votingPU" ILIKE $1`, params: [locationName], nextIdx: 2 };
     case 'noState':
       return { clause: `("votingState" IS NULL OR "votingState" = '')`, params: [], nextIdx: 1 };
     default:
@@ -1056,7 +1059,8 @@ function buildLocationScope(level, locationId) {
 export const getDemographics = async (req, res) => {
   try {
     const { level, locationId } = req.params;
-    const { clause, params } = buildLocationScope(level, locationId);
+    const canonicalName = req.query.name || null;
+    const { clause, params } = buildLocationScope(level, locationId, canonicalName);
 
     const sql = `
       SELECT
@@ -1205,10 +1209,11 @@ export const getPeople = async (req, res) => {
       lga,
       search,
       sortBy = 'createdAt',
-      sortDir = 'desc'
+      sortDir = 'desc',
+      name: canonicalName
     } = req.query;
 
-    const { clause, params, nextIdx } = buildLocationScope(level, locationId);
+    const { clause, params, nextIdx } = buildLocationScope(level, locationId, canonicalName || null);
     let idx = nextIdx;
     const filters = [clause];
 
@@ -1343,9 +1348,9 @@ export const getPeople = async (req, res) => {
 export const exportPeople = async (req, res) => {
   try {
     const { level, locationId } = req.params;
-    const { gender, ageRange, pvc, willVote, profileHealth, activity, lga, search } = req.query;
+    const { gender, ageRange, pvc, willVote, profileHealth, activity, lga, search, name: canonicalName } = req.query;
 
-    const { clause, params, nextIdx } = buildLocationScope(level, locationId);
+    const { clause, params, nextIdx } = buildLocationScope(level, locationId, canonicalName || null);
     let idx = nextIdx;
     const filters = [clause];
 
