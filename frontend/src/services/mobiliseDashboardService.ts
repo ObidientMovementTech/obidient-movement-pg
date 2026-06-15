@@ -67,6 +67,39 @@ export const mobiliseDashboardService = {
       withCredentials: true,
     });
     return response.data;
+  },
+
+  /**
+   * Get demographics/analytics for a location level
+   */
+  getDemographics: async (level: string, locationId: string) => {
+    const response = await axios.get(`${API_BASE}/mobilise-dashboard/${level}/${locationId}/demographics`, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get paginated people list for a location level
+   */
+  getPeople: async (level: string, locationId: string, params: Record<string, string | number>) => {
+    const response = await axios.get(`${API_BASE}/mobilise-dashboard/${level}/${locationId}/people`, {
+      withCredentials: true,
+      params,
+    });
+    return response.data;
+  },
+
+  /**
+   * Export filtered people as CSV
+   */
+  exportPeople: async (level: string, locationId: string, params: Record<string, string>) => {
+    const response = await axios.get(`${API_BASE}/mobilise-dashboard/${level}/${locationId}/people/export`, {
+      withCredentials: true,
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
   }
 };
 

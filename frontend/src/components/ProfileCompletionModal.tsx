@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
+import { getProfileCompleteness } from '../utils/profileCompleteness';
 import Modal from './ui/Modal';
 import { MapPin, Flag, Users, Star } from 'lucide-react';
 
@@ -20,34 +21,9 @@ export default function ProfileCompletionModal({
 
   useEffect(() => {
     if (profile) {
-      // Calculate profile completion percentage based on the new merged structure
-      const requiredFields = [
-        { key: 'userName', label: 'Username', getValue: (p: any) => p.userName || p.personalInfo?.user_name },
-        { key: 'gender', label: 'Gender', getValue: (p: any) => p.gender || p.personalInfo?.gender },
-        { key: 'ageRange', label: 'Age Range', getValue: (p: any) => p.ageRange || p.personalInfo?.age_range },
-        { key: 'stateOfOrigin', label: 'State of Origin', getValue: (p: any) => p.stateOfOrigin || p.personalInfo?.state_of_origin },
-        { key: 'votingState', label: 'Voting State', getValue: (p: any) => p.votingState || p.personalInfo?.voting_engagement_state },
-        { key: 'votingLGA', label: 'Voting LGA', getValue: (p: any) => p.votingLGA || p.personalInfo?.lga },
-        { key: 'votingWard', label: 'Voting Ward', getValue: (p: any) => p.votingWard || p.personalInfo?.ward },
-        { key: 'votingPU', label: 'Voting Polling Unit', getValue: (p: any) => p.votingPU || p.personalInfo?.voting_pu },
-        { key: 'citizenship', label: 'Citizenship', getValue: (p: any) => p.citizenship || p.personalInfo?.citizenship },
-        { key: 'isVoter', label: 'Voter Status', getValue: (p: any) => p.isVoter || p.onboardingData?.votingBehavior?.is_registered },
-        { key: 'willVote', label: 'Voting Intention', getValue: (p: any) => p.willVote || p.onboardingData?.votingBehavior?.likely_to_vote },
-        { key: 'profileImage', label: 'Profile Image', getValue: (p: any) => p.profileImage }
-      ];
-
-      const completedFields = requiredFields.filter(field => {
-        const value = field.getValue(profile);
-        return value && value.toString().trim() !== '';
-      });
-
-      const missing = requiredFields.filter(field => {
-        const value = field.getValue(profile);
-        return !value || value.toString().trim() === '';
-      });
-
-      setCompletionScore((completedFields.length / requiredFields.length) * 100);
-      setMissingFields(missing.map(field => field.label));
+      const result = getProfileCompleteness(profile);
+      setCompletionScore(result.percentage);
+      setMissingFields(result.missingFields);
     }
   }, [profile]);
 

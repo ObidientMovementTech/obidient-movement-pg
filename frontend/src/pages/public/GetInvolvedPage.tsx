@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import axios from 'axios';
 import SEOHead from '../../components/public/SEOHead';
 import GradientCTA from '../../components/ui/GradientCTA';
@@ -7,6 +7,8 @@ import { useCountUp } from '../../hooks/useCountUp';
 import useNigeriaLocations from '../../hooks/useNigeriaLocations';
 import FormSelect from '../../components/select/FormSelect';
 import { getRecaptchaToken } from '../../utils/recaptcha';
+import { useUser } from '../../context/UserContext';
+import apiClient from '../../lib/apiClient';
 import rallyImg from '../../assets/images/po5.jpeg';
 
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -175,7 +177,14 @@ const volunteerSkills = [
 ];
 
 /* ───────────────────────────────────────────── */
+const DRAFT_KEY = 'involvement_draft';
+
 const GetInvolvedPage = () => {
+  const { profile } = useUser();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [draftRestored, setDraftRestored] = useState(false);
+
   const s0 = useCountUp(stats[0].value);
   const s1 = useCountUp(stats[1].value);
   const s2 = useCountUp(stats[2].value);
@@ -193,6 +202,7 @@ const GetInvolvedPage = () => {
   const [isDiaspora, setIsDiaspora] = useState(false);
   const [country, setCountry] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedDirectorate, setSelectedDirectorate] = useState('');
   const [experienceLevel, setExperienceLevel] = useState('');
   const [contributionType, setContributionType] = useState('');
   const [message, setMessage] = useState('');
@@ -225,6 +235,37 @@ const GetInvolvedPage = () => {
       .catch(() => {});
   }, []);
 
+  // Read ?role= param to pre-select form tab
+  useEffect(() => {
+    const roleParam = searchParams.get('role');
+    if (roleParam && ['volunteer', 'vote_protection_officer', 'donor'].includes(roleParam)) {
+      setFormRole(roleParam);
+    }
+  }, [searchParams]);
+
+  // Restore draft if user just returned from login/signup
+  useEffect(() => {
+    if (!profile) return;
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw);
+      setFormRole(draft.formRole || 'volunteer');
+      setFullName(draft.fullName || '');
+      setEmail(draft.email || '');
+      setPhone(draft.phone || '');
+      setIsDiaspora(draft.isDiaspora || false);
+      setCountry(draft.country || '');
+      setSelectedSkills(draft.selectedSkills || []);
+      setSelectedDirectorate(draft.selectedDirectorate || '');
+      setExperienceLevel(draft.experienceLevel || '');
+      setContributionType(draft.contributionType || '');
+      setMessage(draft.message || '');
+      setDraftRestored(true);
+      // Don't remove yet — removed after successful submit
+    } catch { /* ignore corrupt data */ }
+  }, [profile]);
+
   const copyAccountNumber = (account: PublicBankAccount) => {
     navigator.clipboard.writeText(account.account_number);
     setCopiedAccountId(account.id);
@@ -253,13 +294,27 @@ const GetInvolvedPage = () => {
       return;
     }
 
+    // Auth gate: if not logged in, save draft and redirect to login
+    if (!profile) {
+      const draft = {
+        formRole, fullName, email, phone, isDiaspora, country,
+        selectedSkills, selectedDirectorate, experienceLevel, contributionType, message,
+        state: locations.selectedState?.name || '',
+        lga: locations.selectedLGA?.name || '',
+        ward: locations.selectedWard?.name || '',
+      };
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      navigate('/auth/login?redirect=/get-involved');
+      return;
+    }
+
     setFormStatus('submitting');
     setFormError('');
 
     try {
       const recaptchaToken = await getRecaptchaToken('involvement_interest');
 
-      await axios.post(`${API}/api/involvement/submit`, {
+      await apiClient.post('/api/involvement/submit', {
         fullName: fullName.trim(),
         email: email.trim(),
         phone: phone.trim(),
@@ -270,12 +325,15 @@ const GetInvolvedPage = () => {
         isDiaspora,
         country: isDiaspora ? country.trim() : undefined,
         skills: formRole === 'volunteer' ? selectedSkills : undefined,
+        directorate: formRole === 'volunteer' && selectedDirectorate ? selectedDirectorate : undefined,
         experienceLevel: formRole === 'vote_protection_officer' ? experienceLevel : undefined,
         contributionType: formRole === 'donor' ? contributionType : undefined,
         message: message.trim() || undefined,
         recaptchaToken,
       });
 
+      sessionStorage.removeItem(DRAFT_KEY);
+      setDraftRestored(false);
       setFormStatus('success');
     } catch (err: any) {
       setFormStatus('error');
@@ -665,6 +723,28 @@ const GetInvolvedPage = () => {
                 </div>
               )}
 
+              {formRole === 'volunteer' && (
+                <div>
+                  <label className="block text-sm font-medium text-text-light dark:text-text-dark mb-2">Which department interests you?</label>
+                  <select
+                    value={selectedDirectorate}
+                    onChange={(e) => setSelectedDirectorate(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-text-light dark:text-text-dark focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green outline-none transition-all"
+                  >
+                    <option value="">I&apos;m not sure / Any department</option>
+                    <option value="operations">Operations</option>
+                    <option value="political_engagement">Political Engagement</option>
+                    <option value="legal">Legal</option>
+                    <option value="technology">Technology</option>
+                    <option value="communications">Communications</option>
+                    <option value="mobilisation">Mobilisation</option>
+                    <option value="finance">Finance</option>
+                    <option value="research">Research</option>
+                    <option value="diaspora_engagement">Diaspora Engagement</option>
+                  </select>
+                </div>
+              )}
+
               {formRole === 'vote_protection_officer' && (
                 <div>
                   <label className="block text-sm font-medium text-text-light dark:text-text-dark mb-2">Experience Level</label>
@@ -720,6 +800,13 @@ const GetInvolvedPage = () => {
                   placeholder="Tell us anything relevant — availability, organization you represent, etc."
                 />
               </div>
+
+              {/* Draft restored banner */}
+              {draftRestored && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+                  Your form has been restored. Review your details and submit when ready.
+                </div>
+              )}
 
               {/* Error */}
               {formError && (

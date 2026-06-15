@@ -6,6 +6,7 @@ import coordinatorService, {
   NigeriaLocation,
   CAN_ASSIGN,
   AssignDesignationPayload,
+  VALID_DIRECTORATES,
 } from '../../../services/coordinatorService';
 import { mobiliseDashboardService } from '../../../services/mobiliseDashboardService';
 import { countryCodes } from '../../../utils/countryCodes';
@@ -38,6 +39,7 @@ const AssignLeaderPage: React.FC = () => {
   const [selectedLGA, setSelectedLGA] = useState<NigeriaLocation | null>(null);
   const [selectedWard, setSelectedWard] = useState<NigeriaLocation | null>(null);
   const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedDirectorate, setSelectedDirectorate] = useState('');
 
   // Location data
   const [states, setStates] = useState<NigeriaLocation[]>([]);
@@ -104,14 +106,15 @@ const AssignLeaderPage: React.FC = () => {
     const { designation: userDesignation } = userLevel;
     // Admins can assign all coordinator roles
     if (userLevel.role === 'admin') {
-      return ['National Coordinator', 'State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Diaspora Coordinator'];
+      return ['National Coordinator', 'State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Diaspora Coordinator', 'Directorate Head'];
     }
     return CAN_ASSIGN[userDesignation] || [];
   }, [userLevel]);
 
   // Determine which location fields are needed
   const needsCountry = designation === 'Diaspora Coordinator';
-  const needsState = designation !== '' && designation !== 'Community Member' && designation !== 'Diaspora Coordinator';
+  const needsDirectorate = designation === 'Directorate Head';
+  const needsState = designation !== '' && designation !== 'Community Member' && designation !== 'Diaspora Coordinator' && designation !== 'Directorate Head';
   const needsLGA =
     designation === 'LGA Coordinator' ||
     designation === 'Ward Coordinator' ||
@@ -208,6 +211,7 @@ const AssignLeaderPage: React.FC = () => {
   const canSubmit = (() => {
     if (!designation || !selectedUser) return false;
     if (needsCountry && !selectedCountry) return false;
+    if (needsDirectorate && !selectedDirectorate) return false;
     if (needsState && !selectedState) return false;
     if (needsLGA && !selectedLGA) return false;
     if (needsWard && !selectedWard) return false;
@@ -221,6 +225,7 @@ const AssignLeaderPage: React.FC = () => {
     setSelectedLGA(null);
     setSelectedWard(null);
     setSelectedCountry('');
+    setSelectedDirectorate('');
     setAssignError(null);
     setAssignSuccess(null);
   };
@@ -231,6 +236,7 @@ const AssignLeaderPage: React.FC = () => {
     setSelectedLGA(null);
     setSelectedWard(null);
     setSelectedCountry('');
+    setSelectedDirectorate('');
     setAssignError(null);
 
     // Re-apply locked locations
@@ -261,6 +267,7 @@ const AssignLeaderPage: React.FC = () => {
         assignedLGA: selectedLGA?.name,
         assignedWard: selectedWard?.name,
         assignedCountry: needsCountry ? selectedCountry : undefined,
+        assignedDirectorate: needsDirectorate ? selectedDirectorate : undefined,
         override: !!hasExistingDesignation,
       };
 
@@ -469,6 +476,27 @@ const AssignLeaderPage: React.FC = () => {
                           {c.name}
                         </option>
                       ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Directorate picker (Directorate Head) */}
+              {needsDirectorate && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Directorate
+                  </label>
+                  <select
+                    value={selectedDirectorate}
+                    onChange={(e) => setSelectedDirectorate(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-accent-green focus:border-transparent outline-none"
+                  >
+                    <option value="">Select directorate…</option>
+                    {VALID_DIRECTORATES.map((d) => (
+                      <option key={d.slug} value={d.slug}>
+                        {d.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}

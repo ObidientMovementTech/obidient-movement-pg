@@ -77,6 +77,8 @@ export interface UserProfile {
   assignedState?: string;
   assignedLGA?: string;
   assignedWard?: string;
+  assignedCountry?: string;
+  assignedDirectorate?: string;
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;

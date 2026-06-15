@@ -4,7 +4,9 @@ import {
   ChevronRight,
   Search,
   Users,
-  UserPlus
+  UserPlus,
+  BarChart3,
+  List
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -24,6 +26,7 @@ import {
 } from '../types/dashboard.types';
 import { mobiliseDashboardService } from '../../../services/mobiliseDashboardService';
 import DashboardCharts from '../components/DashboardCharts';
+import AnalyticsPanel from './analytics/AnalyticsPanel';
 
 // Register ChartJS components
 ChartJS.register(
@@ -75,6 +78,9 @@ const StateDashboard: React.FC = () => {
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
+
+  // View toggle: 'hierarchy' (existing) or 'analytics' (new)
+  const [activeTab, setActiveTab] = useState<'hierarchy' | 'analytics'>('analytics');
 
   // Initialize dashboard
   useEffect(() => {
@@ -483,7 +489,50 @@ const StateDashboard: React.FC = () => {
               })}
             </nav>
           )}
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-4">
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === 'analytics'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              Analytics
+            </button>
+            <button
+              onClick={() => setActiveTab('hierarchy')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === 'hierarchy'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              Locations
+            </button>
+          </div>
         </div>
+
+        {/* ═══ Analytics Tab ═══ */}
+        {activeTab === 'analytics' && (() => {
+          // Determine the analytics scope from current view
+          const lastBreadcrumb = breadcrumbs[breadcrumbs.length - 1];
+          const analyticsLevel = currentView === 'national' ? 'national' : currentView;
+          const analyticsLocationId = lastBreadcrumb?.id || 'all';
+          return (
+            <AnalyticsPanel
+              level={analyticsLevel}
+              locationId={analyticsLocationId}
+            />
+          );
+        })()}
+
+        {/* ═══ Hierarchy Tab (existing) ═══ */}
+        {activeTab === 'hierarchy' && (<>
 
         {/* Stats card — matching mobile layout */}
         {nationalStats && (
@@ -647,6 +696,8 @@ const StateDashboard: React.FC = () => {
             })}
           </div>
         )}
+
+        </>)}
       </div>
     </div>
   );

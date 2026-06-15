@@ -1,7 +1,7 @@
 import { query } from '../config/db.js';
 import { sendInvolvementInterestEmail } from '../utils/emailHandler.js';
 
-// ──── Submit involvement interest (public) ────
+// ──── Submit involvement interest (authenticated) ────
 export const submitInterest = async (req, res) => {
   try {
     // Honeypot check — if the hidden "website" field is filled, it's a bot
@@ -9,12 +9,14 @@ export const submitInterest = async (req, res) => {
       return res.json({ success: true, message: 'Thank you for your interest! A coordinator will reach out within 48 hours.' });
     }
 
+    const userId = req.user?.userId || req.user?.id;
+
     const {
       fullName, email, phone, role,
       state, lga, ward,
       isDiaspora, country,
       skills, experienceLevel, contributionType,
-      message,
+      message, directorate,
     } = req.body;
 
     // Validate required fields
@@ -59,8 +61,8 @@ export const submitInterest = async (req, res) => {
     const result = await query(
       `INSERT INTO involvement_interests
        (full_name, email, phone, role, state, lga, ward, is_diaspora, country,
-        skills, experience_level, contribution_type, message, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        skills, experience_level, contribution_type, message, ip_address, user_agent, directorate, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING id, created_at`,
       [
         fullName.trim(),
@@ -78,6 +80,8 @@ export const submitInterest = async (req, res) => {
         message?.trim() || null,
         req.ip,
         req.get('User-Agent'),
+        (role === 'volunteer' && directorate) ? directorate : null,
+        userId || null,
       ]
     );
 
@@ -94,6 +98,7 @@ export const submitInterest = async (req, res) => {
       experience_level: experienceLevel,
       contribution_type: contributionType,
       message: message?.trim(),
+      directorate: (role === 'volunteer' && directorate) ? directorate : null,
     }).catch(err => console.error('[INVOLVEMENT] Email notification error:', err.message));
 
     res.status(201).json({
@@ -107,12 +112,12 @@ export const submitInterest = async (req, res) => {
   }
 };
 
-// ──── Get all interests (admin) ────
+// ──── Get all interests (admin or directorate head) ────
 export const getInterests = async (req, res) => {
   try {
     const {
       page = 1, limit = 20,
-      role, status, state, search,
+      role, status, state, search, directorate,
       startDate, endDate,
     } = req.query;
 
@@ -120,6 +125,18 @@ export const getInterests = async (req, res) => {
     const conditions = [];
     const params = [];
     let paramIdx = 1;
+
+    // Directorate Head scoping — only see their department's interests
+    const callerDesignation = req.userDesignation;
+    const callerDirectorate = req.userDirectorate;
+    if (callerDesignation === 'Directorate Head' && callerDirectorate) {
+      conditions.push(`i.directorate = $${paramIdx++}`);
+      params.push(callerDirectorate);
+    } else if (directorate) {
+      // Admin can filter by directorate
+      conditions.push(`i.directorate = $${paramIdx++}`);
+      params.push(directorate);
+    }
 
     if (role) {
       conditions.push(`i.role = $${paramIdx++}`);
@@ -278,14 +295,24 @@ export const deleteInterest = async (req, res) => {
 };
 
 // ──── Get interest stats (admin) ────
-export const getInterestStats = async (_req, res) => {
+export const getInterestStats = async (req, res) => {
   try {
+    // Directorate Head scoping
+    const callerDesignation = req.userDesignation;
+    const callerDirectorate = req.userDirectorate;
+    const scopeWhere = (callerDesignation === 'Directorate Head' && callerDirectorate)
+      ? `WHERE directorate = '${callerDirectorate}'`
+      : '';
+    const scopeAnd = (callerDesignation === 'Directorate Head' && callerDirectorate)
+      ? `AND directorate = '${callerDirectorate}'`
+      : '';
+
     const [totalResult, byRoleResult, byStatusResult, thisWeekResult, thisMonthResult] = await Promise.all([
-      query('SELECT COUNT(*) FROM involvement_interests'),
-      query('SELECT role, COUNT(*) FROM involvement_interests GROUP BY role'),
-      query('SELECT status, COUNT(*) FROM involvement_interests GROUP BY status'),
-      query(`SELECT COUNT(*) FROM involvement_interests WHERE created_at >= NOW() - INTERVAL '7 days'`),
-      query(`SELECT COUNT(*) FROM involvement_interests WHERE created_at >= NOW() - INTERVAL '30 days'`),
+      query(`SELECT COUNT(*) FROM involvement_interests ${scopeWhere}`),
+      query(`SELECT role, COUNT(*) FROM involvement_interests ${scopeWhere} GROUP BY role`),
+      query(`SELECT status, COUNT(*) FROM involvement_interests ${scopeWhere} GROUP BY status`),
+      query(`SELECT COUNT(*) FROM involvement_interests WHERE created_at >= NOW() - INTERVAL '7 days' ${scopeAnd}`),
+      query(`SELECT COUNT(*) FROM involvement_interests WHERE created_at >= NOW() - INTERVAL '30 days' ${scopeAnd}`),
     ]);
 
     const byRole = {};

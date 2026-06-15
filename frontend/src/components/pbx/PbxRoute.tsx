@@ -6,6 +6,8 @@ const COORDINATOR_DESIGNATIONS = [
   'State Coordinator',
   'LGA Coordinator',
   'Ward Coordinator',
+  'Diaspora Coordinator',
+  'Directorate Head',
 ];
 
 /**

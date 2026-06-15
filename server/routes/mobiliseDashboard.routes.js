@@ -5,7 +5,10 @@ import {
   getStateData,
   getLGAData,
   getWardData,
-  getPollingUnitData
+  getPollingUnitData,
+  getDemographics,
+  getPeople,
+  exportPeople
 } from '../controllers/mobiliseDashboard.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
 
@@ -37,5 +40,10 @@ router.get('/ward/:wardId', getWardData);
 
 // Get specific Polling Unit details
 router.get('/polling-unit/:puId', getPollingUnitData);
+
+// ── Analytical Dashboard Endpoints ──
+router.get('/:level/:locationId/demographics', getDemographics);
+router.get('/:level/:locationId/people', getPeople);
+router.get('/:level/:locationId/people/export', exportPeople);
 
 export default router;

@@ -86,6 +86,7 @@ interface UserDesignationUpdate {
   assignedLGA?: string | null;
   assignedWard?: string | null;
   assignedCountry?: string | null;
+  assignedDirectorate?: string | null;
 }
 
 export const adminUserManagementService = {

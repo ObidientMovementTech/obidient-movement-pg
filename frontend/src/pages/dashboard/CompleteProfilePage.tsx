@@ -83,7 +83,13 @@ export default function CompleteProfilePage() {
   // ── Redirect if already complete ────────────────────────────
   useEffect(() => {
     if (profile && getProfileCompleteness(profile).isComplete) {
-      navigate("/dashboard", { replace: true });
+      const storedRedirect = sessionStorage.getItem('post_auth_redirect');
+      if (storedRedirect) {
+        sessionStorage.removeItem('post_auth_redirect');
+        navigate(storedRedirect, { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     }
   }, [profile, navigate]);
 

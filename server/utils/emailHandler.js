@@ -423,7 +423,7 @@ For updates and more information, visit your dashboard at: https://member.obidie
   }
 };
 
-// Send Involvement Interest notification to all admins
+// Send Involvement Interest notification to all admins + relevant Directorate Head
 export const sendInvolvementInterestEmail = async (interest) => {
   const roleLabels = {
     volunteer: 'Volunteer',
@@ -437,27 +437,52 @@ export const sendInvolvementInterestEmail = async (interest) => {
   try {
     const { query: dbQuery } = await import('../config/db.js');
     const adminResult = await dbQuery(`SELECT email, name FROM users WHERE role = 'admin'`);
-    const admins = adminResult.rows;
+    const recipients = [...adminResult.rows];
 
-    if (admins.length === 0) {
+    // Also notify the relevant Directorate Head if a directorate was specified
+    if (interest.directorate) {
+      const headResult = await dbQuery(
+        `SELECT id, email, name FROM users WHERE designation = 'Directorate Head' AND "assignedDirectorate" = $1`,
+        [interest.directorate]
+      );
+      if (headResult.rows.length > 0) {
+        const head = headResult.rows[0];
+        // Avoid duplicate if head is also admin
+        if (!recipients.find(r => r.email === head.email)) {
+          recipients.push(head);
+        }
+        // Create in-app notification for the directorate head
+        try {
+          await dbQuery(
+            `INSERT INTO notifications (id, "userId", type, title, message, "createdAt")
+             VALUES (gen_random_uuid(), $1, 'involvement', $2, $3, NOW())`,
+            [head.id, 'New Volunteer Interest', `${interest.full_name} wants to join your ${interest.directorate.replace(/_/g, ' ')} directorate.`]
+          );
+        } catch (notifErr) {
+          console.error('[EMAIL] Failed to create directorate head notification:', notifErr.message);
+        }
+      }
+    }
+
+    if (recipients.length === 0) {
       console.log('[EMAIL] No admin users found to notify about involvement interest');
       return;
     }
 
-    const emailPromises = admins.map(admin =>
+    const emailPromises = recipients.map(recipient =>
       emailTransporter.sendMail({
         from: `"${sender.name}" <${sender.email}>`,
-        to: admin.email,
+        to: recipient.email,
         subject,
         html,
         text: plainText,
       }).catch(error => {
-        console.error(`[EMAIL] Failed to send involvement interest email to ${admin.email}:`, error.message);
+        console.error(`[EMAIL] Failed to send involvement interest email to ${recipient.email}:`, error.message);
       })
     );
 
     await Promise.allSettled(emailPromises);
-    console.log(`[EMAIL] Involvement interest notification sent to ${admins.length} admin(s)`);
+    console.log(`[EMAIL] Involvement interest notification sent to ${recipients.length} recipient(s)`);
   } catch (error) {
     console.error('[EMAIL] Error sending involvement interest email:', error.message);
   }

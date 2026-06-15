@@ -6,10 +6,14 @@ const COORDINATOR_DESIGNATIONS = [
   'State Coordinator',
   'LGA Coordinator',
   'Ward Coordinator',
+  'Diaspora Coordinator',
+  'Directorate Head',
 ];
 
 const DESIGNATION_LEVELS: Record<string, number> = {
   'National Coordinator': 4,
+  'Directorate Head': 4,
+  'Diaspora Coordinator': 4,
   'State Coordinator': 3,
   'LGA Coordinator': 2,
   'Ward Coordinator': 1,

@@ -1521,7 +1521,7 @@ export const adminUserManagementController = {
         });
       }
 
-      const { designation, assignedState, assignedLGA, assignedWard, assignedCountry } = req.body;
+      const { designation, assignedState, assignedLGA, assignedWard, assignedCountry, assignedDirectorate } = req.body;
 
       // Validate designation
       const validDesignations = [
@@ -1530,6 +1530,7 @@ export const adminUserManagementController = {
         'LGA Coordinator',
         'Ward Coordinator',
         'Diaspora Coordinator',
+        'Directorate Head',
         'Polling Unit Agent',
         'Vote Defender',
         'Community Member'
@@ -1571,6 +1572,27 @@ export const adminUserManagementController = {
         });
       }
 
+      if (designation === 'Directorate Head') {
+        const validDirectorates = ['operations', 'political_engagement', 'legal', 'technology', 'communications', 'mobilisation', 'finance', 'research', 'diaspora_engagement'];
+        if (!assignedDirectorate || !validDirectorates.includes(assignedDirectorate)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Directorate Head requires a valid assignedDirectorate'
+          });
+        }
+        // Check uniqueness
+        const existingHead = await query(
+          `SELECT id, name FROM users WHERE designation = 'Directorate Head' AND "assignedDirectorate" = $1 AND id != $2`,
+          [assignedDirectorate, userId]
+        );
+        if (existingHead.rows.length > 0) {
+          return res.status(409).json({
+            success: false,
+            message: `${existingHead.rows[0].name} is already the head of this directorate. Remove them first or reassign.`
+          });
+        }
+      }
+
       // Check if user exists
       const userResult = await query('SELECT id, name FROM users WHERE id = $1', [userId]);
       if (userResult.rows.length === 0) {
@@ -1582,6 +1604,8 @@ export const adminUserManagementController = {
 
       // Update user designation and assignment
       const isDiaspora = designation === 'Diaspora Coordinator';
+      const isDirectorate = designation === 'Directorate Head';
+      const isLocationless = isDiaspora || isDirectorate;
       const updateResult = await query(
         `UPDATE users 
          SET designation = $1, 
@@ -1589,22 +1613,24 @@ export const adminUserManagementController = {
              "assignedLGA" = $3, 
              "assignedWard" = $4,
              "assignedCountry" = $5,
+             "assignedDirectorate" = $6,
              "updatedAt" = NOW()
-         WHERE id = $6
-         RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry"`,
+         WHERE id = $7
+         RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry", "assignedDirectorate"`,
         [
           designation,
-          isDiaspora ? null : assignedState,
-          isDiaspora ? null : assignedLGA,
-          isDiaspora ? null : assignedWard,
+          isLocationless ? null : assignedState,
+          isLocationless ? null : assignedLGA,
+          isLocationless ? null : assignedWard,
           isDiaspora ? assignedCountry : null,
+          isDirectorate ? assignedDirectorate : null,
           userId
         ]
       );
 
       const updatedUser = updateResult.rows[0];
 
-      auditLog({ actorId: req.user.id, action: 'user.designation_change', targetType: 'user', targetId: userId, details: { designation, assignedState, assignedLGA, assignedWard, assignedCountry }, req });
+      auditLog({ actorId: req.user.id, action: 'user.designation_change', targetType: 'user', targetId: userId, details: { designation, assignedState, assignedLGA, assignedWard, assignedCountry, assignedDirectorate }, req });
 
       res.json({
         success: true,

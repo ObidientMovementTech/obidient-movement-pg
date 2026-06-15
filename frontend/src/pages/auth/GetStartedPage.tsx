@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router";
+import { useNavigate, Link, useSearchParams } from "react-router";
 import Toast from "../../components/Toast.js";
 import {
   CheckCircleIcon,
@@ -17,7 +17,16 @@ import ListBoxComp from "../../components/select/ListBox.js";
 
 const GetStartedPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { profile, isLoading: isAuthLoading } = useUserContext();
+
+  // Store redirect param in sessionStorage so it survives the verification + profile-completion flow
+  useEffect(() => {
+    const redirect = searchParams.get('redirect');
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      sessionStorage.setItem('post_auth_redirect', redirect);
+    }
+  }, [searchParams]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

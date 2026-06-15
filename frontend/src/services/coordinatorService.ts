@@ -13,6 +13,7 @@ export interface SearchedUser {
   assignedLGA?: string;
   assignedWard?: string;
   assignedCountry?: string;
+  assignedDirectorate?: string;
 }
 
 export interface NigeriaLocation {
@@ -39,12 +40,13 @@ export interface AssignDesignationPayload {
   assignedLGA?: string;
   assignedWard?: string;
   assignedCountry?: string;
+  assignedDirectorate?: string;
   override?: boolean;
 }
 
 // What each coordinator level can assign (mirrors backend CAN_ASSIGN)
 export const CAN_ASSIGN: Record<string, string[]> = {
-  'National Coordinator': ['State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Diaspora Coordinator'],
+  'National Coordinator': ['State Coordinator', 'LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent', 'Diaspora Coordinator', 'Directorate Head'],
   'State Coordinator': ['LGA Coordinator', 'Ward Coordinator', 'Polling Unit Agent'],
   'LGA Coordinator': ['Ward Coordinator', 'Polling Unit Agent'],
   'Ward Coordinator': ['Polling Unit Agent'],
@@ -56,6 +58,19 @@ export const COORDINATOR_DESIGNATIONS = [
   'LGA Coordinator',
   'Ward Coordinator',
   'Diaspora Coordinator',
+  'Directorate Head',
+];
+
+export const VALID_DIRECTORATES = [
+  { slug: 'operations', label: 'Operations' },
+  { slug: 'political_engagement', label: 'Political Engagement' },
+  { slug: 'legal', label: 'Legal' },
+  { slug: 'technology', label: 'Technology' },
+  { slug: 'communications', label: 'Communications' },
+  { slug: 'mobilisation', label: 'Mobilisation' },
+  { slug: 'finance', label: 'Finance' },
+  { slug: 'research', label: 'Research' },
+  { slug: 'diaspora_engagement', label: 'Diaspora Engagement' },
 ];
 
 export const coordinatorService = {

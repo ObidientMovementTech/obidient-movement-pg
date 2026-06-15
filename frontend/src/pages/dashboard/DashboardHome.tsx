@@ -62,7 +62,7 @@ export default function DashboardHome() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobilizationUrl, setMobilizationUrl] = useState('');
-  const [ctaLinks, setCtaLinks] = useState<Record<string, string>>({});
+  const [feedbackUrl, setFeedbackUrl] = useState('');
 
 
 
@@ -88,26 +88,21 @@ export default function DashboardHome() {
       'State Coordinator',
       'LGA Coordinator',
       'Ward Coordinator',
+      'Diaspora Coordinator',
+      'Directorate Head',
     ].includes(profile.designation);
 
   useEffect(() => {
-    const ctaKeys = ['cta_volunteer_url', 'cta_run_for_office_url', 'cta_donate_url', 'cta_feedback_url'];
-    const ctaFetch = Promise.all(
-      ctaKeys.map(key =>
-        axios.get(`${API}/api/settings/${key}`).then(r => ({ key, value: r.data.value || '' })).catch(() => ({ key, value: '' }))
-      )
-    ).then(results => {
-      const links: Record<string, string> = {};
-      results.forEach(r => { if (r.value) links[r.key] = r.value; });
-      setCtaLinks(links);
-    });
+    const feedbackFetch = axios.get(`${API}/api/settings/cta_feedback_url`)
+      .then(r => setFeedbackUrl(r.data.value || ''))
+      .catch(() => {});
 
     Promise.all([
       getOwnedVotingBlocs().then((d) => setOwnedBlocs(d.votingBlocs || [])),
       getJoinedVotingBlocs().then((d) => setJoinedBlocs(d.votingBlocs || [])),
       getNotifications().then((d) => setNotifications(Array.isArray(d) ? d.slice(0, 5) : [])),
       axios.get(`${API}/api/settings/mobilization_pack_url`).then((r) => setMobilizationUrl(r.data.value || '')).catch(() => {}),
-      ctaFetch,
+      feedbackFetch,
     ])
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -606,42 +601,53 @@ export default function DashboardHome() {
 
       {/* ═══ Call-to-Action Cards ═══ */}
       {(() => {
-        const ctaCards = [
+        const ctaCards: Array<{
+          key: string;
+          title: string;
+          desc: string;
+          icon: typeof UserPlus;
+          gradient: string;
+          shadow: string;
+          href?: string;
+          to?: string;
+        }> = [
           {
-            key: 'cta_volunteer_url',
+            key: 'volunteer',
             title: 'Volunteer',
             desc: 'Join a directorate — help build the New Nigeria from your community.',
             icon: UserPlus,
             gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
             shadow: 'rgba(5,150,105,0.25)',
+            to: '/get-involved?role=volunteer',
           },
           {
-            key: 'cta_run_for_office_url',
-            title: 'Run for Office',
-            desc: 'Ready to serve? Submit your interest for 2027 elections.',
+            key: 'vpo',
+            title: 'Vote Protection',
+            desc: 'Ready to defend democracy? Join as a Vote Protection Officer.',
             icon: Vote,
             gradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
             shadow: 'rgba(37,99,235,0.25)',
+            to: '/get-involved?role=vote_protection_officer',
           },
           {
-            key: 'cta_donate_url',
+            key: 'donate',
             title: 'Donate',
             desc: 'Support the movement — every contribution fuels change.',
             icon: Heart,
             gradient: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
             shadow: 'rgba(124,58,237,0.25)',
+            to: '/get-involved?role=donor',
           },
-          {
-            key: 'cta_feedback_url',
+          ...(feedbackUrl ? [{
+            key: 'feedback',
             title: 'Give Feedback',
             desc: 'Your voice matters — share ideas, report issues, shape direction.',
             icon: MessageSquare,
             gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
             shadow: 'rgba(217,119,6,0.25)',
-          },
-        ].filter(c => ctaLinks[c.key]);
-
-        if (ctaCards.length === 0) return null;
+            href: feedbackUrl,
+          }] : []),
+        ];
 
         return (
           <Box>
@@ -661,7 +667,7 @@ export default function DashboardHome() {
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: '1fr',
-                  sm: ctaCards.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+                  sm: 'repeat(2, 1fr)',
                   md: `repeat(${Math.min(ctaCards.length, 4)}, 1fr)`,
                 },
                 gap: { xs: 1.5, md: 2 },
@@ -669,14 +675,15 @@ export default function DashboardHome() {
             >
               {ctaCards.map((cta) => {
                 const Icon = cta.icon;
+                const isExternal = !!cta.href;
+                const linkProps = isExternal
+                  ? { component: 'a' as const, href: cta.href, target: '_blank', rel: 'noopener noreferrer' }
+                  : { component: Link, to: cta.to! };
                 return (
                   <Card
                     key={cta.key}
                     elevation={0}
-                    component="a"
-                    href={ctaLinks[cta.key]}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    {...linkProps}
                     sx={{
                       textDecoration: 'none',
                       background: cta.gradient,

@@ -50,6 +50,7 @@ import {
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import apiClient from '../../lib/apiClient';
+import { useUser } from '../../context/UserContext';
 
 const FONT = '"Poppins", sans-serif';
 const PRIMARY = '#006837';
@@ -69,6 +70,7 @@ interface Interest {
   skills: string[] | null;
   experience_level: string | null;
   contribution_type: string | null;
+  directorate: string | null;
   message: string | null;
   status: 'pending' | 'contacted' | 'active' | 'declined';
   admin_notes: string | null;
@@ -101,6 +103,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'info' |
 };
 
 export default function InterestsPage() {
+  const { profile } = useUser();
+  const isDirectorateHead = profile?.designation === 'Directorate Head';
+
   /* ─── State ─── */
   const [stats, setStats] = useState<Stats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -115,6 +120,7 @@ export default function InterestsPage() {
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterDirectorate, setFilterDirectorate] = useState('');
 
   // Detail dialog
   const [selected, setSelected] = useState<Interest | null>(null);
@@ -147,6 +153,7 @@ export default function InterestsPage() {
           search: search || undefined,
           role: filterRole || undefined,
           status: filterStatus || undefined,
+          directorate: filterDirectorate || undefined,
         },
       });
       setInterests(data.data);
@@ -164,7 +171,7 @@ export default function InterestsPage() {
 
   useEffect(() => {
     fetchInterests();
-  }, [page, rowsPerPage, search, filterRole, filterStatus]);
+  }, [page, rowsPerPage, search, filterRole, filterStatus, filterDirectorate]);
 
   /* ─── Status update ─── */
   const handleStatusUpdate = async (id: number, status: string) => {
@@ -279,6 +286,23 @@ export default function InterestsPage() {
               <MenuItem value="declined">Declined</MenuItem>
             </Select>
           </FormControl>
+          {!isDirectorateHead && (
+            <FormControl size="small" sx={{ minWidth: 170 }}>
+              <InputLabel>Directorate</InputLabel>
+              <Select value={filterDirectorate} label="Directorate" onChange={(e) => { setFilterDirectorate(e.target.value); setPage(0); }}>
+                <MenuItem value="">All Directorates</MenuItem>
+                <MenuItem value="operations">Operations</MenuItem>
+                <MenuItem value="political_engagement">Political Engagement</MenuItem>
+                <MenuItem value="legal">Legal</MenuItem>
+                <MenuItem value="technology">Technology</MenuItem>
+                <MenuItem value="communications">Communications</MenuItem>
+                <MenuItem value="mobilisation">Mobilisation</MenuItem>
+                <MenuItem value="finance">Finance</MenuItem>
+                <MenuItem value="research">Research</MenuItem>
+                <MenuItem value="diaspora_engagement">Diaspora Engagement</MenuItem>
+              </Select>
+            </FormControl>
+          )}
         </CardContent>
       </Card>
 

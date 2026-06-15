@@ -12,6 +12,19 @@ import { genderOptions, ageRangeOptions } from '../../utils/lookups';
 import { adminUserManagementService } from '../../services/adminUserManagementService';
 import { countryCodes } from '../../utils/countryCodes';
 
+// Directorate options
+const DIRECTORATES = [
+  { slug: 'operations', label: 'Operations' },
+  { slug: 'political_engagement', label: 'Political Engagement' },
+  { slug: 'legal', label: 'Legal' },
+  { slug: 'technology', label: 'Technology' },
+  { slug: 'communications', label: 'Communications' },
+  { slug: 'mobilisation', label: 'Mobilisation' },
+  { slug: 'finance', label: 'Finance' },
+  { slug: 'research', label: 'Research' },
+  { slug: 'diaspora_engagement', label: 'Diaspora Engagement' },
+];
+
 // Designation constants
 const DESIGNATIONS = {
   NATIONAL_COORDINATOR: 'National Coordinator',
@@ -19,6 +32,7 @@ const DESIGNATIONS = {
   LGA_COORDINATOR: 'LGA Coordinator',
   WARD_COORDINATOR: 'Ward Coordinator',
   DIASPORA_COORDINATOR: 'Diaspora Coordinator',
+  DIRECTORATE_HEAD: 'Directorate Head',
   POLLING_UNIT_AGENT: 'Polling Unit Agent',
   VOTE_DEFENDER: 'Vote Defender',
   COMMUNITY_MEMBER: 'Community Member'
@@ -237,12 +251,15 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     if (formData.designation) {
       try {
         const isDiaspora = formData.designation === DESIGNATIONS.DIASPORA_COORDINATOR;
+        const isDirectorate = formData.designation === DESIGNATIONS.DIRECTORATE_HEAD;
+        const isLocationless = isDiaspora || isDirectorate;
         await adminUserManagementService.updateUserDesignation(userId, {
           designation: formData.designation,
-          assignedState: isDiaspora ? null : (assignLocations.selectedState?.name || null),
-          assignedLGA: isDiaspora ? null : (assignLocations.selectedLGA?.name || null),
-          assignedWard: isDiaspora ? null : (assignLocations.selectedWard?.name || null),
-          assignedCountry: isDiaspora ? (formData as any).assignedCountry || null : null
+          assignedState: isLocationless ? null : (assignLocations.selectedState?.name || null),
+          assignedLGA: isLocationless ? null : (assignLocations.selectedLGA?.name || null),
+          assignedWard: isLocationless ? null : (assignLocations.selectedWard?.name || null),
+          assignedCountry: isDiaspora ? (formData as any).assignedCountry || null : null,
+          assignedDirectorate: isDirectorate ? (formData as any).assignedDirectorate || null : null
         });
       } catch (error: any) {
         console.error('Designation update failed:', error);
@@ -655,6 +672,31 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                 </FormControl>
                 <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#1d4ed8' }}>
                   This coordinator will manage diaspora members in the assigned country.
+                </Typography>
+              </Box>
+            )}
+
+            {/* Directorate Head — Directorate Assignment */}
+            {formData.designation === DESIGNATIONS.DIRECTORATE_HEAD && (
+              <Box sx={{ p: 2, bgcolor: '#fef3c7', borderRadius: 2, border: '1px solid #fde68a', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.8rem', color: '#92400e' }}>
+                  Assigned Directorate
+                </Typography>
+                <FormControl size="small" fullWidth>
+                  <InputLabel sx={{ fontFamily: FONT }}>Directorate</InputLabel>
+                  <Select
+                    value={(formData as any).assignedDirectorate || ''}
+                    label="Directorate"
+                    onChange={(e) => setFormData(prev => ({ ...prev, assignedDirectorate: e.target.value }))}
+                    sx={{ fontFamily: FONT }}
+                  >
+                    {DIRECTORATES.map((d) => (
+                      <MenuItem key={d.slug} value={d.slug}>{d.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#b45309' }}>
+                  This person will lead the selected directorate. Only one head per directorate is allowed.
                 </Typography>
               </Box>
             )}

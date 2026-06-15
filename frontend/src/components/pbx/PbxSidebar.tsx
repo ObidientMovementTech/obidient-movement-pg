@@ -39,6 +39,7 @@ interface NavItem {
   /** RBAC props — missing means visible to all /pbx users */
   minimumLevel?: 'national' | 'state' | 'lga' | 'ward' | 'pu';
   allowedRoles?: string[];
+  allowedDesignations?: string[];
 }
 
 const navItems: NavItem[] = [
@@ -49,7 +50,7 @@ const navItems: NavItem[] = [
   { label: 'Blog', icon: <FileText size={20} />, path: '/pbx/blog', minimumLevel: 'state' },
   { label: 'Newsletter', icon: <Newspaper size={20} />, path: '/pbx/newsletter', allowedRoles: ['admin'] },
   { label: 'Broadcast', icon: <Megaphone size={20} />, path: '/pbx/broadcast', allowedRoles: ['admin'] },
-  { label: 'Interests', icon: <HandHeart size={20} />, path: '/pbx/interests', allowedRoles: ['admin'] },
+  { label: 'Interests', icon: <HandHeart size={20} />, path: '/pbx/interests', allowedRoles: ['admin'], allowedDesignations: ['Directorate Head'] },
   { label: 'Bank Accounts', icon: <Landmark size={20} />, path: '/pbx/bank-accounts', allowedRoles: ['admin'] },
   { label: 'Mobile Feeds', icon: <Smartphone size={20} />, path: '/pbx/mobile-feeds', allowedRoles: ['admin'] },
   { label: 'Mobile App', icon: <Download size={20} />, path: '/pbx/app-management', allowedRoles: ['admin'] },
@@ -111,11 +112,12 @@ function SidebarContent() {
           );
 
           // Wrap in RBACGate if RBAC constraints exist
-          if (item.allowedRoles || item.minimumLevel) {
+          if (item.allowedRoles || item.minimumLevel || item.allowedDesignations) {
             return (
               <RBACGate
                 key={item.label}
                 allowedRoles={item.allowedRoles}
+                allowedDesignations={item.allowedDesignations}
                 minimumLevel={item.minimumLevel}
               >
                 {button}

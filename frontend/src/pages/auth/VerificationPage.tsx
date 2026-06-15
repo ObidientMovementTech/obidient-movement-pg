@@ -82,7 +82,10 @@ const VerificationPage = () => {
       await verifyEmailCode(activeEmail, code);
       setToast({ message: "Email verified successfully!", type: "success" });
       await refreshProfile();
-      setTimeout(() => navigate("/dashboard", { replace: true }), 800);
+      // Check for stored redirect (only used if profile is somehow already complete)
+      const storedRedirect = sessionStorage.getItem('post_auth_redirect');
+      const destination = storedRedirect || "/dashboard";
+      setTimeout(() => navigate(destination, { replace: true }), 800);
     } catch (err: any) {
       setToast({ message: err.message || "Verification failed.", type: "error" });
       // Clear inputs on error

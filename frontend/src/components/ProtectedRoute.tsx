@@ -20,8 +20,13 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     return <Navigate to={COMPLETE_PROFILE_PATH} replace />;
   }
 
-  // If profile IS complete but user is on the completion page, send them to dashboard.
+  // If profile IS complete but user is on the completion page, send them to stored redirect or dashboard.
   if (isProfileComplete(profile) && location.pathname === COMPLETE_PROFILE_PATH) {
+    const storedRedirect = sessionStorage.getItem('post_auth_redirect');
+    if (storedRedirect) {
+      sessionStorage.removeItem('post_auth_redirect');
+      return <Navigate to={storedRedirect} replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 

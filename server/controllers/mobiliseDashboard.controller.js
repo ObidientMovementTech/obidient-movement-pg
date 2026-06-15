@@ -1025,3 +1025,431 @@ export const getPollingUnitData = async (req, res) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// ANALYTICAL DASHBOARD ENDPOINTS
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Build a WHERE clause + params for scoping queries to a location level.
+ * Returns { clause, params, paramIndex }
+ */
+function buildLocationScope(level, locationId) {
+  const locationName = fromSlug(locationId);
+  switch (level) {
+    case 'state':
+      return { clause: `"votingState" = $1`, params: [locationName], nextIdx: 2 };
+    case 'lga':
+      return { clause: `"votingLGA" = $1`, params: [locationName], nextIdx: 2 };
+    case 'ward':
+      return { clause: `"votingWard" = $1`, params: [locationName], nextIdx: 2 };
+    case 'noState':
+      return { clause: `("votingState" IS NULL OR "votingState" = '')`, params: [], nextIdx: 1 };
+    default:
+      return { clause: `"votingState" IS NOT NULL`, params: [], nextIdx: 1 };
+  }
+}
+
+/**
+ * GET /mobilise-dashboard/:level/:locationId/demographics
+ * Returns all aggregate analytics in a single response.
+ */
+export const getDemographics = async (req, res) => {
+  try {
+    const { level, locationId } = req.params;
+    const { clause, params } = buildLocationScope(level, locationId);
+
+    const sql = `
+      SELECT
+        -- KPIs
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes') AS has_pvc,
+        COUNT(*) FILTER (WHERE "willVote" = 'Yes') AS will_vote,
+        COUNT(*) FILTER (WHERE "profileCompletionPercentage" = 100) AS profile_complete,
+        COUNT(*) FILTER (WHERE last_login_at > NOW() - INTERVAL '30 days') AS active_30d,
+
+        -- Gender
+        COUNT(*) FILTER (WHERE gender = 'Male') AS gender_male,
+        COUNT(*) FILTER (WHERE gender = 'Female') AS gender_female,
+        COUNT(*) FILTER (WHERE gender IS NULL OR gender = '' OR gender NOT IN ('Male','Female')) AS gender_unknown,
+
+        -- Age ranges
+        COUNT(*) FILTER (WHERE "ageRange" LIKE '18-24%') AS age_18_24,
+        COUNT(*) FILTER (WHERE "ageRange" LIKE '25-34%') AS age_25_34,
+        COUNT(*) FILTER (WHERE "ageRange" LIKE '35-44%') AS age_35_44,
+        COUNT(*) FILTER (WHERE "ageRange" LIKE '45-54%') AS age_45_54,
+        COUNT(*) FILTER (WHERE "ageRange" LIKE '55-64%') AS age_55_64,
+        COUNT(*) FILTER (WHERE "ageRange" LIKE '65%') AS age_65_plus,
+        COUNT(*) FILTER (WHERE "ageRange" IS NULL OR "ageRange" = '') AS age_unknown,
+
+        -- Voting intent
+        COUNT(*) FILTER (WHERE "willVote" = 'No') AS will_vote_no,
+        COUNT(*) FILTER (WHERE "willVote" IS NULL OR "willVote" = '' OR "willVote" NOT IN ('Yes','No')) AS will_vote_unknown,
+
+        -- Profile health
+        COUNT(*) FILTER (WHERE "profileCompletionPercentage" >= 80 AND "profileCompletionPercentage" < 100) AS profile_high,
+        COUNT(*) FILTER (WHERE "profileCompletionPercentage" >= 50 AND "profileCompletionPercentage" < 80) AS profile_medium,
+        COUNT(*) FILTER (WHERE "profileCompletionPercentage" < 50) AS profile_low,
+
+        -- Insights
+        COUNT(*) FILTER (WHERE "isVoter" != 'Yes' AND ("willVote" != 'Yes' OR "willVote" IS NULL) AND "profileCompletionPercentage" < 50) AS needs_attention,
+        COUNT(*) FILTER (WHERE last_login_at < NOW() - INTERVAL '90 days' OR last_login_at IS NULL) AS ghosts,
+        COUNT(*) FILTER (WHERE "isVoter" = 'Yes' AND "willVote" = 'Yes' AND "profileCompletionPercentage" = 100) AS champions,
+        COUNT(*) FILTER (WHERE "votingLGA" IS NULL OR "votingLGA" = '') AS no_location
+      FROM users
+      WHERE ${clause}
+    `;
+
+    const result = await query(sql, params);
+    const r = result.rows[0];
+
+    // Signup trend - last 12 weeks
+    const trendSql = `
+      SELECT
+        DATE_TRUNC('week', "createdAt") AS week,
+        COUNT(*) AS count
+      FROM users
+      WHERE ${clause} AND "createdAt" > NOW() - INTERVAL '12 weeks'
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const trendResult = await query(trendSql, params);
+
+    const total = parseInt(r.total);
+    const genderFemale = parseInt(r.gender_female);
+    const age1824 = parseInt(r.age_18_24);
+
+    // Count users with no state (only relevant at national level)
+    let noStateCount = 0;
+    if (level === 'national' || !level) {
+      const noStateRes = await query(`SELECT COUNT(*) FROM users WHERE "votingState" IS NULL OR "votingState" = ''`);
+      noStateCount = parseInt(noStateRes.rows[0].count);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        kpis: {
+          total,
+          hasPvc: parseInt(r.has_pvc),
+          noPvc: total - parseInt(r.has_pvc),
+          willVote: parseInt(r.will_vote),
+          profileComplete: parseInt(r.profile_complete),
+          active30d: parseInt(r.active_30d)
+        },
+        gender: {
+          male: parseInt(r.gender_male),
+          female: genderFemale,
+          unknown: parseInt(r.gender_unknown)
+        },
+        ageRanges: [
+          { label: '18-24', count: age1824 },
+          { label: '25-34', count: parseInt(r.age_25_34) },
+          { label: '35-44', count: parseInt(r.age_35_44) },
+          { label: '45-54', count: parseInt(r.age_45_54) },
+          { label: '55-64', count: parseInt(r.age_55_64) },
+          { label: '65+', count: parseInt(r.age_65_plus) },
+          { label: 'Unknown', count: parseInt(r.age_unknown) }
+        ],
+        pvcStatus: {
+          yes: parseInt(r.has_pvc),
+          no: total - parseInt(r.has_pvc)
+        },
+        votingIntent: {
+          yes: parseInt(r.will_vote),
+          no: parseInt(r.will_vote_no),
+          unknown: parseInt(r.will_vote_unknown)
+        },
+        profileHealth: {
+          complete: parseInt(r.profile_complete),
+          high: parseInt(r.profile_high),
+          medium: parseInt(r.profile_medium),
+          low: parseInt(r.profile_low)
+        },
+        signupTrend: trendResult.rows.map(row => ({
+          week: row.week,
+          count: parseInt(row.count)
+        })),
+        insights: {
+          needsAttention: parseInt(r.needs_attention),
+          ghosts: parseInt(r.ghosts),
+          champions: parseInt(r.champions),
+          noLocation: parseInt(r.no_location),
+          noStateCount,
+          genderGapAlert: total > 0 && (genderFemale / total) < 0.15,
+          youthGapAlert: total > 0 && (age1824 / total) < 0.08
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting demographics:', error);
+    res.status(500).json({ success: false, message: 'Failed to get demographics', error: error.message });
+  }
+};
+
+/**
+ * GET /mobilise-dashboard/:level/:locationId/people
+ * Paginated, filtered, sortable list of actual users.
+ */
+export const getPeople = async (req, res) => {
+  try {
+    const { level, locationId } = req.params;
+    const {
+      page = 1,
+      limit = 50,
+      gender,
+      ageRange,
+      pvc,
+      willVote,
+      profileHealth,
+      activity,
+      lga,
+      search,
+      sortBy = 'createdAt',
+      sortDir = 'desc'
+    } = req.query;
+
+    const { clause, params, nextIdx } = buildLocationScope(level, locationId);
+    let idx = nextIdx;
+    const filters = [clause];
+
+    if (gender) {
+      if (gender === 'unknown') {
+        filters.push(`(gender IS NULL OR gender = '' OR gender NOT IN ('Male','Female'))`);
+      } else {
+        filters.push(`gender = $${idx}`);
+        params.push(gender);
+        idx++;
+      }
+    }
+    if (ageRange) {
+      if (ageRange === 'unknown') {
+        filters.push(`("ageRange" IS NULL OR "ageRange" = '')`);
+      } else {
+        filters.push(`"ageRange" LIKE $${idx}`);
+        params.push(`${ageRange}%`);
+        idx++;
+      }
+    }
+    if (pvc) {
+      if (pvc === 'Yes') {
+        filters.push(`"isVoter" = 'Yes'`);
+      } else {
+        filters.push(`("isVoter" IS NULL OR "isVoter" != 'Yes')`);
+      }
+    }
+    if (willVote) {
+      if (willVote === 'Yes') {
+        filters.push(`"willVote" = 'Yes'`);
+      } else if (willVote === 'No') {
+        filters.push(`"willVote" = 'No'`);
+      } else {
+        filters.push(`("willVote" IS NULL OR "willVote" = '' OR "willVote" NOT IN ('Yes','No'))`);
+      }
+    }
+    if (profileHealth) {
+      switch (profileHealth) {
+        case 'complete': filters.push(`"profileCompletionPercentage" = 100`); break;
+        case 'high': filters.push(`"profileCompletionPercentage" >= 80 AND "profileCompletionPercentage" < 100`); break;
+        case 'medium': filters.push(`"profileCompletionPercentage" >= 50 AND "profileCompletionPercentage" < 80`); break;
+        case 'low': filters.push(`"profileCompletionPercentage" < 50`); break;
+      }
+    }
+    if (activity) {
+      switch (activity) {
+        case 'active': filters.push(`last_login_at > NOW() - INTERVAL '30 days'`); break;
+        case 'inactive': filters.push(`last_login_at BETWEEN NOW() - INTERVAL '90 days' AND NOW() - INTERVAL '30 days'`); break;
+        case 'dormant': filters.push(`(last_login_at < NOW() - INTERVAL '90 days' OR last_login_at IS NULL)`); break;
+      }
+    }
+    if (lga) {
+      filters.push(`"votingLGA" = $${idx}`);
+      params.push(fromSlug(lga));
+      idx++;
+    }
+    if (search) {
+      filters.push(`(name ILIKE $${idx} OR phone ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    const whereClause = filters.join(' AND ');
+
+    // Allowed sort columns (whitelist to prevent SQL injection)
+    const allowedSorts = { name: 'name', gender: 'gender', ageRange: '"ageRange"', pvc: '"isVoter"', willVote: '"willVote"', lga: '"votingLGA"', profile: '"profileCompletionPercentage"', lastActive: 'last_login_at', createdAt: '"createdAt"' };
+    const sortColumn = allowedSorts[sortBy] || '"createdAt"';
+    const direction = sortDir === 'asc' ? 'ASC' : 'DESC';
+
+    // Count
+    const countSql = `SELECT COUNT(*) FROM users WHERE ${whereClause}`;
+    const countResult = await query(countSql, params);
+    const total = parseInt(countResult.rows[0].count);
+
+    // Paginated data
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const dataSql = `
+      SELECT id, name, phone, email, gender, "ageRange" AS "ageRange", "isVoter", "willVote",
+             "votingState", "votingLGA", "votingWard", "votingPU", "profileCompletionPercentage",
+             "profileImage", "stateOfOrigin", citizenship, designation,
+             last_login_at, "createdAt"
+      FROM users
+      WHERE ${whereClause}
+      ORDER BY ${sortColumn} ${direction} NULLS LAST
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `;
+    params.push(parseInt(limit), offset);
+
+    const dataResult = await query(dataSql, params);
+
+    res.json({
+      success: true,
+      data: dataResult.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        email: row.email || null,
+        gender: row.gender || null,
+        ageRange: row.ageRange || null,
+        isVoter: row.isVoter || null,
+        willVote: row.willVote || null,
+        votingState: row.votingState || null,
+        votingLGA: row.votingLGA || null,
+        votingWard: row.votingWard || null,
+        votingPU: row.votingPU || null,
+        profileCompletionPercentage: row.profileCompletionPercentage || 0,
+        profileImage: row.profileImage || null,
+        stateOfOrigin: row.stateOfOrigin || null,
+        citizenship: row.citizenship || null,
+        designation: row.designation || null,
+        lastActive: row.last_login_at || null,
+        createdAt: row.createdAt
+      })),
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error getting people:', error);
+    res.status(500).json({ success: false, message: 'Failed to get people', error: error.message });
+  }
+};
+
+/**
+ * GET /mobilise-dashboard/:level/:locationId/people/export
+ * CSV export of filtered people.
+ */
+export const exportPeople = async (req, res) => {
+  try {
+    const { level, locationId } = req.params;
+    const { gender, ageRange, pvc, willVote, profileHealth, activity, lga, search } = req.query;
+
+    const { clause, params, nextIdx } = buildLocationScope(level, locationId);
+    let idx = nextIdx;
+    const filters = [clause];
+
+    if (gender) {
+      if (gender === 'unknown') {
+        filters.push(`(gender IS NULL OR gender = '' OR gender NOT IN ('Male','Female'))`);
+      } else {
+        filters.push(`gender = $${idx}`);
+        params.push(gender);
+        idx++;
+      }
+    }
+    if (ageRange) {
+      if (ageRange === 'unknown') {
+        filters.push(`("ageRange" IS NULL OR "ageRange" = '')`);
+      } else {
+        filters.push(`"ageRange" LIKE $${idx}`);
+        params.push(`${ageRange}%`);
+        idx++;
+      }
+    }
+    if (pvc) {
+      if (pvc === 'Yes') {
+        filters.push(`"isVoter" = 'Yes'`);
+      } else {
+        filters.push(`("isVoter" IS NULL OR "isVoter" != 'Yes')`);
+      }
+    }
+    if (willVote) {
+      if (willVote === 'Yes') {
+        filters.push(`"willVote" = 'Yes'`);
+      } else if (willVote === 'No') {
+        filters.push(`"willVote" = 'No'`);
+      } else {
+        filters.push(`("willVote" IS NULL OR "willVote" = '' OR "willVote" NOT IN ('Yes','No'))`);
+      }
+    }
+    if (profileHealth) {
+      switch (profileHealth) {
+        case 'complete': filters.push(`"profileCompletionPercentage" = 100`); break;
+        case 'high': filters.push(`"profileCompletionPercentage" >= 80 AND "profileCompletionPercentage" < 100`); break;
+        case 'medium': filters.push(`"profileCompletionPercentage" >= 50 AND "profileCompletionPercentage" < 80`); break;
+        case 'low': filters.push(`"profileCompletionPercentage" < 50`); break;
+      }
+    }
+    if (activity) {
+      switch (activity) {
+        case 'active': filters.push(`last_login_at > NOW() - INTERVAL '30 days'`); break;
+        case 'inactive': filters.push(`last_login_at BETWEEN NOW() - INTERVAL '90 days' AND NOW() - INTERVAL '30 days'`); break;
+        case 'dormant': filters.push(`(last_login_at < NOW() - INTERVAL '90 days' OR last_login_at IS NULL)`); break;
+      }
+    }
+    if (lga) {
+      filters.push(`"votingLGA" = $${idx}`);
+      params.push(fromSlug(lga));
+      idx++;
+    }
+    if (search) {
+      filters.push(`(name ILIKE $${idx} OR phone ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    const whereClause = filters.join(' AND ');
+
+    const sql = `
+      SELECT name, phone, gender, "ageRange", "isVoter", "willVote",
+             "votingState", "votingLGA", "votingWard", "votingPU",
+             "profileCompletionPercentage", last_login_at, "createdAt"
+      FROM users
+      WHERE ${whereClause}
+      ORDER BY name ASC
+    `;
+    const result = await query(sql, params);
+
+    // Build CSV
+    const headers = ['Name', 'Phone', 'Gender', 'Age Range', 'Has PVC', 'Will Vote', 'State', 'LGA', 'Ward', 'Polling Unit', 'Profile %', 'Last Active', 'Joined'];
+    const rows = result.rows.map(r => [
+      r.name || '',
+      r.phone || '',
+      r.gender || '',
+      r.ageRange || '',
+      r.isVoter || '',
+      r.willVote || '',
+      r.votingState || '',
+      r.votingLGA || '',
+      r.votingWard || '',
+      r.votingPU || '',
+      r.profileCompletionPercentage || 0,
+      r.last_login_at ? new Date(r.last_login_at).toISOString().split('T')[0] : '',
+      r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="members_${level}_${locationId}_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting people:', error);
+    res.status(500).json({ success: false, message: 'Failed to export', error: error.message });
+  }
+};
+

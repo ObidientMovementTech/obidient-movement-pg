@@ -155,7 +155,12 @@ export default function LoginPage() {
           if (redirectAfterLogin.startsWith("/cause/")) {
             localStorage.removeItem("support-cause-code");
           }
-          navigate(needsCompletion ? "/complete-profile" : redirectAfterLogin);
+          if (needsCompletion) {
+            sessionStorage.setItem('post_auth_redirect', redirectAfterLogin);
+            navigate("/complete-profile");
+          } else {
+            navigate(redirectAfterLogin);
+          }
           return;
         }
         const causeCode = localStorage.getItem("support-cause-code");
@@ -218,7 +223,12 @@ export default function LoginPage() {
           if (redirectAfterLogin.startsWith("/cause/")) {
             localStorage.removeItem("support-cause-code");
           }
-          navigate(needsCompletion ? "/complete-profile" : redirectAfterLogin);
+          if (needsCompletion) {
+            sessionStorage.setItem('post_auth_redirect', redirectAfterLogin);
+            navigate("/complete-profile");
+          } else {
+            navigate(redirectAfterLogin);
+          }
           return;
         }
         const causeCode = localStorage.getItem("support-cause-code");
@@ -267,7 +277,7 @@ export default function LoginPage() {
         />
         <p className="account-txt text-dark dark:text-gray-300 text-sm mt-1">
           You don't have an account?{" "}
-          <Link to="/auth/sign-up" className="underline text-accent-green">
+          <Link to={postLoginRedirect ? `/auth/sign-up?redirect=${encodeURIComponent(postLoginRedirect)}` : "/auth/sign-up"} className="underline text-accent-green">
             Sign up
           </Link>
         </p>

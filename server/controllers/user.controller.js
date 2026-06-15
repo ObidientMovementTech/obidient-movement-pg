@@ -739,10 +739,10 @@ export const getProfileCompletion = async (req, res) => {
     }
 
     // Calculate completion percentage manually as fallback
-    // These fields match exactly what the EditProfileModal considers required
+    // These fields match the unified 12-field formula (DB trigger + frontend)
     const requiredFields = [
-      'name', 'phone', 'userName', 'gender', 'ageRange', 'citizenship',
-      'stateOfOrigin', 'votingState', 'votingLGA', 'votingWard', 'isVoter', 'willVote'
+      'profileImage', 'name', 'phone', 'gender', 'ageRange', 'stateOfOrigin',
+      'votingState', 'votingLGA', 'votingWard', 'votingPU', 'isVoter', 'willVote'
     ];
 
     const completedFields = requiredFields.filter(field => {
@@ -760,16 +760,16 @@ export const getProfileCompletion = async (req, res) => {
     // Debug logging to see exactly what fields are missing
     console.log('🔍 Profile completion debug for user:', userId);
     console.log('📊 Field status:', {
+      profileImage: user.profileImage || 'MISSING',
       name: user.name || 'MISSING',
       phone: user.phone || 'MISSING',
-      userName: user.userName || 'MISSING',
       gender: user.gender || 'MISSING',
       ageRange: user.ageRange || 'MISSING',
-      citizenship: user.citizenship || 'MISSING',
       stateOfOrigin: user.stateOfOrigin || 'MISSING',
       votingState: user.votingState || 'MISSING',
       votingLGA: user.votingLGA || 'MISSING',
       votingWard: user.votingWard || 'MISSING',
+      votingPU: user.votingPU || 'MISSING',
       isVoter: user.isVoter || 'MISSING',
       willVote: user.willVote || 'MISSING'
     });
@@ -787,16 +787,16 @@ export const getProfileCompletion = async (req, res) => {
         missingFields: missingFields,
         // Add field details for debugging
         fieldDetails: {
+          profileImage: user.profileImage || null,
           name: user.name || null,
           phone: user.phone || null,
-          userName: user.userName || null,
           gender: user.gender || null,
           ageRange: user.ageRange || null,
-          citizenship: user.citizenship || null,
           stateOfOrigin: user.stateOfOrigin || null,
           votingState: user.votingState || null,
           votingLGA: user.votingLGA || null,
           votingWard: user.votingWard || null,
+          votingPU: user.votingPU || null,
           isVoter: user.isVoter || null,
           willVote: user.willVote || null
         }
