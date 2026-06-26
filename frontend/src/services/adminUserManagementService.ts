@@ -30,6 +30,7 @@ interface UserProfileUpdate {
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
+  movementEmail?: string | null;
 }
 
 interface UserCreation {
@@ -61,7 +62,6 @@ interface UserCreation {
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
-  movementEmail?: string | null;
 
   // Admin Assignment (removed designation for now)
   assignedState?: string;
