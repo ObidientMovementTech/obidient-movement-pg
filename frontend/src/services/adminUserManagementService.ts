@@ -61,6 +61,7 @@ interface UserCreation {
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
+  movementEmail?: string | null;
 
   // Admin Assignment (removed designation for now)
   assignedState?: string;

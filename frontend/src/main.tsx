@@ -31,6 +31,7 @@ const NewsletterUnsubscribePage = lazy(() => import("./pages/public/NewsletterUn
 const ContactPage = lazy(() => import("./pages/public/ContactPage.tsx"));
 const LeadersPage = lazy(() => import("./pages/public/LeadersPage.tsx"));
 const PeterObiPage = lazy(() => import("./pages/public/PeterObiPage.tsx"));
+const LeaderDetailPage = lazy(() => import("./pages/public/LeaderDetailPage.tsx"));
 const GetInvolvedPage = lazy(() => import("./pages/public/GetInvolvedPage.tsx"));
 const GalleryPage = lazy(() => import("./pages/public/GalleryPage.tsx"));
 const PrivacyPage = lazy(() => import("./pages/public/PrivacyPage.tsx"));
@@ -161,6 +162,7 @@ const router = createBrowserRouter([
       { path: "contact", element: <ContactPage /> },
       { path: "leaders", element: <LeadersPage /> },
       { path: "leaders/peter-obi", element: <PeterObiPage /> },
+      { path: "leaders/:id", element: <LeaderDetailPage /> },
       { path: "get-involved", element: <GetInvolvedPage /> },
       { path: "gallery", element: <GalleryPage /> },
       { path: "privacy", element: <PrivacyPage /> },

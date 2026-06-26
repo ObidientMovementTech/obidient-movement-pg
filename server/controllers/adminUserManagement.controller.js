@@ -6,6 +6,7 @@ import { generateOTP } from '../utils/otpUtils.js';
 import { sendOTPEmail, sendConfirmationEmail } from '../utils/emailHandler.js';
 import VotingBloc from '../models/votingBloc.model.js';
 import DefaultVotingBlocSettings from '../models/defaultVotingBlocSettings.model.js';
+import { generateUniqueSlug } from '../utils/slugify.js';
 import { auditLog } from '../utils/auditLog.js';
 
 export const adminUserManagementController = {
@@ -77,6 +78,7 @@ export const adminUserManagementController = {
           u.id, u.name, u.email, u.phone, u.role, u."emailVerified", u."kycStatus",
           u."profileImage", u."countryOfResidence", u."votingState", u."votingLGA",
           u.designation, u."assignedState", u."assignedLGA", u."assignedWard",
+          u."assignedDirectorate", u."assignedCountry", u."movementEmail",
           u."createdAt", u."updatedAt"
         FROM users u
         ${whereClause}
@@ -496,7 +498,8 @@ export const adminUserManagementController = {
         personalInfo,
         bankName,
         bankAccountNumber,
-        bankAccountName
+        bankAccountName,
+        movementEmail
       } = req.body;
 
       const client = await getClient();
@@ -534,6 +537,7 @@ export const adminUserManagementController = {
         addField('bankName', bankName, true);
         addField('bankAccountNumber', bankAccountNumber, true);
         addField('bankAccountName', bankAccountName, true);
+        addField('movementEmail', movementEmail, true);
 
         // Boolean/enum fields — use !== undefined check
         if (isVoter !== undefined) {
@@ -1606,17 +1610,25 @@ export const adminUserManagementController = {
       const isDiaspora = designation === 'Diaspora Coordinator';
       const isDirectorate = designation === 'Directorate Head';
       const isLocationless = isDiaspora || isDirectorate;
+
+      const profileSlug = await generateUniqueSlug(userResult.rows[0].name, designation, {
+        assignedState: isLocationless ? null : assignedState,
+        assignedCountry: isDiaspora ? assignedCountry : null,
+        assignedDirectorate: isDirectorate ? assignedDirectorate : null,
+      }, userId);
+
       const updateResult = await query(
-        `UPDATE users 
-         SET designation = $1, 
-             "assignedState" = $2, 
-             "assignedLGA" = $3, 
+        `UPDATE users
+         SET designation = $1,
+             "assignedState" = $2,
+             "assignedLGA" = $3,
              "assignedWard" = $4,
              "assignedCountry" = $5,
              "assignedDirectorate" = $6,
+             "profileSlug" = $7,
              "updatedAt" = NOW()
-         WHERE id = $7
-         RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry", "assignedDirectorate"`,
+         WHERE id = $8
+         RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry", "assignedDirectorate", "profileSlug"`,
         [
           designation,
           isLocationless ? null : assignedState,
@@ -1624,6 +1636,7 @@ export const adminUserManagementController = {
           isLocationless ? null : assignedWard,
           isDiaspora ? assignedCountry : null,
           isDirectorate ? assignedDirectorate : null,
+          profileSlug,
           userId
         ]
       );

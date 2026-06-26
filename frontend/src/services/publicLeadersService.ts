@@ -11,6 +11,32 @@ export interface PublicLeader {
   assignedLGA: string | null;
   assignedWard: string | null;
   profileImage: string | null;
+  profileSlug: string | null;
+}
+
+export interface DirectorateLeader {
+  id: string;
+  name: string;
+  phone: string | null;
+  designation: string;
+  assignedDirectorate: string;
+  profileImage: string | null;
+  profileSlug: string | null;
+}
+
+export interface PublicLeaderProfile {
+  id: string;
+  name: string;
+  phone: string | null;
+  designation: string;
+  assignedState: string | null;
+  assignedLGA: string | null;
+  assignedWard: string | null;
+  assignedCountry: string | null;
+  assignedDirectorate: string | null;
+  profileImage: string | null;
+  profileSlug: string | null;
+  movementEmail: string | null;
 }
 
 export interface PublicLeadersResponse {
@@ -18,6 +44,10 @@ export interface PublicLeadersResponse {
   total: number;
   page: number;
   pages: number;
+}
+
+export interface DirectorateLeadersResponse {
+  leaders: DirectorateLeader[];
 }
 
 export interface LeaderStatsResponse {
@@ -37,6 +67,16 @@ export interface LeadersQuery {
 
 export const getPublicLeaders = async (params?: LeadersQuery): Promise<PublicLeadersResponse> => {
   const res = await axios.get(`${API_BASE}/api/public/leaders`, { params });
+  return res.data;
+};
+
+export const getDirectorateHeads = async (): Promise<DirectorateLeadersResponse> => {
+  const res = await axios.get(`${API_BASE}/api/public/leaders/directorates`);
+  return res.data;
+};
+
+export const getPublicLeaderBySlug = async (slug: string): Promise<PublicLeaderProfile> => {
+  const res = await axios.get(`${API_BASE}/api/public/leaders/${slug}`);
   return res.data;
 };
 

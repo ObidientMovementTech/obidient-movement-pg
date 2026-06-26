@@ -1,6 +1,7 @@
 import { query, pool } from '../config/db.js';
 import { sendPushNotification } from '../services/pushNotificationService.js';
 import { bustLeadersCache } from '../routes/publicLeaders.routes.js';
+import { generateUniqueSlug } from '../utils/slugify.js';
 
 // ── Designation hierarchy (higher index = higher rank) ────────────
 const DESIGNATION_RANK = {
@@ -218,7 +219,7 @@ export const assignDesignation = async (req, res) => {
       // If overriding, demote the existing head
       if (existingHead.rows.length > 0 && override) {
         await query(
-          `UPDATE users SET designation = 'Community Member', "assignedDirectorate" = NULL, "updatedAt" = NOW() WHERE id = $1`,
+          `UPDATE users SET designation = 'Community Member', "assignedDirectorate" = NULL, "profileSlug" = NULL, "updatedAt" = NOW() WHERE id = $1`,
           [existingHead.rows[0].id]
         );
       }
@@ -278,6 +279,16 @@ export const assignDesignation = async (req, res) => {
 
     // Perform the assignment
     const isLocationless = isDiasporaAssignment || isDirectorateAssignment;
+
+    // Fetch user name for slug generation
+    const nameResult = await query(`SELECT name FROM users WHERE id = $1`, [userId]);
+    const userName = nameResult.rows[0]?.name || '';
+    const profileSlug = await generateUniqueSlug(userName, designation, {
+      assignedState: isLocationless ? null : (assignedState || null),
+      assignedCountry: isDiasporaAssignment ? assignedCountry : null,
+      assignedDirectorate: isDirectorateAssignment ? assignedDirectorate : null,
+    }, userId);
+
     const updateResult = await query(
       `UPDATE users
        SET designation = $1,
@@ -286,9 +297,10 @@ export const assignDesignation = async (req, res) => {
            "assignedWard" = $4,
            "assignedCountry" = $5,
            "assignedDirectorate" = $6,
+           "profileSlug" = $7,
            "updatedAt" = NOW()
-       WHERE id = $7
-       RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry", "assignedDirectorate"`,
+       WHERE id = $8
+       RETURNING id, name, designation, "assignedState", "assignedLGA", "assignedWard", "assignedCountry", "assignedDirectorate", "profileSlug"`,
       [
         designation,
         isLocationless ? null : (assignedState || null),
@@ -296,6 +308,7 @@ export const assignDesignation = async (req, res) => {
         isLocationless ? null : (assignedWard || null),
         isDiasporaAssignment ? assignedCountry : null,
         isDirectorateAssignment ? assignedDirectorate : null,
+        profileSlug,
         userId,
       ],
     );
@@ -526,6 +539,7 @@ export const removeDesignation = async (req, res) => {
            "assignedWard" = NULL,
            "assignedCountry" = NULL,
            "assignedDirectorate" = NULL,
+           "profileSlug" = NULL,
            "updatedAt" = NOW()
        WHERE id = $1
        RETURNING id, name, designation`,

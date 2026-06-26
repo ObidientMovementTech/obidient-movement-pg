@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import SEOHead from '../../components/public/SEOHead';
 import GradientCTA from '../../components/ui/GradientCTA';
-import { getPublicLeaders, type PublicLeader } from '../../services/publicLeadersService';
+import { getPublicLeaders, getDirectorateHeads, type PublicLeader, type DirectorateLeader } from '../../services/publicLeadersService';
 import { PETER_OBI } from '../../data/leaderProfiles';
 import leaderImg from '../../assets/images/po2.webp';
 import rallyImg from '../../assets/images/po5.jpeg';
@@ -46,14 +46,29 @@ const orgStructure = [
   { title: 'Polling Unit', count: '176,846', icon: '🗳️' },
 ];
 
+const DIRECTORATE_LABELS: Record<string, string> = {
+  operations: 'Operations',
+  political_engagement: 'Political Engagement',
+  legal: 'Legal',
+  technology: 'Technology',
+  communications: 'Communications',
+  mobilisation: 'Mobilisation',
+  finance: 'Finance',
+  research: 'Research',
+  diaspora_engagement: 'Diaspora Engagement',
+};
+
 const LeadersPage = () => {
   const [leaders, setLeaders] = useState<PublicLeader[]>([]);
+  const [directorateHeads, setDirectorateHeads] = useState<DirectorateLeader[]>([]);
   const [loading, setLoading] = useState(true);
   const [zoneFilter, setZoneFilter] = useState<string>('all');
 
   useEffect(() => {
-    getPublicLeaders()
-      .then((res) => setLeaders(res.leaders))
+    Promise.all([
+      getPublicLeaders().then((res) => setLeaders(res.leaders)),
+      getDirectorateHeads().then((res) => setDirectorateHeads(res.leaders)),
+    ])
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -301,7 +316,77 @@ const LeadersPage = () => {
         </div>
       </section>
 
-      {/* ── 5. STATE COORDINATORS ──────────────────────────── */}
+      {/* ── 5. DIRECTORATE LEADERSHIP ──────────────────────── */}
+      {directorateHeads.length > 0 && (
+        <section className="py-20 lg:py-24 bg-gray-50/50 dark:bg-secondary-light/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-12">
+              <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-accent-green font-semibold">
+                <span className="w-8 h-px bg-accent-green" />
+                Directorate Leadership
+              </span>
+              <h2 className="mt-2 text-2xl lg:text-3xl font-medium text-text-light dark:text-text-dark tracking-tight">
+                Heads of Directorate
+              </h2>
+              <p className="mt-2 text-sm text-text-muted">Specialist leaders driving each functional area of the movement.</p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {directorateHeads.map((head) => (
+                <Link
+                  key={head.id}
+                  to={`/leaders/${head.profileSlug ?? head.id}`}
+                  className="group relative bg-white dark:bg-secondary-light rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-accent-green/40 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-accent-green/5"
+                >
+                  {/* Image */}
+                  <div className="relative h-72 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                    {head.profileImage ? (
+                      <img
+                        src={head.profileImage}
+                        alt={head.name}
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-6xl font-light text-gray-300 dark:text-gray-600">
+                          {head.name.charAt(0)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute top-4 left-4">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-green/90 text-white text-[11px] font-semibold uppercase tracking-wider backdrop-blur-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                        Directorate
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6">
+                    <h3 className="text-xl font-semibold text-text-light dark:text-text-dark group-hover:text-accent-green transition-colors">
+                      {head.name}
+                    </h3>
+                    <p className="mt-1 text-sm text-accent-green/80 font-medium">
+                      Head of {DIRECTORATE_LABELS[head.assignedDirectorate] ?? head.assignedDirectorate} Directorate
+                    </p>
+                    <span className="mt-4 inline-flex items-center gap-1 text-xs text-text-muted group-hover:text-accent-green transition-colors">
+                      View profile
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </span>
+                  </div>
+
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-accent-green via-accent-green/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── 6. STATE COORDINATORS ──────────────────────────── */}
       <section className="py-20 lg:py-24 bg-gray-50/50 dark:bg-secondary-light/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">

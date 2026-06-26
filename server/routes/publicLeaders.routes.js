@@ -8,6 +8,7 @@ const VALID_DESIGNATIONS = [
   'State Coordinator',
   'LGA Coordinator',
   'Ward Coordinator',
+  'Directorate Head',
 ];
 
 /* ─── In-memory cache (TTL: 5 minutes) ─── */
@@ -98,7 +99,7 @@ router.get('/leaders', async (req, res) => {
     // Data query
     const dataResult = await query(
       `SELECT id, name, phone, designation, "assignedState", "assignedLGA", "assignedWard",
-              "profileImage"
+              "profileImage", "profileSlug"
        FROM users
        ${whereClause}
        ORDER BY
@@ -123,6 +124,7 @@ router.get('/leaders', async (req, res) => {
       assignedLGA: row.assignedLGA,
       assignedWard: row.assignedWard,
       profileImage: row.profileImage,
+      profileSlug: row.profileSlug,
     }));
 
     const response = { leaders, total, page, pages: Math.ceil(total / limit) };
@@ -131,6 +133,44 @@ router.get('/leaders', async (req, res) => {
   } catch (err) {
     console.error('Public leaders fetch error:', err);
     res.status(500).json({ message: 'Failed to fetch leaders' });
+  }
+});
+
+/**
+ * GET /api/public/leaders/directorates
+ * Public endpoint — returns all assigned Directorate Heads.
+ * Returns empty array (not 404) when no one is assigned.
+ */
+router.get('/leaders/directorates', async (req, res) => {
+  try {
+    const cacheKey = 'leaders:directorates';
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    const result = await query(
+      `SELECT id, name, phone, designation, "assignedDirectorate", "profileImage", "profileSlug"
+       FROM users
+       WHERE designation = 'Directorate Head'
+         AND "assignedDirectorate" IS NOT NULL
+       ORDER BY "assignedDirectorate" ASC, name ASC`
+    );
+
+    const response = {
+      leaders: result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        designation: row.designation,
+        assignedDirectorate: row.assignedDirectorate,
+        profileImage: row.profileImage,
+        profileSlug: row.profileSlug,
+      })),
+    };
+    setCache(cacheKey, response);
+    res.json(response);
+  } catch (err) {
+    console.error('Directorate heads fetch error:', err);
+    res.status(500).json({ message: 'Failed to fetch directorate heads' });
   }
 });
 
@@ -178,6 +218,56 @@ router.get('/leaders/stats', async (req, res) => {
   } catch (err) {
     console.error('Public leaders stats error:', err);
     res.status(500).json({ message: 'Failed to fetch leader stats' });
+  }
+});
+
+/**
+ * GET /api/public/leaders/:slug
+ * Public endpoint — single leader profile by profileSlug.
+ * Must be declared AFTER all static sub-paths (/stats, /directorates).
+ */
+router.get('/leaders/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const cacheKey = `leaders:profile:${slug}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    const result = await query(
+      `SELECT id, name, phone, designation,
+              "assignedState", "assignedLGA", "assignedWard",
+              "assignedCountry", "assignedDirectorate", "profileImage", "profileSlug", "movementEmail"
+       FROM users
+       WHERE "profileSlug" = $1
+         AND designation = ANY($2)`,
+      [slug, VALID_DESIGNATIONS]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Leader not found' });
+    }
+
+    const row = result.rows[0];
+    const leader = {
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      designation: row.designation,
+      assignedState: row.assignedState,
+      assignedLGA: row.assignedLGA,
+      assignedWard: row.assignedWard,
+      assignedCountry: row.assignedCountry,
+      assignedDirectorate: row.assignedDirectorate,
+      profileImage: row.profileImage,
+      profileSlug: row.profileSlug,
+      movementEmail: row.movementEmail,
+    };
+
+    setCache(cacheKey, leader);
+    res.json(leader);
+  } catch (err) {
+    console.error('Public leader profile fetch error:', err);
+    res.status(500).json({ message: 'Failed to fetch leader profile' });
   }
 });
 

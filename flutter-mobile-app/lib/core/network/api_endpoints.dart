@@ -158,6 +158,14 @@ class ApiEndpoints {
   static String mobiliseDashboardPU(String puId) =>
       '/mobilise-dashboard/polling-unit/$puId';
 
+  // Analytics endpoints
+  static String mobiliseDashboardDemographics(String level, String locationId) =>
+      '/mobilise-dashboard/$level/$locationId/demographics';
+  static String mobiliseDashboardPeople(String level, String locationId) =>
+      '/mobilise-dashboard/$level/$locationId/people';
+  static String mobiliseDashboardPeopleExport(String level, String locationId) =>
+      '/mobilise-dashboard/$level/$locationId/people/export';
+
   // ── Coordinator (/api/coordinator) ───────────────────────────
   static const coordinatorSearch = '/api/coordinator/search';
   static const coordinatorAssign = '/api/coordinator/assign';

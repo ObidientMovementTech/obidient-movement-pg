@@ -63,6 +63,9 @@ interface User {
   assignedState?: string;
   assignedLGA?: string;
   assignedWard?: string;
+  assignedDirectorate?: string;
+  assignedCountry?: string;
+  movementEmail?: string;
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
@@ -94,6 +97,9 @@ interface EditModalState {
   assignedState: string;
   assignedLGA: string;
   assignedWard: string;
+  assignedDirectorate: string;
+  assignedCountry: string;
+  movementEmail: string;
   bankName: string;
   bankAccountNumber: string;
   bankAccountName: string;
@@ -143,6 +149,9 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     assignedState: '',
     assignedLGA: '',
     assignedWard: '',
+    assignedDirectorate: '',
+    assignedCountry: '',
+    movementEmail: '',
     bankName: '',
     bankAccountNumber: '',
     bankAccountName: ''
@@ -203,6 +212,9 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
         assignedState: user.assignedState || '',
         assignedLGA: user.assignedLGA || '',
         assignedWard: user.assignedWard || '',
+        assignedDirectorate: user.assignedDirectorate || '',
+        assignedCountry: user.assignedCountry || '',
+        movementEmail: user.movementEmail || '',
         bankName: user.bankName || '',
         bankAccountNumber: user.bankAccountNumber || '',
         bankAccountName: user.bankAccountName || ''
@@ -240,7 +252,8 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
         kycStatus: formData.kycStatus,
         bankName: formData.bankName || undefined,
         bankAccountNumber: formData.bankAccountNumber || undefined,
-        bankAccountName: formData.bankAccountName || undefined
+        bankAccountName: formData.bankAccountName || undefined,
+        movementEmail: formData.movementEmail || null
       });
     } catch (error: any) {
       console.error('Profile update failed:', error);
@@ -258,8 +271,8 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
           assignedState: isLocationless ? null : (assignLocations.selectedState?.name || null),
           assignedLGA: isLocationless ? null : (assignLocations.selectedLGA?.name || null),
           assignedWard: isLocationless ? null : (assignLocations.selectedWard?.name || null),
-          assignedCountry: isDiaspora ? (formData as any).assignedCountry || null : null,
-          assignedDirectorate: isDirectorate ? (formData as any).assignedDirectorate || null : null
+          assignedCountry: isDiaspora ? formData.assignedCountry || null : null,
+          assignedDirectorate: isDirectorate ? formData.assignedDirectorate || null : null
         });
       } catch (error: any) {
         console.error('Designation update failed:', error);
@@ -657,7 +670,7 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                 <FormControl size="small" fullWidth>
                   <InputLabel sx={{ fontFamily: FONT }}>Country</InputLabel>
                   <Select
-                    value={(formData as any).assignedCountry || ''}
+                    value={formData.assignedCountry || ''}
                     label="Country"
                     onChange={(e) => setFormData(prev => ({ ...prev, assignedCountry: e.target.value }))}
                     sx={{ fontFamily: FONT }}
@@ -685,7 +698,7 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                 <FormControl size="small" fullWidth>
                   <InputLabel sx={{ fontFamily: FONT }}>Directorate</InputLabel>
                   <Select
-                    value={(formData as any).assignedDirectorate || ''}
+                    value={formData.assignedDirectorate || ''}
                     label="Directorate"
                     onChange={(e) => setFormData(prev => ({ ...prev, assignedDirectorate: e.target.value }))}
                     sx={{ fontFamily: FONT }}
@@ -695,6 +708,17 @@ const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                     ))}
                   </Select>
                 </FormControl>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Movement Email (optional)"
+                  placeholder="e.g. firstname@obidients.com"
+                  value={formData.movementEmail || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, movementEmail: e.target.value }))}
+                  sx={{ fontFamily: FONT }}
+                  InputProps={{ sx: { fontFamily: FONT, fontSize: '0.85rem' } }}
+                  InputLabelProps={{ sx: { fontFamily: FONT } }}
+                />
                 <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#b45309' }}>
                   This person will lead the selected directorate. Only one head per directorate is allowed.
                 </Typography>

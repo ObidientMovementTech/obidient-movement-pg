@@ -7,6 +7,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/dashboard_data.dart';
 import '../providers/dashboard_providers.dart';
+import 'analytics_tab_view.dart';
 
 class StateDashboardScreen extends ConsumerStatefulWidget {
   const StateDashboardScreen({super.key});
@@ -18,6 +19,7 @@ class StateDashboardScreen extends ConsumerStatefulWidget {
 
 class _StateDashboardScreenState extends ConsumerState<StateDashboardScreen> {
   String _search = '';
+  String _activeTab = 'analytics';
 
   @override
   void initState() {
@@ -114,37 +116,24 @@ class _StateDashboardScreenState extends ConsumerState<StateDashboardScreen> {
                 onTap: (bc) => _navigateToBreadcrumb(bc),
               ),
 
-            // ── Stats cards ─────────────────────────────
-            if (dashState.response != null && !dashState.loading)
-              _StatsRow(stats: dashState.response!.stats, theme: theme),
-
-            // ── Search ──────────────────────────────────
+            // ── Tab toggle ──────────────────────────────
             if (dashState.response != null && !dashState.loading)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  onChanged: (v) => setState(() => _search = v),
-                  style: TextStyle(
-                      fontSize: 14, color: theme.colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name…',
-                    hintStyle: TextStyle(
-                        color:
-                            theme.colorScheme.onSurface.withOpacity(0.3)),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        size: 18,
-                        color:
-                            theme.colorScheme.onSurface.withOpacity(0.3)),
-                    filled: true,
-                    fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: Row(
+                  children: [
+                    _TabPill(
+                      label: 'Analytics',
+                      isActive: _activeTab == 'analytics',
+                      onTap: () => setState(() => _activeTab = 'analytics'),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    _TabPill(
+                      label: 'Locations',
+                      isActive: _activeTab == 'locations',
+                      onTap: () => setState(() => _activeTab = 'locations'),
+                    ),
+                  ],
                 ),
               ),
 
@@ -156,12 +145,61 @@ class _StateDashboardScreenState extends ConsumerState<StateDashboardScreen> {
                       ? _buildError(theme, dashState.error!)
                       : dashState.response == null
                           ? _buildSkeleton(theme)
-                          : _buildList(
-                              theme, dashState.response!, userLevelAsync),
+                          : _activeTab == 'analytics'
+                              ? _buildAnalyticsTab(dashState.response!)
+                              : _buildLocationsTab(theme, dashState.response!, userLevelAsync),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAnalyticsTab(DashboardResponse data) {
+    // Derive level + locationId from current breadcrumbs
+    final level = data.level;
+    final lastBc = data.breadcrumbs.isNotEmpty ? data.breadcrumbs.last : null;
+    final locationId = lastBc?.id ?? 'national';
+    final locationName = lastBc?.name;
+
+    return AnalyticsTabView(
+      key: ValueKey('$level-$locationId'),
+      level: level,
+      locationId: locationId,
+      locationName: locationName,
+    );
+  }
+
+  Widget _buildLocationsTab(ThemeData theme, DashboardResponse data,
+      AsyncValue<UserLevelInfo> userLevelAsync) {
+    return Column(
+      children: [
+        // Stats cards
+        _StatsRow(stats: data.stats, theme: theme),
+        // Search
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            onChanged: (v) => setState(() => _search = v),
+            style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface),
+            decoration: InputDecoration(
+              hintText: 'Search by name…',
+              hintStyle: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.3)),
+              prefixIcon: Icon(Icons.search_rounded, size: 18,
+                color: theme.colorScheme.onSurface.withOpacity(0.3)),
+              filled: true,
+              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        // List
+        Expanded(child: _buildList(theme, data, userLevelAsync)),
+      ],
     );
   }
 
@@ -327,6 +365,41 @@ class _IconBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+      ),
+    );
+  }
+}
+
+class _TabPill extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+  const _TabPill({required this.label, required this.isActive, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? AppColors.primary : Theme.of(context).colorScheme.outline.withOpacity(0.15),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isActive ? Colors.white : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+          ),
+        ),
       ),
     );
   }
